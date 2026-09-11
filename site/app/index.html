@@ -21636,6 +21636,7 @@ function App() {
       h("button", { className: "iconbtn", title: "My assignments and allowances", onClick: function () { setMyWork(true); } }, "◱"),
       can(user, "manageClientsProjects") || can(user, "viewAuditLog") || can(user, "backupRestore") || can(user, "assignTasks")
         ? h("button", { className: "iconbtn", title: "Lists & data administration", onClick: function () { setAdmin(true); } }, "⚙") : null,
+      h("a", { className: "iconbtn", style: { textDecoration: "none", fontWeight: 700 }, href: "../handbook/index.html", target: "_blank", rel: "noopener", title: "Help — open the WorkDesk Handbook" }, "?"),
       h("button", { className: "who iconbtn", style: { minWidth: 0, padding: "0 8px", gap: 9 }, onClick: function () { setProfile(true); }, title: "My profile" },
         h("span", { className: "avatar", style: user.photoUrl ? { backgroundImage: "url(" + user.photoUrl + ")", backgroundSize: "cover" } : null }, user.photoUrl ? "" : initialsOf(user.fullName)),
         h("span", { className: "nm col", style: { alignItems: "flex-start", gap: 0 } },
