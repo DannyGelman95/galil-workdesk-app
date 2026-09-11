@@ -1,10 +1,10 @@
-name: Deploy GALIL WorkDesk to GitHub Pages
+name: Deploy GALIL site to GitHub Pages
 
 on:
   push:
     branches: [main]
     paths:
-      - "public/**"
+      - "site/**"
       - ".github/workflows/deploy-pages.yml"
   workflow_dispatch:
 
@@ -30,7 +30,7 @@ jobs:
       - name: Upload pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: public
+          path: site
 
       - name: Deploy to GitHub Pages
         id: deployment

@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GALIL WorkDesk — Handbook</title>
+<meta name="description" content="User guide for GALIL WorkDesk: time tracking, planning, tasks, expenses, approvals, budgets and administration.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@400;500;600;700&family=Noto+Sans+Mono:wght@400;600&family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'%3E%3Cpath d='M78 34H42a10 10 0 00-10 10v152a10 10 0 0010 10h36' fill='none' stroke='%231F3D24' stroke-width='18' stroke-linecap='round'/%3E%3Cpath d='M162 34h36a10 10 0 0110 10v152a10 10 0 01-10 10h-36' fill='none' stroke='%231F3D24' stroke-width='18' stroke-linecap='round'/%3E%3Cpath d='M148 92A44 44 0 10152 148V122H122' fill='none' stroke='%238CC63E' stroke-width='20' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/styles.css">
+</head>
+<body>
+
+<header id="hdr">
+  <div class="wrap bar">
+    <a class="brand" href="../index.html" aria-label="GALIL home">
+      <svg viewBox="0 0 240 240" aria-hidden="true">
+        <path d="M78 34H42a10 10 0 00-10 10v152a10 10 0 0010 10h36" fill="none" stroke="#1F3D24" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M162 34h36a10 10 0 0110 10v152a10 10 0 01-10 10h-36" fill="none" stroke="#1F3D24" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M148 92A44 44 0 10152 148V122H122" fill="none" stroke="#8CC63E" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <b>GALIL</b>
+    </a>
+    <nav class="main" id="nav">
+      <span style="color:var(--steel);font-size:15px;padding:6px 0">WorkDesk Handbook</span>
+    </nav>
+    <a class="btn btn-line btn-ghost" href="../app/index.html">← Back to WorkDesk</a>
+    <button class="burger" id="burger" aria-expanded="false" aria-controls="nav" aria-label="Menu">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M3 6h18M3 12h18M3 18h18"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="pagehead">
+  <div class="wrap">
+    <div class="rev">GALIL WorkDesk · Handbook</div>
+    <h1>Everything the app can do, explained.</h1>
+    <p class="lede">This is the same handbook you can open from inside WorkDesk — look for the <strong>?</strong> button next to your profile in the top bar. Use the menu to jump to any topic.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap hb-body">
+    <nav class="hb-toc" id="toc" aria-label="Handbook contents">
+      <div class="grp">Getting started</div>
+      <a href="#signing-in">Signing in &amp; accounts</a>
+      <a href="#roles">Roles &amp; what you can see</a>
+      <a href="#topbar">The top bar &amp; tabs</a>
+
+      <div class="grp">Day to day</div>
+      <a href="#time-log">Time Log</a>
+      <a href="#planner">Week Planner</a>
+      <a href="#tasks">Tasks</a>
+      <a href="#expenses">Expenses</a>
+      <a href="#my-work">My assignments &amp; allowances</a>
+
+      <div class="grp">Management</div>
+      <a href="#approvals">Approvals</a>
+      <a href="#budgets">Budgets &amp; Work Orders</a>
+      <a href="#dashboard">Dashboard</a>
+
+      <div class="grp">Reference</div>
+      <a href="#library">Library</a>
+      <a href="#admin">Lists &amp; data administration</a>
+      <a href="#backup">Backup &amp; restore</a>
+      <a href="#export">Excel export</a>
+
+      <div class="grp">Help</div>
+      <a href="#faq">Troubleshooting &amp; FAQ</a>
+    </nav>
+
+    <div class="hb-content">
+
+      <section class="doc" id="signing-in">
+        <h2>Signing in &amp; accounts</h2>
+        <p>WorkDesk is restricted to <code class="k">@galiltc.co.il</code> email addresses. From the sign-in screen you can either sign in with a password, or use the simulated "Sign in with Microsoft" account picker.</p>
+        <p>Don't have an account yet? Use <strong>Create account</strong> on the sign-in screen. New accounts start in a <strong>pending activation</strong> state — someone with People-management rights (Operations Manager or CEO) needs to activate you before you can use the app. Self-selectable roles at sign-up are Employee, Senior Employee and Team Lead; anything above that (Project Manager and up) is assigned by an administrator afterwards.</p>
+        <div class="hb-callout"><b>Note</b> — WorkDesk doesn't have a live server yet. Sign-in and the whole database are simulated in your browser (see <a href="#backup">Backup &amp; restore</a>). Real Microsoft Entra ID sign-in is on the roadmap.</div>
+      </section>
+
+      <section class="doc" id="roles">
+        <h2>Roles &amp; what you can see</h2>
+        <p>Every account has exactly one role, and the role decides which tabs you see and whose records you can view, edit or approve.</p>
+        <table class="hb-table">
+          <thead><tr><th>Role</th><th>Can generally do</th></tr></thead>
+          <tbody>
+            <tr><td>Employee</td><td>Report own time, plan own week, report own expenses, work assigned tasks, write to the Library.</td></tr>
+            <tr><td>Senior Employee</td><td>As Employee, plus create draft tasks within assigned projects and see the full task board.</td></tr>
+            <tr><td>Team Lead</td><td>As Senior Employee, plus approve time and expenses for their team and manage task assignment.</td></tr>
+            <tr><td>Project Manager</td><td>As Team Lead, plus own projects, work orders, budgets and assignments.</td></tr>
+            <tr><td>Operations Manager</td><td>As Project Manager, but across all clients — manages master lists, employees, roles and company settings.</td></tr>
+            <tr><td>Finance</td><td>Read-only across budgets, expenses, work orders and exports. Cannot approve time.</td></tr>
+            <tr><td>CEO / Owner</td><td>Full access, including role assignment, deletion, the audit log and company settings.</td></tr>
+            <tr><td>External Contractor</td><td>Reports time only against work orders they're explicitly assigned to. No budgets, Library or Dashboard.</td></tr>
+            <tr><td>Viewer</td><td>Read-only dashboard access for a named stakeholder. No reporting rights.</td></tr>
+          </tbody>
+        </table>
+        <p>The exact permission matrix (down to "own team only" vs. "own projects only" scopes) is visible to admins in <a href="#admin">Lists &amp; data administration → Roles &amp; permissions</a>.</p>
+      </section>
+
+      <section class="doc" id="topbar">
+        <h2>The top bar &amp; tabs</h2>
+        <p>The dark bar at the top of WorkDesk is always visible. From left to right:</p>
+        <ul>
+          <li>The GALIL WorkDesk mark, and an <strong>Offline</strong> chip if your browser has lost its connection (your changes are still cached locally and will sync once you're back online).</li>
+          <li><strong>◱ My assignments and allowances</strong> — your personal list of budgeted work.</li>
+          <li><strong>⚙ Lists &amp; data administration</strong> — only shown if your role can manage clients/projects, view the audit log, back up data, or assign tasks.</li>
+          <li><strong>? Help</strong> — opens this handbook in a new tab, from anywhere in the app.</li>
+          <li>Your avatar and name — opens <strong>My profile</strong>.</li>
+        </ul>
+        <p>Below that is the tab bar. Which tabs you see depends on your role and permissions: Time Log, Week Planner, Tasks, Expenses, Budgets, Approvals, Dashboard and Library. A small badge on <strong>Approvals</strong> shows how many requests are waiting on you; a badge on <strong>Tasks</strong> shows how many of your tasks are overdue.</p>
+      </section>
+
+      <section class="doc" id="time-log">
+        <h2>Time Log</h2>
+        <p>This is where you report how a day was spent. Every entry has a date and a type — <strong>Work</strong>, <strong>Sick</strong> or <strong>Vacation</strong>. Work entries are timed (start/end, or a manual hour count) and split into two hour "colours":</p>
+        <ul>
+          <li><strong>Red hours</strong> — internal / company time, not billed to a client.</li>
+          <li><strong>Yellow hours</strong> — client-billable time, and require a client, project and (usually) a work order.</li>
+        </ul>
+        <p>You can attach a task, add a description and notes, and link a project status update to the same entry. Entries move through a lifecycle: <em>registered → pending</em> (if it needs approval) <em>→ approved/locked</em>, or <em>cancelled</em>. Team Leads, Project Managers, Operations Managers and the CEO can view and edit time for the people in their scope; everyone else only sees their own.</p>
+        <p>The filter bar lets managers slice the log by employee, client, project, work order, task, entry type, project status and entry status — and export the filtered view straight to Excel (see <a href="#export">Excel export</a>).</p>
+      </section>
+
+      <section class="doc" id="planner">
+        <h2>Week Planner</h2>
+        <p>A week-at-a-glance view for planning work ahead of time and comparing it against what actually got logged. Anyone can plan their own week; Team Leads and above can plan for the people in their scope.</p>
+      </section>
+
+      <section class="doc" id="tasks">
+        <h2>Tasks</h2>
+        <p>Tasks belong to a project (and optionally a work order), and carry a title, description, status, priority, start/due dates, an optional hour allowance, and one or more assignees. Senior Employees and above can create draft tasks on projects they're part of; Team Leads and above can assign tasks to other people. Updating your own task's status is available to everyone who can see it.</p>
+        <p>From the Tasks tab you can jump straight into reporting time against a task — WorkDesk opens the Time Log form with that task pre-selected.</p>
+      </section>
+
+      <section class="doc" id="expenses">
+        <h2>Expenses</h2>
+        <p>Report an expense the same way you report time: pick an expense type, a date, and either a money amount (with currency) or an hours value, then describe it and optionally link it to a client, project or work order. Attach receipts if you have them. Expenses go through the same <a href="#approvals">Approvals</a> workflow as time — submitted, then approved or declined by a Team Lead, Project Manager, Operations Manager or the CEO (scoped to their team/projects), with Finance able to view everything read-only.</p>
+      </section>
+
+      <section class="doc" id="my-work">
+        <h2>My assignments &amp; allowances</h2>
+        <p>Open this from the <strong>◱</strong> button in the top bar. It lists every project/work order you're assigned to, your hour allowance on each, how much you've consumed, how much is sitting in pending approvals, and how much is left.</p>
+      </section>
+
+      <section class="doc" id="approvals">
+        <h2>Approvals</h2>
+        <p>Where Team Leads, Project/Operations Managers and the CEO review pending time and expense requests. Filter by type and status; approve, decline (with a note), ask the requester a question, or raise their hour allowance right from the request. The CEO and Operations Manager see everything; everyone else sees requests from people in their own scope, plus anything explicitly assigned to them.</p>
+      </section>
+
+      <section class="doc" id="budgets">
+        <h2>Budgets &amp; Work Orders</h2>
+        <p>Where Project Managers and above set up and track the money and hours behind a project: budgets (by money, hours or unit basis, with a rate and currency), and the work orders that consume them. Finance has read-only access here; Project Managers are scoped to their own projects, while Operations Managers and the CEO see every project.</p>
+      </section>
+
+      <section class="doc" id="dashboard">
+        <h2>Dashboard</h2>
+        <p>A rolled-up view of red (company) vs. yellow (client) hours, and — for anyone with company-wide dashboard rights — figures across the whole team, filterable by employee. Everyone with reporting rights can see their own dashboard; Team Leads and above (plus Finance and Viewer accounts) can see the company-wide figures within their scope.</p>
+      </section>
+
+      <section class="doc" id="library">
+        <h2>Library</h2>
+        <p>A searchable set of shared notes with tags — the place for "how we do X" knowledge that isn't formal enough for this handbook. Anyone who can report time can write a note; notes can be marked private to just the author. Search by keyword or filter by tag from the Library tab. External Contractors don't get Library access.</p>
+      </section>
+
+      <section class="doc" id="admin">
+        <h2>Lists &amp; data administration</h2>
+        <p>Open this from the <strong>⚙</strong> button in the top bar — it only appears if you manage clients/projects, view the audit log, back up data, or assign tasks. Inside, it's organised into its own tabs:</p>
+        <table class="hb-table">
+          <thead><tr><th>Tab</th><th>What it's for</th></tr></thead>
+          <tbody>
+            <tr><td>People</td><td>The employee directory — teams, managers, employment details, roles.</td></tr>
+            <tr><td>Pending activation</td><td>New sign-ups waiting for an admin to activate their account.</td></tr>
+            <tr><td>Assignments &amp; allowances</td><td>Who's assigned to which project/work order, and their hour allowances.</td></tr>
+            <tr><td>Clients / Projects / Work orders</td><td>The master lists everything else in the app points back to.</td></tr>
+            <tr><td>Expense types</td><td>The categories available when reporting an expense.</td></tr>
+            <tr><td>Roles &amp; permissions</td><td>The full permission matrix, read-only reference for every role and capability.</td></tr>
+            <tr><td>Verification queue</td><td>Newly-created clients/projects awaiting sign-off.</td></tr>
+            <tr><td>Company settings</td><td>Company-wide configuration (Operations Manager and CEO only).</td></tr>
+            <tr><td>Backup &amp; restore</td><td>See <a href="#backup">Backup &amp; restore</a> below.</td></tr>
+            <tr><td>Audit log</td><td>A history of who changed what, and when.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="doc" id="backup">
+        <h2>Backup &amp; restore</h2>
+        <p>WorkDesk doesn't have a shared server database yet — each browser keeps its own copy of the company's data in <code class="k">localStorage</code>, so it's <strong>not shared between users or devices</strong>. Use <strong>Lists &amp; data administration → Backup &amp; restore</strong> to export the whole database as a JSON file, or to import one:</p>
+        <ul>
+          <li><strong>Restore everything</strong> — replaces your local copy entirely with the file's contents.</li>
+          <li><strong>Import lists only</strong> — brings in just the master lists (clients, projects, work orders, expense types, teams) without touching people, time or approvals.</li>
+        </ul>
+        <div class="hb-callout"><b>Tip</b> — take a backup before trying anything you're unsure about, and use it to move a demo session between browsers or machines.</div>
+      </section>
+
+      <section class="doc" id="export">
+        <h2>Excel export</h2>
+        <p>Time Log, Planner and Budgets each offer an Excel export of the currently filtered view, built entirely in your browser — no server involved. What you can export is scoped the same way viewing is: your own records only, your team's, your projects', or everything, depending on your role.</p>
+      </section>
+
+      <section class="doc" id="faq">
+        <h2>Troubleshooting &amp; FAQ</h2>
+        <h3>My changes disappeared after I switched computers.</h3>
+        <p>That's expected for now — see <a href="#backup">Backup &amp; restore</a>. Export a backup on the old machine and import it on the new one.</p>
+        <h3>I can't see a tab I expect to see.</h3>
+        <p>Tabs and buttons are role-based (see <a href="#roles">Roles &amp; what you can see</a>). Ask an Operations Manager or the CEO to check your role and permissions under <strong>Lists &amp; data administration → People</strong>.</p>
+        <h3>The app says "Browser storage is full".</h3>
+        <p>Take a backup, then remove old attachments (receipts, photos) to free up space — <code class="k">localStorage</code> has a small size limit per browser.</p>
+        <h3>Something looks wrong and I don't know why.</h3>
+        <p>An Operations Manager or the CEO can check the <strong>Audit log</strong> (under Lists &amp; data administration) to see exactly who changed what, and when.</p>
+        <h3>Still stuck?</h3>
+        <p>Reach the team at <a href="mailto:info@galiltc.co.il">info@galiltc.co.il</a>.</p>
+      </section>
+
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap f-grid">
+    <div>
+      <div style="color:#fff;font-weight:700;letter-spacing:.06em;font-size:19px;margin-bottom:4px">GALIL</div>
+      <div>WorkDesk Handbook</div>
+    </div>
+    <nav class="f-links">
+      <a href="../index.html">Website</a>
+      <a href="../app/index.html">WorkDesk app</a>
+      <a href="mailto:info@galiltc.co.il">Contact</a>
+    </nav>
+    <div style="width:100%;border-top:1px solid #2C4A32;padding-top:18px;font-size:13px;color:#7C9575">
+      © 2026 GALIL Technical Writing Ltd.
+    </div>
+  </div>
+</footer>
+
+<script src="../assets/site.js"></script>
+<script>
+(function () {
+  "use strict";
+  var toc = document.getElementById("toc");
+  var links = Array.prototype.slice.call(toc.querySelectorAll("a"));
+  var sections = links.map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); });
+  if (!("IntersectionObserver" in window)) return;
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) {
+      var i = sections.indexOf(en.target);
+      if (i < 0) return;
+      if (en.isIntersecting) {
+        links.forEach(function (a) { a.classList.remove("on"); });
+        links[i].classList.add("on");
+      }
+    });
+  }, { rootMargin: "-20% 0px -70% 0px" });
+  sections.forEach(function (s) { if (s) io.observe(s); });
+})();
+</script>
+</body>
+</html>
