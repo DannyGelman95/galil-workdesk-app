@@ -12,6 +12,7 @@ import Chip from '@mui/material/Chip';
 import { useLanguage } from '../lib/LanguageContext';
 import { brand } from '../theme';
 import PageHead from '../components/PageHead';
+import FileUploadButton from '../components/FileUploadButton';
 import { useMailtoForm } from '../lib/useMailtoForm';
 
 const ROLES = [
@@ -206,8 +207,10 @@ export default function Careers() {
                       <Button
                         variant="contained"
                         disableElevation
-                        href="#apply"
-                        onClick={() => setValue('role', t(role.title[0], role.title[1]))}
+                        onClick={() => {
+                          setValue('role', t(role.title[0], role.title[1]));
+                          document.getElementById('apply')?.scrollIntoView({ behavior: 'smooth' });
+                        }}
                       >
                         {t('Apply for this role', 'הגישו מועמדות')}
                       </Button>
@@ -305,11 +308,11 @@ export default function Careers() {
                 />
 
                 <Box>
-                  <TextField
-                    fullWidth
-                    type="file"
+                  <FileUploadButton
                     label={t('CV / resume', 'קורות חיים')}
-                    slotProps={{ inputLabel: { shrink: true }, htmlInput: { accept: '.pdf,.doc,.docx' } }}
+                    accept=".pdf,.doc,.docx"
+                    chooseLabel={t('Choose file', 'בחירת קובץ')}
+                    fileName={values.cv ? values.cv.split(/[/\\]/).pop() : ''}
                     onChange={handleChange('cv')}
                   />
                   <Typography sx={{ fontSize: 13.5, color: brand.steel, mt: '6px' }}>
