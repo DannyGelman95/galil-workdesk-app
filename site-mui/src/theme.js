@@ -47,6 +47,18 @@ export function getTheme(direction) {
           body: { backgroundColor: brand.paper },
         },
       },
+      // Inputs otherwise render transparent, showing whatever section
+      // background sits behind them (e.g. the tinted --surface sections),
+      // and their border defaults to MUI's grey rather than the brand rule.
+      MuiOutlinedInput: {
+        styleOverrides: {
+          root: {
+            backgroundColor: '#fff',
+            '& .MuiOutlinedInput-notchedOutline': { borderColor: brand.rule },
+            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: brand.forest },
+          },
+        },
+      },
     },
   });
 }
