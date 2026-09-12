@@ -29,6 +29,7 @@ export default function FileUploadButton({ label, accept, fileName, chooseLabel,
         variant="outlined"
         startIcon={<UploadFileIcon />}
         sx={{
+          bgcolor: '#fff',
           borderColor: brand.rule,
           color: brand.forest,
           justifyContent: 'flex-start',
