@@ -2,19 +2,21 @@
 
 The GALIL company repository: the public marketing **website**, the
 **WorkDesk** internal time-tracking / project / budget management app, and
-the **WorkDesk Handbook** (its user guide). All three are static, self-contained
-HTML — no build step, no server — and deploy together to GitHub Pages.
+the **WorkDesk Handbook** (its user guide). The website is a React +
+Material UI app (`site-mui/`); the app and handbook are static,
+self-contained HTML with no build step. All three deploy together to
+GitHub Pages.
 
 ## Repository layout
 
 ```
-site/                     Everything published to GitHub Pages.
-  index.html               Website — home.
-  services.html            Website — what we produce.
-  careers.html             Website — open roles + "send us your CV" form.
-  contact.html             Website — contact form.
-  assets/                  Shared CSS/JS for the website + handbook (brand,
-                           header/nav, language toggle, mailto form handling).
+site-mui/                 The public website — React + Vite + Material UI.
+                           Home, What we do, Careers, Contact, bilingual
+                           EN/Hebrew with RTL support. Built in CI and
+                           published at the Pages root. See site-mui/README.md.
+site/                     The other two products published to GitHub Pages
+                           (carried into the deploy as-is, unrelated to the
+                           site-mui build).
   app/
     index.html              The WorkDesk app (V7). Self-contained build: React
                            inlined, no network calls. Open it directly in a
@@ -22,18 +24,17 @@ site/                     Everything published to GitHub Pages.
   handbook/
     index.html              The WorkDesk Handbook — user guide for the app,
                            also linked from the ? button in the app's top bar.
-archive/                  Superseded app builds, kept for reference.
+archive/                  Superseded builds, kept for reference.
   GALIL-WorkDesk-v6.html
   galil-workdesk-dev-cdn-build.html
+  galil-website-static-v1/  The original static HTML/CSS/JS website
+                           (index/services/careers/contact.html + assets/),
+                           superseded by site-mui/.
 website-concept/          Original single-page marketing concept. Superseded
-                           by site/ (kept for reference).
+                           by the website above (kept for reference).
   index.html
 docs/                     Functional spec, auth setup guide, brand assets.
   archive/                 Superseded guides.
-site-mui/                 The public website (site/) rebuilt with React +
-                           Material UI. Same pages, copy and bilingual
-                           EN/Hebrew behaviour, componentized with MUI and
-                           Vite. See site-mui/README.md.
 materials/                Data exports, backups and an older source reference.
   exports/                 Sample Excel exports (dashboard, time, plan, budgets).
   backups/                 Sample JSON backup/restore files the app can import.
@@ -44,26 +45,27 @@ materials/                Data exports, backups and an older source reference.
 
 ## Running it
 
-Nothing here needs a build step or server. Either:
+- **Website** (`site-mui/`): `cd site-mui && npm install && npm run dev`
+  (or `npm run build` for a production build — see `site-mui/README.md`).
+- **App and handbook**: no build step needed — open `site/app/index.html` or
+  `site/handbook/index.html` directly in a browser, or serve `site/` with any
+  static file server.
+- Push to `main` and let the included workflow build and publish everything
+  to GitHub Pages (see **Deployment** below).
 
-- Open any page directly in a browser (`site/index.html`, `site/app/index.html`,
-  `site/handbook/index.html`, …), or
-- Serve the `site/` folder with any static file server — this keeps the
-  relative links between the website, the app and the handbook working, or
-- Push to `main` and let the included workflow publish `site/` to GitHub Pages
-  (see **Deployment** below).
+## The website (`site-mui/`)
 
-## The website (`site/`)
+A bilingual (English/Hebrew, RTL) marketing site — Home, What we do, Careers
+and Contact — built with React, Vite and Material UI. The **Careers** page
+lists open roles (Technical Writer, Instructor, Office Manager) plus three
+placeholder roles that can be activated later (see `ROLES`/`PLACEHOLDER_ROLES`
+in `site-mui/src/pages/Careers.jsx`). Both the Careers "didn't find your
+role? send us your CV" form and the Contact form are static-site-friendly:
+they validate in the browser, then hand off to the visitor's own email
+client via a `mailto:` link (`site-mui/src/lib/useMailtoForm.js`) — there's
+no backend yet, so there's nowhere for a submission to land server-side.
 
-A bilingual (English/Hebrew) marketing site: Home, What we do, Careers and
-Contact. The **Careers** page lists open roles (Technical Writer, Instructor,
-Office Manager) plus three placeholder roles that can be activated later —
-see the comment above the placeholder cards in `site/careers.html`. Both the
-Careers "didn't find your role? send us your CV" form and the Contact form
-are static-site-friendly: they validate in the browser, then hand off to the
-visitor's own email client via a `mailto:` link (built by `site/assets/site.js`)
-— there's no backend yet, so there's nowhere for a submission to land
-server-side.
+See `site-mui/README.md` for the app's structure and stack.
 
 ## The app (`site/app/`)
 
@@ -111,13 +113,15 @@ the WorkDesk Handbook (`site/handbook/index.html`) in a new tab.
 
 ## Deployment (GitHub Pages)
 
-A workflow at `.github/workflows/deploy-pages.yml` publishes `site/` to
-GitHub Pages on every push to `main`. One manual, one-time step is required
-before it will run successfully: in the repo's **Settings → Pages**, set
-**Source** to **GitHub Actions**. After that, every push to `main` that
-touches `site/` redeploys automatically, and the workflow can also be run by
-hand from the **Actions** tab. Once deployed, the website is at the Pages
-root, the app is at `/app/`, and the handbook is at `/handbook/`.
+A workflow at `.github/workflows/deploy-pages.yml` builds `site-mui` and
+publishes it to GitHub Pages on every push to `main`, with `site/app/` and
+`site/handbook/` carried over unchanged into the same deploy. One manual,
+one-time step is required before it will run successfully: in the repo's
+**Settings → Pages**, set **Source** to **GitHub Actions**. After that, every
+push to `main` that touches `site-mui/` or `site/` redeploys automatically,
+and the workflow can also be run by hand from the **Actions** tab. Once
+deployed, the website is at the Pages root, the app is at `/app/`, and the
+handbook is at `/handbook/`.
 
 ## Roadmap — replacing the fake database
 

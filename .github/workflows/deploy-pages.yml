@@ -35,22 +35,27 @@ jobs:
           cache: npm
           cache-dependency-path: site-mui/package-lock.json
 
-      - name: Build the Material UI site (site-mui)
+      - name: Build the website (site-mui)
         working-directory: site-mui
         run: |
           npm ci
           npm run build
 
-      - name: Add the Material UI build to the published site
+      # The published site is the Material UI build (site-mui/dist) at the
+      # root, with the WorkDesk app and Handbook — unrelated static
+      # products that live under site/ — carried over unchanged.
+      - name: Assemble the published site
         run: |
-          rm -rf site/mui
-          mkdir -p site/mui
-          cp -r site-mui/dist/. site/mui/
+          rm -rf pages-dist
+          mkdir -p pages-dist
+          cp -r site-mui/dist/. pages-dist/
+          cp -r site/app pages-dist/app
+          cp -r site/handbook pages-dist/handbook
 
       - name: Upload pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: site
+          path: pages-dist
 
       - name: Deploy to GitHub Pages
         id: deployment

@@ -1,10 +1,10 @@
-# GALIL website — Material UI version
+# GALIL website
 
 A React + [Material UI](https://mui.com/material-ui/getting-started/installation/)
-rebuild of the marketing website in `../site/` (Home, What we do, Careers,
-Contact). Same content, copy and bilingual English/Hebrew behaviour as the
-static version, componentized with MUI and Vite instead of hand-rolled
-HTML/CSS/JS.
+build of the GALIL marketing website (Home, What we do, Careers, Contact),
+bilingual in English/Hebrew with RTL support. This is the current website —
+it replaced the original static HTML/CSS/JS version, now kept for reference
+at `../archive/galil-website-static-v1/`.
 
 ## Stack
 
@@ -42,8 +42,15 @@ src/
 
 Every string in the UI is passed through `t(english, hebrew)` from
 `useLanguage()`, mirroring the `data-en`/`data-he` attribute pairs used in
-the static site's markup.
+the archived static site's markup.
 
-This app is not wired into the repo's GitHub Pages deploy workflow — it's a
-standalone Vite project you build and host wherever you like (`npm run
-build` then serve `dist/`).
+Routing uses React Router's `HashRouter` (`/#/services`, `/#/careers`, …) so
+the built output is plain static files with no server-side rewrite rules —
+it can be dropped into any static host, including GitHub Pages.
+
+## Deployment
+
+`.github/workflows/deploy-pages.yml` builds this app (`npm ci && npm run
+build`) and publishes `dist/` at the GitHub Pages root, with `site/app/` and
+`site/handbook/` copied in alongside it unchanged. See the root README's
+**Deployment** section.
