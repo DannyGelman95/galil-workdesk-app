@@ -30,6 +30,10 @@ website-concept/          Original single-page marketing concept. Superseded
   index.html
 docs/                     Functional spec, auth setup guide, brand assets.
   archive/                 Superseded guides.
+site-mui/                 The public website (site/) rebuilt with React +
+                           Material UI. Same pages, copy and bilingual
+                           EN/Hebrew behaviour, componentized with MUI and
+                           Vite. See site-mui/README.md.
 materials/                Data exports, backups and an older source reference.
   exports/                 Sample Excel exports (dashboard, time, plan, budgets).
   backups/                 Sample JSON backup/restore files the app can import.

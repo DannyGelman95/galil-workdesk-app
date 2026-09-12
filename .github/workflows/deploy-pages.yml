@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "site/**"
+      - "site-mui/**"
       - ".github/workflows/deploy-pages.yml"
   workflow_dispatch:
 
@@ -26,6 +27,25 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: site-mui/package-lock.json
+
+      - name: Build the Material UI site (site-mui)
+        working-directory: site-mui
+        run: |
+          npm ci
+          npm run build
+
+      - name: Add the Material UI build to the published site
+        run: |
+          rm -rf site/mui
+          mkdir -p site/mui
+          cp -r site-mui/dist/. site/mui/
 
       - name: Upload pages artifact
         uses: actions/upload-pages-artifact@v3
