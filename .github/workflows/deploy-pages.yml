@@ -1,0 +1,62 @@
+name: Deploy GALIL site to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "site-mui/**"
+      - ".github/workflows/deploy-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: site-mui/package-lock.json
+
+      - name: Build the website (site-mui)
+        working-directory: site-mui
+        run: |
+          npm ci
+          npm run build
+
+      # The published site is the Material UI build (site-mui/dist) at the
+      # root, with the WorkDesk app and Handbook — unrelated static
+      # products that live under site/ — carried over unchanged.
+      - name: Assemble the published site
+        run: |
+          rm -rf pages-dist
+          mkdir -p pages-dist
+          cp -r site-mui/dist/. pages-dist/
+          cp -r site/app pages-dist/app
+          cp -r site/handbook pages-dist/handbook
+
+      - name: Upload pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: pages-dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GALIL — Technical writing, training and implementation</title>
+<meta name="description" content="GALIL turns complex machinery and software into documentation people can actually follow. Technical writing, training and implementation for Israeli industry.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@400;500;600;700&family=Noto+Sans+Mono:wght@400;600&family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'%3E%3Cpath d='M78 34H42a10 10 0 00-10 10v152a10 10 0 0010 10h36' fill='none' stroke='%231F3D24' stroke-width='18' stroke-linecap='round'/%3E%3Cpath d='M162 34h36a10 10 0 0110 10v152a10 10 0 01-10 10h-36' fill='none' stroke='%231F3D24' stroke-width='18' stroke-linecap='round'/%3E%3Cpath d='M148 92A44 44 0 10152 148V122H122' fill='none' stroke='%238CC63E' stroke-width='20' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<a class="btn btn-solid" href="#main" style="position:absolute;inset-inline-start:-9999px;top:0"
+   onfocus="this.style.insetInlineStart='12px';this.style.top='12px';this.style.zIndex=99"
+   onblur="this.style.insetInlineStart='-9999px'"
+   data-en="Skip to content" data-he="דלג לתוכן">Skip to content</a>
+
+<header id="hdr">
+  <div class="wrap bar">
+    <a class="brand" href="index.html" aria-label="GALIL home">
+      <svg viewBox="0 0 240 240" aria-hidden="true">
+        <path d="M78 34H42a10 10 0 00-10 10v152a10 10 0 0010 10h36" fill="none" stroke="#1F3D24" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M162 34h36a10 10 0 0110 10v152a10 10 0 01-10 10h-36" fill="none" stroke="#1F3D24" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M148 92A44 44 0 10152 148V122H122" fill="none" stroke="#8CC63E" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <b>GALIL</b>
+    </a>
+
+    <nav class="main" id="nav">
+      <a href="index.html" aria-current="page" data-en="Home" data-he="בית">Home</a>
+      <a href="services.html" data-en="What we do" data-he="מה אנחנו עושים">What we do</a>
+      <a href="careers.html" data-en="Careers" data-he="דרושים">Careers</a>
+      <a href="contact.html" data-en="Contact" data-he="צור קשר">Contact</a>
+    </nav>
+
+    <div class="lang" role="group" aria-label="Language">
+      <button type="button" data-lang="en" aria-pressed="true">EN</button>
+      <button type="button" data-lang="he" aria-pressed="false">עב</button>
+    </div>
+
+    <a class="btn btn-solid btn-ghost" href="contact.html" data-en="Start a project" data-he="התחילו פרויקט">Start a project</a>
+
+    <button class="burger" id="burger" aria-expanded="false" aria-controls="nav" aria-label="Menu">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M3 6h18M3 12h18M3 18h18"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ===================== HERO ===================== -->
+<section class="hero" id="top">
+  <div class="wrap hero-grid">
+    <div>
+      <div class="rev" data-en="Rishon LeTsiyyon · established 2009 · EN / עברית"
+                       data-he="ראשון לציון · משנת 2009 · עברית / EN">Rishon LeTsiyyon · established 2009 · EN / עברית</div>
+
+      <h1 data-en="Someone has to explain the machine."
+          data-he="מישהו צריך להסביר את המכונה.">Someone has to explain the machine.</h1>
+
+      <p class="lede" data-en="GALIL writes the manuals, procedures and training that let your customers, technicians and new engineers use what you built — correctly, on the first attempt, in Hebrew and in English."
+                      data-he="גליל כותבת את המדריכים, הנהלים וההדרכות שמאפשרים ללקוחות, לטכנאים ולמהנדסים החדשים שלכם להפעיל את מה שבניתם — נכון, כבר בפעם הראשונה, בעברית ובאנגלית.">GALIL writes the manuals, procedures and training that let your customers, technicians and new engineers use what you built — correctly, on the first attempt, in Hebrew and in English.</p>
+
+      <div class="hero-cta">
+        <a class="btn btn-solid" href="contact.html" data-en="Tell us what you're building" data-he="ספרו לנו מה אתם בונים">Tell us what you're building</a>
+        <a class="btn btn-line" href="services.html" data-en="See what we produce" data-he="מה אנחנו מפיקים">See what we produce</a>
+      </div>
+
+      <p class="hero-note">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8CC63E" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+        <span data-en="Working under NDA with defence, aerospace and industrial manufacturers since 2009."
+              data-he="עובדים תחת הסכמי סודיות עם יצרנים בתחומי הביטחון, התעופה והתעשייה משנת 2009.">Working under NDA with defence, aerospace and industrial manufacturers since 2009.</span>
+      </p>
+    </div>
+
+    <!-- exploded assembly with manual-style callouts -->
+    <div class="diagram">
+      <figure>
+        <svg class="assy" id="assy" viewBox="0 0 700 520" role="img"
+             aria-label="An exploded assembly drawing with four numbered callouts: name every part, write the procedure, train the technician, keep it current.">
+          <defs>
+            <linearGradient id="pl" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#A7D95F"/><stop offset="1" stop-color="#77B22F"/>
+            </linearGradient>
+            <linearGradient id="pl2" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#8CC63E"/><stop offset="1" stop-color="#5E9424"/>
+            </linearGradient>
+          </defs>
+
+          <path d="M70 430 L640 110" stroke="#C4D6B8" stroke-width="1" stroke-dasharray="7 6"/>
+
+          <g class="part" data-part="1">
+            <g transform="rotate(-30 150 400)">
+              <rect x="72" y="372" width="176" height="60" rx="30" fill="url(#pl)"/>
+              <circle cx="104" cy="402" r="15" fill="#F1F5EC"/>
+              <circle cx="216" cy="402" r="15" fill="#F1F5EC"/>
+            </g>
+          </g>
+
+          <g class="part" data-part="2">
+            <g transform="rotate(-30 300 316)">
+              <rect x="222" y="288" width="176" height="58" rx="29" fill="url(#pl2)"/>
+              <circle cx="254" cy="317" r="14" fill="#F1F5EC"/>
+              <circle cx="366" cy="317" r="14" fill="#F1F5EC"/>
+            </g>
+          </g>
+
+          <g class="part" data-part="3">
+            <ellipse cx="432" cy="238" rx="40" ry="27" fill="none" stroke="#1F3D24" stroke-width="13"/>
+            <ellipse cx="500" cy="200" rx="40" ry="27" fill="none" stroke="#3E6B2A" stroke-width="13"/>
+          </g>
+
+          <g class="part" data-part="4">
+            <g transform="rotate(-30 580 148)">
+              <rect x="500" y="126" width="164" height="44" rx="22" fill="#5E9424"/>
+              <rect x="500" y="126" width="52" height="44" rx="22" fill="#8CC63E"/>
+            </g>
+          </g>
+
+          <g id="callouts" stroke-linecap="round">
+            <g class="cal" data-part="1">
+              <path class="leader" style="--len:340;--d:.15s" d="M172 424 L150 492 L84 492"/>
+              <g transform="translate(56 478)"><g class="bubble" style="--d:.28s">
+                <circle cx="14" cy="14" r="14" fill="#1F3D24"/>
+                <text x="14" y="19" text-anchor="middle" font-family="Noto Sans Mono,monospace" font-size="13" font-weight="600" fill="#fff">01</text>
+              </g></g>
+            </g>
+            <g class="cal" data-part="2">
+              <path class="leader" style="--len:340;--d:.3s" d="M300 316 L170 244 L100 244"/>
+              <g transform="translate(66 230)"><g class="bubble" style="--d:.43s">
+                <circle cx="14" cy="14" r="14" fill="#1F3D24"/>
+                <text x="14" y="19" text-anchor="middle" font-family="Noto Sans Mono,monospace" font-size="13" font-weight="600" fill="#fff">02</text>
+              </g></g>
+            </g>
+            <g class="cal" data-part="3">
+              <path class="leader" style="--len:340;--d:.45s" d="M470 252 L520 350 L594 350"/>
+              <g transform="translate(600 336)"><g class="bubble" style="--d:.58s">
+                <circle cx="14" cy="14" r="14" fill="#1F3D24"/>
+                <text x="14" y="19" text-anchor="middle" font-family="Noto Sans Mono,monospace" font-size="13" font-weight="600" fill="#fff">03</text>
+              </g></g>
+            </g>
+            <g class="cal" data-part="4">
+              <path class="leader" style="--len:340;--d:.6s" d="M566 132 L520 64 L490 64"/>
+              <g transform="translate(456 50)"><g class="bubble" style="--d:.73s">
+                <circle cx="14" cy="14" r="14" fill="#1F3D24"/>
+                <text x="14" y="19" text-anchor="middle" font-family="Noto Sans Mono,monospace" font-size="13" font-weight="600" fill="#fff">04</text>
+              </g></g>
+            </g>
+          </g>
+        </svg>
+      </figure>
+
+      <ul class="key" id="key">
+        <li data-part="1"><span class="n">01</span><span data-en="Name every part, once, consistently." data-he="לתת שם לכל רכיב — פעם אחת, באופן עקבי.">Name every part, once, consistently.</span></li>
+        <li data-part="2"><span class="n">02</span><span data-en="Write the procedure a technician can follow." data-he="לכתוב נוהל שטכנאי יכול באמת לבצע.">Write the procedure a technician can follow.</span></li>
+        <li data-part="3"><span class="n">03</span><span data-en="Train the people who will use it." data-he="להדריך את מי שישתמש במערכת.">Train the people who will use it.</span></li>
+        <li data-part="4"><span class="n">04</span><span data-en="Keep it current as the product changes." data-he="לתחזק את התיעוד ככל שהמוצר משתנה.">Keep it current as the product changes.</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== WHAT WE DO (teaser) ===================== -->
+<section id="services">
+  <div class="wrap">
+    <div class="head">
+      <h2 data-en="What we do" data-he="מה אנחנו עושים">What we do</h2>
+      <p data-en="Three practices, usually bought together. Most engagements start with documentation and grow into training once the material exists."
+         data-he="שלושה תחומי פעילות, שנרכשים בדרך כלל יחד. רוב הפרויקטים מתחילים בתיעוד ומתרחבים להדרכה ברגע שהחומר קיים.">Three practices, usually bought together. Most engagements start with documentation and grow into training once the material exists.</p>
+    </div>
+    <div class="teasers">
+      <div class="teaser">
+        <div class="ref">TW / 01</div>
+        <h3 data-en="Technical writing" data-he="כתיבה טכנית">Technical writing</h3>
+        <p data-en="Operator and maintenance manuals, installation guides, software help and SOPs — written from the hardware, not from marketing copy."
+           data-he="מדריכי הפעלה ותחזוקה, מדריכי התקנה, עזרה למשתמש ונהלי עבודה — נכתב מול החומרה, לא מתוך חומר שיווקי.">Operator and maintenance manuals, installation guides, software help and SOPs — written from the hardware, not from marketing copy.</p>
+        <a class="more" href="services.html#tw" data-en="Read more →" data-he="עוד ←">Read more →</a>
+      </div>
+      <div class="teaser">
+        <div class="ref">TR / 02</div>
+        <h3 data-en="Training" data-he="הדרכה">Training</h3>
+        <p data-en="Courseware, instructor guides, e-learning and on-site delivery, built from the documentation we already wrote."
+           data-he="חומרי לימוד, מדריכים למנחה, לומדות והעברת הדרכות באתר הלקוח, בנויים מתוך התיעוד שכתבנו.">Courseware, instructor guides, e-learning and on-site delivery, built from the documentation we already wrote.</p>
+        <a class="more" href="services.html#tr" data-en="Read more →" data-he="עוד ←">Read more →</a>
+      </div>
+      <div class="teaser">
+        <div class="ref">IM / 03</div>
+        <h3 data-en="Implementation" data-he="הטמעה">Implementation</h3>
+        <p data-en="Standing up the documentation practice itself: templates, terminology, style rules, tooling and review workflow."
+           data-he="הקמת מערך התיעוד עצמו: תבניות, מונחון, כללי סגנון, כלים ותהליך אישור.">Standing up the documentation practice itself: templates, terminology, style rules, tooling and review workflow.</p>
+        <a class="more" href="services.html#im" data-en="Read more →" data-he="עוד ←">Read more →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== PROOF ===================== -->
+<section class="proof" id="proof">
+  <div class="wrap">
+    <div class="head">
+      <h2 data-en="Fifteen years of other people's machines" data-he="חמש־עשרה שנה של מכונות של אחרים">Fifteen years of other people's machines</h2>
+      <p data-en="Most of our work sits behind an NDA, so here is what we can say."
+         data-he="רוב העבודה שלנו נמצאת תחת הסכמי סודיות, ולכן הנה מה שכן אפשר לומר.">Most of our work sits behind an NDA, so here is what we can say.</p>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="v">15</div><div class="l" data-en="Years documenting Israeli industry" data-he="שנות תיעוד בתעשייה הישראלית">Years documenting Israeli industry</div></div>
+      <div class="stat"><div class="v">20+</div><div class="l" data-en="Writers, trainers and editors on staff" data-he="כתבים, מדריכים ועורכים בצוות">Writers, trainers and editors on staff</div></div>
+      <div class="stat"><div class="v">900+</div><div class="l" data-en="Manuals and courses delivered" data-he="מדריכים וקורסים שנמסרו">Manuals and courses delivered</div></div>
+      <div class="stat"><div class="v">2</div><div class="l" data-en="Working languages, natively" data-he="שפות עבודה, ברמת שפת אם">Working languages, natively</div></div>
+    </div>
+
+    <div class="wall">
+      <div data-en="Defence systems" data-he="מערכות ביטחוניות">Defence systems</div>
+      <div data-en="Aerospace" data-he="תעופה וחלל">Aerospace</div>
+      <div data-en="Medical devices" data-he="מכשור רפואי">Medical devices</div>
+      <div data-en="Industrial automation" data-he="אוטומציה תעשייתית">Industrial automation</div>
+      <div data-en="Enterprise software" data-he="תוכנה ארגונית">Enterprise software</div>
+      <p data-en="Client names available under NDA on request." data-he="שמות לקוחות יימסרו בכפוף להסכם סודיות.">Client names available under NDA on request.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== HIRING BANNER ===================== -->
+<section id="hiring-banner">
+  <div class="wrap" style="display:flex;flex-wrap:wrap;gap:24px;align-items:center;justify-content:space-between;border:1px solid var(--rule);border-radius:16px;padding:clamp(26px,4vw,40px)">
+    <div>
+      <h2 style="font-size:clamp(24px,2.6vw,32px)" data-en="We're hiring writers, instructors and more." data-he="אנחנו מגייסים כותבים, מדריכים ועוד.">We're hiring writers, instructors and more.</h2>
+      <p style="margin:10px 0 0;color:var(--steel)" data-en="See open roles, or send us a CV even if nothing fits today." data-he="ראו משרות פתוחות, או שלחו לנו קורות חיים גם אם דבר לא מתאים כרגע.">See open roles, or send us a CV even if nothing fits today.</p>
+    </div>
+    <a class="btn btn-solid" href="careers.html" data-en="View careers" data-he="למשרות">View careers</a>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap f-grid">
+    <div>
+      <div style="color:#fff;font-weight:700;letter-spacing:.06em;font-size:19px;margin-bottom:4px">GALIL</div>
+      <div data-en="Technical writing · Training · Implementation" data-he="כתיבה טכנית · הדרכה · הטמעה">Technical writing · Training · Implementation</div>
+    </div>
+    <nav class="f-links">
+      <a href="index.html" data-en="Home" data-he="בית">Home</a>
+      <a href="services.html" data-en="What we do" data-he="מה אנחנו עושים">What we do</a>
+      <a href="careers.html" data-en="Careers" data-he="דרושים">Careers</a>
+      <a href="contact.html" data-en="Contact" data-he="צור קשר">Contact</a>
+    </nav>
+    <div class="social">
+      <a href="index.html" aria-label="LinkedIn"><svg viewBox="0 0 24 24"><path d="M4.98 3.5a2.5 2.5 0 11.02 5 2.5 2.5 0 01-.02-5zM3 9h4v12H3zM10 9h3.8v1.7h.05c.53-.95 1.83-1.95 3.77-1.95 4.03 0 4.78 2.5 4.78 5.76V21h-4v-5.6c0-1.34-.03-3.07-1.9-3.07-1.9 0-2.2 1.46-2.2 2.97V21h-4z"/></svg></a>
+      <a href="index.html" aria-label="YouTube"><svg viewBox="0 0 24 24"><path d="M23 12s0-3.5-.45-5.17a2.7 2.7 0 00-1.9-1.9C18.98 4.5 12 4.5 12 4.5s-6.98 0-8.65.43a2.7 2.7 0 00-1.9 1.9C1 8.5 1 12 1 12s0 3.5.45 5.17a2.7 2.7 0 001.9 1.9c1.67.43 8.65.43 8.65.43s6.98 0 8.65-.43a2.7 2.7 0 001.9-1.9C23 15.5 23 12 23 12zM9.8 15.4V8.6l5.8 3.4z"/></svg></a>
+      <a href="mailto:info@galiltc.co.il" aria-label="Email"><svg viewBox="0 0 24 24"><path d="M2 5h20v14H2zm2 2v.5l8 5 8-5V7z"/></svg></a>
+    </div>
+    <div style="width:100%;border-top:1px solid #2C4A32;padding-top:18px;font-size:13px;color:#7C9575">
+      <span data-en="© 2026 GALIL Technical Writing Ltd." data-he="© 2026 גליל כתיבה טכנית בע״מ.">© 2026 GALIL Technical Writing Ltd.</span>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/site.js"></script>
+</body>
+</html>
