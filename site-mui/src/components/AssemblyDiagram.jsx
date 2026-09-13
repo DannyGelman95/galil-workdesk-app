@@ -3,7 +3,7 @@ import Box from '@mui/material/Box';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import Typography from '@mui/material/Typography';
-import { brand } from '../theme';
+import { useBrandColors } from '../lib/ThemeModeContext';
 import { useLanguage } from '../lib/LanguageContext';
 
 const PARTS = [
@@ -35,6 +35,7 @@ const PARTS = [
 ];
 
 function Bubble({ x, y, n, dim }) {
+  const brand = useBrandColors();
   return (
     <g transform={`translate(${x} ${y})`} opacity={dim ? 0.25 : 1} style={{ transition: 'opacity .2s' }}>
       <circle cx="14" cy="14" r="14" fill={brand.forest} />
@@ -47,6 +48,7 @@ function Bubble({ x, y, n, dim }) {
 
 export default function AssemblyDiagram() {
   const { t } = useLanguage();
+  const brand = useBrandColors();
   const [active, setActive] = useState(null);
   const dim = (id) => active !== null && active !== id;
 

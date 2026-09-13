@@ -6,7 +6,7 @@ import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import { useLanguage } from '../lib/LanguageContext';
-import { brand } from '../theme';
+import { useBrandColors } from '../lib/ThemeModeContext';
 import PageHead from '../components/PageHead';
 
 const SVC = [
@@ -94,6 +94,7 @@ const STEPS = [
 
 export default function Services() {
   const { t } = useLanguage();
+  const brand = useBrandColors();
 
   return (
     <>
@@ -139,7 +140,7 @@ export default function Services() {
                           fontSize: 13,
                           fontWeight: 500,
                           color: brand.greenDeep,
-                          bgcolor: '#fff',
+                          bgcolor: brand.card,
                           border: `1px solid ${brand.rule}`,
                         }}
                       />

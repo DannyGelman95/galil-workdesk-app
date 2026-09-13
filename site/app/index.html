@@ -17439,8 +17439,8 @@ var Recharts = (function () {
 </script>
 <script>"use strict";
 /* =====================================================================
-   GALIL WorkDesk — V7
-   Functional & Technical Specification, Version 7 (01 Sep 2026)
+   GALIL WorkDesk — V7.1
+   Functional & Technical Specification, Version 7.1 (13 Sep 2026)
    Standalone build (Spec §3.3): single self-contained HTML, no server,
    data local under the frozen storage key `galil-workdesk-v1` (§3.2).
    ===================================================================== */
@@ -17455,7 +17455,26 @@ var AreaChart = Recharts.AreaChart, Area = Recharts.Area, XAxis = Recharts.XAxis
 /* ---- §3.2 binding constraint: this key never changes ---- */
 var KEY = "galil-workdesk-v1";
 var SESSION_KEY = "galil-workdesk-session";
+/* §14.2 — the chosen theme and the chosen layout are per-device preferences,
+   deliberately kept outside the frozen data key so a restore never changes them. */
+var THEME_KEY = "galil-workdesk-theme";
+var VIEW_KEY = "galil-workdesk-view";
 var APP_VERSION = 7;
+
+/* ================= §14.2 light / dark theme ================= */
+var THEMES = ["light", "dark"];
+function systemTheme() {
+  try { return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"; }
+  catch (e) { return "light"; }
+}
+function readTheme() {
+  try { var v = localStorage.getItem(THEME_KEY); if (THEMES.indexOf(v) >= 0) return v; } catch (e) {}
+  return systemTheme();
+}
+function applyTheme(t) {
+  try { document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+  try { localStorage.setItem(THEME_KEY, t); } catch (e) {}
+}
 
 /* ================= §14.1 brand tokens ================= */
 var C = {
@@ -17468,6 +17487,7 @@ var C = {
   teal:    "#17A3B8",
   red:     "#E05C4B",
   yellow:  "#E3AC35",
+  blue:    "#3B7DD8",
   amber:   "#F0A32C",
   sick:    "#9C8CE8",
   vacation:"#3FA97E",
@@ -17528,6 +17548,8 @@ var SELF_SELECTABLE = ["EMP", "SEN", "TL"];
 var PERM = {
   /* capability                EMP  SEN  TL   PM   OPS  FIN  CEO  EXT  VIEW */
   reportOwnTime:              ["Y","Y","Y","Y","Y","-","Y","Y","-"],
+  /* Blue - Management: only roles that manage client projects and tasks */
+  reportBlueTime:             ["-","-","Y","Y","Y","-","Y","-","-"],
   viewOthersTime:             ["-","-","T","P","Y","Y","Y","-","Y"],
   editOthersTime:             ["-","-","T","P","Y","-","Y","-","-"],
   approveTime:                ["-","-","T","P","Y","-","Y","-","-"],
@@ -17552,7 +17574,7 @@ var PERM = {
   viewAuditLog:               ["-","-","-","-","Y","Y","Y","-","-"]
 };
 var PERM_LABELS = {
-  reportOwnTime: "Report own time", viewOthersTime: "View others' time", editOthersTime: "Edit others' time",
+  reportOwnTime: "Report own time", reportBlueTime: "Report Blue \u00b7 management hours", viewOthersTime: "View others' time", editOthersTime: "Edit others' time",
   approveTime: "Approve time requests", planOwnWeek: "Plan own week", planOthersWeek: "Plan others' week",
   reportExpenses: "Report expenses", approveExpenses: "Approve expenses", viewBudgets: "View budgets",
   editBudgets: "Create / edit budgets", createWorkOrders: "Create work orders", createTasks: "Create tasks",
@@ -17713,7 +17735,7 @@ function seed() {
   var mk = function (o) {
     return {
       id: uid("e"), date: o.d, type: o.type || "Work", start: o.s || "", end: o.e || "",
-      red: o.red || 0, yellow: o.yellow || 0, day: o.day || 0,
+      red: o.red || 0, yellow: o.yellow || 0, blue: o.blue || 0, day: o.day || 0,
       assignee: o.u, clientId: o.c || null, projectId: o.p || null, workOrderId: o.w || null, taskId: o.t || null,
       client: "", project: "", workOrder: "", task: "",
       projectStatus: "", description: o.desc || "", notes: "",
@@ -17795,8 +17817,21 @@ function entitlementCheck(db, entry) {
 
   var hrs = Number(entry.yellow) || 0;
 
-  /* 2 — Red · Company is never gated */
-  if (!hrs) return ok;
+  /* 2 — Red · Company and Blue · Management are never gated.
+     Blue is management time: it is attributed to a client and project so it can be
+     reported on, but it draws on neither a personal allowance nor a project budget.
+     Both still count toward the daily soft and hard limits (checks 8 and 9). */
+  if (!hrs) {
+    var other = (Number(entry.red) || 0) + (Number(entry.blue) || 0);
+    if (!other) return ok;
+    var sd0 = db.entries.filter(function (e) {
+      return e.assignee === entry.assignee && e.date === entry.date && e.id !== entry.id && e.status === "registered";
+    }).reduce(function (a, e) { return a + (Number(e.red) || 0) + (Number(e.yellow) || 0) + (Number(e.blue) || 0); }, 0);
+    var t0 = sd0 + other;
+    if (t0 > hard) return no("Daily limit exceeded");
+    if (t0 > soft) return { status: "registered", reason: "", softFlag: true, escalate: null };
+    return ok;
+  }
 
   /* 3 — free-text (unlisted) client, project or work order */
   if ((!entry.clientId && entry.client) || (!entry.projectId && entry.project) || (!entry.workOrderId && entry.workOrder)) return no("Unlisted item");
@@ -17829,8 +17864,8 @@ function entitlementCheck(db, entry) {
   /* 8 / 9 — daily soft and hard limits */
   var sameDay = db.entries.filter(function (e) {
     return e.assignee === entry.assignee && e.date === entry.date && e.id !== entry.id && e.status === "registered";
-  }).reduce(function (a, e) { return a + (Number(e.red) || 0) + (Number(e.yellow) || 0); }, 0);
-  var total = sameDay + hrs + (Number(entry.red) || 0);
+  }).reduce(function (a, e) { return a + (Number(e.red) || 0) + (Number(e.yellow) || 0) + (Number(e.blue) || 0); }, 0);
+  var total = sameDay + hrs + (Number(entry.red) || 0) + (Number(entry.blue) || 0);
   if (total > hard) return no("Daily limit exceeded");
   if (total > soft) return { status: "registered", reason: "", softFlag: true, escalate: null };
 
@@ -18296,11 +18331,38 @@ function exportJSON(obj, filename) {
    §14 — interface, brand and accessibility: stylesheet + shared widgets
    ===================================================================== */
 var CSS = [
+/* ================= §14.1 theme tokens — light is the default ================= */
 ":root{",
-"--green:#8CC63E;--deep:#5C8B22;--wash:#F2F8E9;--ink:#1B2A18;--muted:#5B6B57;",
-"--line:#D8E7C4;--teal:#17A3B8;--red:#E05C4B;--yellow:#E3AC35;--amber:#F0A32C;",
+"--green:#8CC63E;--deep:#5C8B22;--deepfg:#FFFFFF;--wash:#F2F8E9;--ink:#1B2A18;--muted:#5B6B57;",
+"--line:#D8E7C4;--teal:#17A3B8;--red:#E05C4B;--yellow:#E3AC35;--blue:#3B7DD8;--amber:#F0A32C;",
 "--sick:#9C8CE8;--vac:#3FA97E;--err:#C0392B;--paper:#FBFDF7;",
-"--font:'Noto Sans','Segoe UI',Arial,sans-serif;--mono:'Noto Sans Mono','Cascadia Mono','Consolas',ui-monospace,monospace;}",
+"--surface:#FFFFFF;--surface2:#FCFDFA;--sunk:#F4F6F1;--hover:#EAF3DC;",
+"--mutebg:#F1F3EF;--muteline:#E2E7DE;--barbg:#EDF1E8;",
+"--amberbg:#FEF6E7;--amberline:#F5D89B;--ambertx:#7A5407;",
+"--errbg:#FBEBE9;--errline:#EBC6C1;--tealbg:#E7F6F8;--tealline:#AEE0E7;--tealtx:#0B6675;",
+"--bluebg:#E8F1FC;--blueline:#B7D2F3;--bluetx:#1E548F;",
+"--sel:#1B2A18;--selfg:#FFFFFF;--onlight:#14260A;",
+/* the dark chrome bar stays dark in both themes, so text on it is always light */
+"--chrome:#1B2A18;--chrometx:#FFFFFF;--chromedim:#C9DDB4;--chromesoft:#B9CFA2;",
+"--ovl:rgba(27,42,24,.45);--shadow:rgba(27,42,24,.05);--shadow2:rgba(27,42,24,.18);",
+"--font:'Noto Sans','Segoe UI',Arial,sans-serif;--mono:'Noto Sans Mono','Cascadia Mono','Consolas',ui-monospace,monospace;",
+"color-scheme:light;}",
+
+/* ---- dark theme: explicit choice, and the system default when nothing is chosen ---- */
+":root[data-theme=\"dark\"]{",
+"--green:#9FD154;--deep:#B6E072;--deepfg:#14260A;--wash:#1E2818;--ink:#E9F2DF;--muted:#9AAC90;",
+"--line:#2E3C26;--teal:#49C2D4;--red:#F07E6E;--yellow:#EEC262;--blue:#7FB2F0;--amber:#F5B84F;",
+"--sick:#B3A6F0;--vac:#5FC495;--err:#F0796B;--paper:#11170E;",
+"--surface:#182014;--surface2:#141B10;--sunk:#1B2416;--hover:#243019;",
+"--mutebg:#20281C;--muteline:#2E3C26;--barbg:#232C1D;",
+"--amberbg:#2E2412;--amberline:#5A4720;--ambertx:#F0C270;",
+"--errbg:#2E1815;--errline:#5C2C26;--tealbg:#12333A;--tealline:#1D5763;--tealtx:#68CEDD;",
+"--bluebg:#14263D;--blueline:#28496F;--bluetx:#9CC5F5;",
+"--sel:#9FD154;--selfg:#14260A;--onlight:#14260A;",
+"--chrome:#2B3A22;--chrometx:#FFFFFF;--chromedim:#C9DDB4;--chromesoft:#B9CFA2;",
+"--ovl:rgba(0,0,0,.62);--shadow:rgba(0,0,0,.4);--shadow2:rgba(0,0,0,.7);",
+"color-scheme:dark;}",
+
 "*{box-sizing:border-box}",
 "html,body,#root{height:100%;margin:0}",
 "body{background:var(--paper);color:var(--ink);font:400 14px/1.45 var(--font);-webkit-font-smoothing:antialiased}",
@@ -18310,20 +18372,22 @@ var CSS = [
 ".app{display:flex;flex-direction:column;height:100%;overflow:hidden}",
 
 /* ---- top bar ---- */
-".topbar{display:flex;align-items:center;gap:14px;padding:8px 16px;background:var(--ink);color:#fff;flex:0 0 auto}",
+".topbar{display:flex;align-items:center;gap:14px;padding:8px 16px;background:var(--chrome);color:var(--chrometx);flex:0 0 auto}",
 ".brand{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:.16em;font-size:14px}",
 ".brand .mark{width:30px;height:26px;flex:0 0 auto}",
-".brand small{display:block;letter-spacing:.04em;font-weight:400;font-size:10px;color:#B9CFA2;text-transform:none}",
+".brand small{display:block;letter-spacing:.04em;font-weight:400;font-size:10px;color:var(--chromesoft);text-transform:none}",
 ".spacer{flex:1}",
 ".who{display:flex;align-items:center;gap:9px;font-size:13px}",
-".avatar{width:32px;height:32px;border-radius:50%;background:var(--green);color:var(--ink);display:grid;place-items:center;font-weight:700;font-size:12px;flex:0 0 auto}",
+".avatar{width:32px;height:32px;border-radius:50%;background:var(--green);color:var(--onlight);display:grid;place-items:center;font-weight:700;font-size:12px;flex:0 0 auto}",
 ".rolechip{background:rgba(140,198,62,.18);color:var(--green);border:1px solid rgba(140,198,62,.45);padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600}",
 ".iconbtn{min-width:44px;min-height:44px;display:grid;place-items:center;background:transparent;border:0;color:#D9E8C6;border-radius:10px;cursor:pointer;font-size:16px}",
 ".iconbtn:hover{background:rgba(255,255,255,.1);color:#fff}",
+".iconbtn.ink{color:var(--muted)}",
+".iconbtn.ink:hover{background:var(--wash);color:var(--ink)}",
 
 /* ---- tab bar ---- */
-".tabs{display:flex;gap:2px;padding:0 10px;background:var(--ink);flex:0 0 auto;overflow-x:auto;scrollbar-width:thin}",
-".tab{position:relative;background:transparent;border:0;color:#C9DDB4;padding:9px 15px;min-height:44px;cursor:pointer;font-size:13.5px;font-weight:600;border-radius:10px 10px 0 0;white-space:nowrap;display:flex;align-items:center;gap:7px}",
+".tabs{display:flex;gap:2px;padding:0 10px;background:var(--chrome);flex:0 0 auto;overflow-x:auto;scrollbar-width:thin}",
+".tab{position:relative;background:transparent;border:0;color:var(--chromedim);padding:9px 15px;min-height:44px;cursor:pointer;font-size:13.5px;font-weight:600;border-radius:10px 10px 0 0;white-space:nowrap;display:flex;align-items:center;gap:7px}",
 ".tab:hover{background:rgba(255,255,255,.08);color:#fff}",
 ".tab.on{background:var(--paper);color:var(--ink)}",
 ".tab .badge{background:var(--amber);color:#fff;border-radius:999px;font-size:11px;font-weight:700;min-width:19px;height:19px;padding:0 5px;display:grid;place-items:center}",
@@ -18331,7 +18395,7 @@ var CSS = [
 
 /* ---- layout ---- */
 ".page{flex:1;min-height:0;display:flex;flex-direction:column;padding:12px 16px 14px;gap:10px;overflow:hidden}",
-".panel{background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 1px 2px rgba(27,42,24,.04)}",
+".panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 1px 2px var(--shadow)}",
 ".pad{padding:12px 14px}",
 ".scroll{flex:1;min-height:0;overflow:auto}",
 ".row{display:flex;align-items:center;gap:9px;flex-wrap:wrap}",
@@ -18342,70 +18406,78 @@ var CSS = [
 ".h3{font:600 14px/1.3 var(--font);margin:0}",
 ".cap{font-size:12px;color:var(--muted)}",
 ".mono{font-family:var(--mono);font-variant-numeric:tabular-nums}",
+/* tabular figures without changing typeface — §14.1 one face across a table row */
+".tnum{font-variant-numeric:tabular-nums;font-feature-settings:'tnum' 1}",
 ".sep{height:1px;background:var(--line);margin:8px 0}",
+/* Hebrew alongside English: bidi-correct but still left-aligned under the English name */
+".he{direction:rtl;text-align:left;unicode-bidi:isolate}",
 
 /* ---- fields ---- */
 ".fld{display:flex;flex-direction:column;gap:3px;min-width:0}",
 ".fld>label{font-size:11.5px;font-weight:600;color:var(--muted);letter-spacing:.02em}",
-".fld input,.fld select,.fld textarea{min-height:38px;padding:7px 9px;border:1px solid var(--line);border-radius:9px;background:#fff;font-size:13.5px;width:100%}",
+".fld input,.fld select,.fld textarea{min-height:38px;padding:7px 9px;border:1px solid var(--line);border-radius:9px;background-color:var(--surface);font-size:13.5px;width:100%}",
 ".fld textarea{min-height:38px;resize:vertical}",
 ".fld input:focus,.fld select:focus,.fld textarea:focus{border-color:var(--deep);outline:2px solid rgba(92,139,34,.25);outline-offset:0}",
-".fld.bad input,.fld.bad select,.fld.bad textarea{border-color:var(--err);background:#FDF3F2}",
+".fld.bad input,.fld.bad select,.fld.bad textarea{border-color:var(--err);background-color:var(--errbg)}",
 ".errmsg{color:var(--err);font-size:11.5px;font-weight:600;display:flex;align-items:center;gap:4px}",
-".ro{background:var(--wash)!important;color:var(--deep);font-weight:700;font-family:var(--mono);text-align:center}",
+".ro{background-color:var(--wash)!important;color:var(--deep);font-weight:700;font-family:var(--mono);text-align:center}",
 
 /* ---- every select wears the app's own chrome, not the browser's ---- */
-"select{appearance:none;-webkit-appearance:none;-moz-appearance:none;cursor:pointer;",
+"select{appearance:none;-webkit-appearance:none;-moz-appearance:none;cursor:pointer;background-color:var(--surface);",
 "background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%235C8B22' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\");",
 "background-repeat:no-repeat;background-position:right 9px center;background-size:11px 7px}",
+":root[data-theme=\"dark\"] select{",
+"background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%239FD154' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")}",
 ".fld select{padding-right:28px}",
-"select:disabled{background-color:#F4F6F1;color:var(--muted);cursor:not-allowed;opacity:1}",
+"select:disabled{background-color:var(--sunk);color:var(--muted);cursor:not-allowed;opacity:1}",
+"option{background:var(--surface);color:var(--ink)}",
 /* compact select used inside table rows */
-".minisel{min-height:32px;border:1px solid var(--line);border-radius:8px;padding:4px 24px 4px 8px;font-size:12.5px;background-color:#fff;background-position:right 7px center;background-size:10px 6px;font-family:var(--font)}",
+".minisel{min-height:32px;border:1px solid var(--line);border-radius:8px;padding:4px 24px 4px 8px;font-size:12.5px;background-color:var(--surface);background-position:right 7px center;background-size:10px 6px;font-family:var(--font)}",
 ".minisel:hover{border-color:var(--deep)}",
-".miniinp{min-height:32px;border:1px solid var(--line);border-radius:8px;padding:4px 8px;font-size:12.5px;background:#fff;font-family:var(--mono);text-align:right}",
+".miniinp{min-height:32px;border:1px solid var(--line);border-radius:8px;padding:4px 8px;font-size:12.5px;background:var(--surface);font-family:var(--font);font-variant-numeric:tabular-nums;text-align:right}",
 
 /* ---- file inputs ---- */
-"input[type=file]{font-size:12.5px;border:1px dashed var(--line);border-radius:9px;padding:6px 8px;background:#fff;width:100%;min-height:38px;color:var(--muted)}",
+"input[type=file]{font-size:12.5px;border:1px dashed var(--line);border-radius:9px;padding:6px 8px;background:var(--surface);width:100%;min-height:38px;color:var(--muted)}",
 "input[type=file]::file-selector-button{min-height:28px;padding:4px 11px;margin-right:10px;border-radius:8px;border:1px solid var(--line);background:var(--wash);color:var(--deep);font:600 12.5px var(--font);cursor:pointer}",
-"input[type=file]::file-selector-button:hover{background:var(--green);border-color:var(--green);color:#14260A}",
-"input[type=file]::-webkit-file-upload-button{min-height:28px;padding:4px 11px;margin-right:10px;border-radius:8px;border:1px solid var(--line);background:#F2F8E9;color:#5C8B22;font:600 12.5px sans-serif;cursor:pointer}",
+"input[type=file]::file-selector-button:hover{background:var(--green);border-color:var(--green);color:var(--onlight)}",
 
 /* ---- checkboxes and radios ---- */
 "input[type=checkbox],input[type=radio]{width:15px;height:15px;margin:0;flex:0 0 auto;accent-color:var(--deep);cursor:pointer}",
 
 /* ---- segmented control (hour type) ---- */
-".seg{display:inline-flex;height:38px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}",
+".seg{display:inline-flex;height:38px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}",
 ".seg button{border:0;background:transparent;padding:0 11px;font:700 12.5px var(--font);cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px;color:var(--muted)}",
 ".seg button+button{border-left:1px solid var(--line)}",
 ".seg button:hover{background:var(--wash);color:var(--ink)}",
 ".seg button.on{color:#fff}",
 ".seg button.on.r{background:var(--red)}",
 ".seg button.on.y{background:var(--yellow);color:#3B2A05}",
+".seg button.on.b{background:var(--blue);color:#fff}",
 
 /* ---- click-to-select chips (assignees, dependencies, filters) ---- */
-".picker{display:flex;flex-wrap:wrap;gap:6px;padding:8px;border:1px solid var(--line);border-radius:11px;background:#fff;max-height:170px;overflow:auto;align-content:flex-start}",
-".pk{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:#fff;border-radius:999px;padding:3px 11px 3px 4px;font:600 12.5px var(--font);cursor:pointer;min-height:32px;color:var(--ink);white-space:nowrap}",
+".picker{display:flex;flex-wrap:wrap;gap:6px;padding:8px;border:1px solid var(--line);border-radius:11px;background:var(--surface);max-height:170px;overflow:auto;align-content:flex-start}",
+".pk{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:3px 11px 3px 4px;font:600 12.5px var(--font);cursor:pointer;min-height:32px;color:var(--ink);white-space:nowrap}",
 ".pk:hover{border-color:var(--deep);background:var(--wash)}",
-".pk.on{background:var(--ink);border-color:var(--ink);color:#fff}",
-".pk.on:hover{background:var(--deep);border-color:var(--deep)}",
-".pk .av{width:22px;height:22px;border-radius:50%;background:var(--green);color:#14260A;display:grid;place-items:center;font:700 9px var(--font)}",
-".pk.on .av{background:var(--green);color:#14260A}",
+".pk.on{background:var(--sel);border-color:var(--sel);color:var(--selfg)}",
+".pk.on:hover{background:var(--deep);border-color:var(--deep);color:var(--deepfg)}",
+".pk .av{width:22px;height:22px;border-radius:50%;background:var(--green);color:var(--onlight);display:grid;place-items:center;font:700 9px var(--font)}",
+".pk.on .av{background:var(--green);color:var(--onlight)}",
 ".pk .rl{font-size:10px;font-weight:700;opacity:.62;letter-spacing:.04em}",
 ".pk.plain{padding-left:11px}",
-".pk .tick{width:15px;height:15px;border-radius:5px;border:1.5px solid var(--line);display:grid;place-items:center;font-size:10px;color:transparent;background:#fff}",
-".pk.on .tick{background:var(--green);border-color:var(--green);color:#14260A}",
+".pk .tick{width:15px;height:15px;border-radius:5px;border:1.5px solid var(--line);display:grid;place-items:center;font-size:10px;color:transparent;background:var(--surface)}",
+".pk.on .tick{background:var(--green);border-color:var(--green);color:var(--onlight)}",
 
 /* ---- buttons ---- */
-".btn{min-height:38px;padding:8px 14px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--ink);font-weight:600;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;justify-content:center}",
+".btn{min-height:38px;padding:8px 14px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-weight:600;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;justify-content:center}",
 ".btn:hover{border-color:var(--deep);background:var(--wash)}",
-".btn.p{background:var(--green);border-color:var(--green);color:#14260A}",
-".btn.p:hover{background:var(--deep);border-color:var(--deep);color:#fff}",
-".btn.d{background:#fff;border-color:#EBC6C1;color:var(--err)}",
-".btn.d:hover{background:#FDF3F2;border-color:var(--err)}",
+".btn.p{background:var(--green);border-color:var(--green);color:var(--onlight)}",
+".btn.p:hover{background:var(--deep);border-color:var(--deep);color:var(--deepfg)}",
+".btn.d{background:var(--surface);border-color:var(--errline);color:var(--err)}",
+".btn.d:hover{background:var(--errbg);border-color:var(--err)}",
 ".btn.t{border-color:transparent;background:transparent;color:var(--muted)}",
 ".btn.t:hover{background:var(--wash);color:var(--ink)}",
 ".btn.sm{min-height:32px;padding:5px 10px;font-size:12.5px}",
+".btn.on{background:var(--sel);border-color:var(--sel);color:var(--selfg)}",
 ".btn:disabled{opacity:.45;cursor:not-allowed}",
 ".btn.tap{min-width:44px}",
 
@@ -18413,71 +18485,85 @@ var CSS = [
 ".chip{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;font-size:12.5px;font-weight:600;border:1px solid transparent;white-space:nowrap}",
 ".chip.red{background:rgba(224,92,75,.13);color:#A33627;border-color:rgba(224,92,75,.35)}",
 ".chip.yel{background:rgba(227,172,53,.16);color:#8A6410;border-color:rgba(227,172,53,.4)}",
-".chip.amber{background:rgba(240,163,44,.16);color:#8A5A0A;border-color:rgba(240,163,44,.45)}",
+".chip.blue{background:var(--bluebg);color:var(--bluetx);border-color:var(--blueline)}",
+".chip.amber{background:var(--amberbg);color:var(--ambertx);border-color:var(--amberline)}",
 ".chip.gr{background:var(--wash);color:var(--deep);border-color:var(--line)}",
-".chip.teal{background:rgba(23,163,184,.12);color:#0B6675;border-color:rgba(23,163,184,.35)}",
-".chip.err{background:#FBEBE9;color:var(--err);border-color:#EBC6C1}",
-".chip.mut{background:#F1F3EF;color:var(--muted);border-color:#E2E7DE}",
+".chip.teal{background:var(--tealbg);color:var(--tealtx);border-color:var(--tealline)}",
+".chip.err{background:var(--errbg);color:var(--err);border-color:var(--errline)}",
+".chip.mut{background:var(--mutebg);color:var(--muted);border-color:var(--muteline)}",
+":root[data-theme=\"dark\"] .chip.red{color:#F5A99C}",
+":root[data-theme=\"dark\"] .chip.yel{color:#EDCE85}",
 ".dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}",
 
 /* ---- tables ---- */
 ".tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}",
-".tbl th{position:sticky;top:0;z-index:2;background:var(--ink);color:#fff;text-align:left;font-weight:600;font-size:12px;padding:8px 9px;white-space:nowrap}",
+".tbl th{position:sticky;top:0;z-index:2;background:var(--chrome);color:var(--chrometx);text-align:left;font-weight:600;font-size:12px;padding:8px 9px;white-space:nowrap}",
 ".tbl th:first-child{border-radius:10px 0 0 0}",
 ".tbl th:last-child{border-radius:0 10px 0 0}",
 ".tbl td{padding:7px 9px;border-bottom:1px solid var(--line);vertical-align:top}",
+/* §7.2 the Time Log rows centre vertically — the date and its day sit on one line */
+".tbl.mid td{vertical-align:middle}",
 ".tbl tbody tr:nth-child(even) td{background:var(--wash)}",
-".tbl tbody tr:hover td{background:#EAF3DC}",
+".tbl tbody tr:hover td{background:var(--hover)}",
 ".tbl tr.pend td{opacity:.62}",
 ".tbl tr.pend td:first-child{box-shadow:inset 3px 0 0 var(--amber);opacity:1}",
 ".tbl tr.canc td{opacity:.5;text-decoration:line-through}",
 ".tbl tr.canc td:first-child{box-shadow:inset 3px 0 0 var(--err);text-decoration:none}",
-".tbl .num{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}",
+".tbl .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}",
+/* the Hours column carries pills, so it reads left like every other value */
+".tbl .hrs,.tbl th.hrs{text-align:left;white-space:nowrap}",
+".copy{white-space:nowrap;cursor:pointer;border:0;background:transparent;padding:0;font:inherit;color:inherit;text-align:left;display:inline-flex;align-items:center;gap:5px;border-radius:6px}",
+".copy:hover{color:var(--deep);text-decoration:underline;text-underline-offset:2px}",
+".copy .ci{opacity:0;font-size:10px}",
+".copy:hover .ci,.copy:focus-visible .ci{opacity:.75}",
 ".empty{padding:34px;text-align:center;color:var(--muted);font-size:13.5px}",
 
 /* ---- cards / stat ---- */
 ".cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:9px}",
-".stat{background:#fff;border:1px solid var(--line);border-radius:13px;padding:10px 12px}",
+".stat{background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:10px 12px}",
 ".stat .k{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}",
 ".stat .v{font:700 22px/1.15 var(--mono);margin-top:3px}",
 ".stat .s{font-size:11.5px;color:var(--muted);margin-top:1px}",
 
 /* ---- progress ---- */
-".bar{height:8px;border-radius:999px;background:#EDF1E8;overflow:hidden;display:flex;min-width:70px}",
+".bar{height:8px;border-radius:999px;background:var(--barbg);overflow:hidden;display:flex;min-width:70px;flex:0 0 auto}",
 ".bar i{display:block;height:100%}",
 
 /* ---- banners ---- */
 ".banner{border-radius:11px;padding:8px 12px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;border:1px solid}",
-".banner.amber{background:#FEF6E7;border-color:#F5D89B;color:#7A5407}",
-".banner.err{background:#FBEBE9;border-color:#EBC6C1;color:var(--err)}",
+".banner.amber{background:var(--amberbg);border-color:var(--amberline);color:var(--ambertx)}",
+".banner.err{background:var(--errbg);border-color:var(--errline);color:var(--err)}",
 ".banner.gr{background:var(--wash);border-color:var(--line);color:var(--deep)}",
-".banner.teal{background:#E7F6F8;border-color:#AEE0E7;color:#0B6675}",
+".banner.mut{background:var(--mutebg);border-color:var(--muteline);color:var(--muted)}",
+".banner.teal{background:var(--tealbg);border-color:var(--tealline);color:var(--tealtx)}",
 
 /* ---- modal ---- */
-".ovl{position:fixed;inset:0;background:rgba(27,42,24,.45);display:grid;place-items:center;z-index:80;padding:18px}",
-".modal{background:#fff;border-radius:16px;width:min(1180px,100%);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 24px 70px rgba(0,0,0,.3);overflow:hidden}",
+".ovl{position:fixed;inset:0;background:var(--ovl);display:grid;place-items:center;z-index:80;padding:18px}",
+".modal{background:var(--surface);border-radius:16px;width:min(1180px,100%);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 24px 70px var(--shadow2);overflow:hidden}",
 ".modal.sm{width:min(560px,100%)}",
 ".modal.md{width:min(820px,100%)}",
+".modal.lg{width:min(1040px,100%)}",
 ".modal>header{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--line);background:var(--wash)}",
 ".modal>.body{padding:14px 16px;overflow:auto;flex:1;min-height:0}",
-".modal>footer{display:flex;gap:8px;justify-content:flex-end;padding:11px 16px;border-top:1px solid var(--line);background:#FCFDFA}",
+".modal>footer{display:flex;gap:8px;justify-content:flex-end;padding:11px 16px;border-top:1px solid var(--line);background:var(--surface2)}",
 
 /* ---- toast ---- */
 ".toasts{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:200;display:flex;flex-direction:column;gap:8px;align-items:center}",
-".toast{background:var(--ink);color:#fff;padding:10px 15px;border-radius:12px;font-size:13px;font-weight:600;box-shadow:0 12px 34px rgba(0,0,0,.3);display:flex;align-items:center;gap:12px;max-width:min(660px,92vw)}",
-".toast.ok{background:var(--deep)}",
-".toast.error{background:var(--err)}",
-".toast button{background:rgba(255,255,255,.2);border:0;color:#fff;border-radius:8px;padding:5px 10px;font-weight:700;cursor:pointer;min-height:30px}",
+".toast{background:var(--chrome);color:#fff;padding:10px 15px;border-radius:12px;font-size:13px;font-weight:600;box-shadow:0 12px 34px var(--shadow2);display:flex;align-items:center;gap:12px;max-width:min(660px,92vw)}",
+".toast.ok{background:var(--deep);color:var(--deepfg)}",
+".toast.error{background:var(--err);color:#fff}",
+".toast button{background:rgba(255,255,255,.2);border:0;color:inherit;border-radius:8px;padding:5px 10px;font-weight:700;cursor:pointer;min-height:30px}",
 
 /* ---- auth ---- */
 ".auth{height:100%;overflow:auto;display:grid;justify-items:center;align-content:center;background:linear-gradient(150deg,#5C8B22,#8CC63E 60%,#B7DE80);padding:20px}",
-".authcard{background:#fff;border-radius:20px;width:min(460px,100%);padding:24px 26px 20px;box-shadow:0 26px 70px rgba(20,40,10,.32)}",
+":root[data-theme=\"dark\"] .auth{background:linear-gradient(150deg,#16210F,#2B3A22 55%,#3E5A22)}",
+".authcard{background:var(--surface);border-radius:20px;width:min(460px,100%);padding:24px 26px 20px;box-shadow:0 26px 70px rgba(20,40,10,.32)}",
 ".authcard.wide{width:min(720px,100%)}",
 /* the Entra account list keeps the card inside the viewport */
 ".msbox{background:var(--wash);border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:7px}",
 ".msbox .list{display:flex;flex-direction:column;gap:4px;max-height:172px;overflow:auto}",
-".msacc{display:flex;align-items:center;gap:9px;width:100%;background:#fff;border:1px solid var(--line);border-radius:10px;padding:5px 9px;min-height:42px;cursor:pointer;text-align:left;font:inherit}",
-".msacc:hover{border-color:var(--deep);background:#fff}",
+".msacc{display:flex;align-items:center;gap:9px;width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:5px 9px;min-height:42px;cursor:pointer;text-align:left;font:inherit;color:var(--ink)}",
+".msacc:hover{border-color:var(--deep)}",
 ".msacc .nm{font-weight:600;font-size:13px;line-height:1.15}",
 ".msacc .em{font-size:11px;color:var(--muted);font-family:var(--mono)}",
 ".authlogo{display:flex;flex-direction:column;align-items:center;gap:5px;margin-bottom:18px}",
@@ -18509,32 +18595,88 @@ var CSS = [
 ".kcol{flex:0 0 250px;display:flex;flex-direction:column;background:var(--wash);border:1px solid var(--line);border-radius:13px;min-height:0}",
 ".kcol>h4{margin:0;padding:9px 11px;font-size:12.5px;font-weight:700;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line)}",
 ".kcol>div{flex:1;overflow:auto;padding:8px;display:flex;flex-direction:column;gap:7px;min-height:60px}",
-".kcard{background:#fff;border:1px solid var(--line);border-radius:11px;padding:9px 10px;cursor:grab;box-shadow:0 1px 2px rgba(27,42,24,.05)}",
+".kcard{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:9px 10px;cursor:grab;box-shadow:0 1px 2px var(--shadow)}",
 ".kcard:hover{border-color:var(--deep)}",
 ".kcard.drag{opacity:.4}",
-".kcol.over{border-color:var(--deep);background:#EAF3DC}",
+".kcol.over{border-color:var(--deep);background:var(--hover)}",
 
 /* ---- planner ---- */
 ".week{display:grid;grid-template-columns:repeat(7,1fr);gap:7px;height:100%;min-height:0}",
-".day{display:flex;flex-direction:column;background:#fff;border:1px solid var(--line);border-radius:12px;min-height:0;overflow:hidden}",
+".day{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;min-height:0;overflow:hidden}",
 ".day>h5{margin:0;padding:7px 9px;font-size:12px;font-weight:700;background:var(--wash);border-bottom:1px solid var(--line);display:flex;justify-content:space-between}",
 ".day>div{flex:1;overflow:auto;padding:6px;display:flex;flex-direction:column;gap:5px}",
 ".day.today{border-color:var(--green);box-shadow:0 0 0 2px rgba(140,198,62,.3)}",
 ".pcard{border-radius:9px;padding:6px 8px;font-size:11.5px;border-left:3px solid var(--teal);background:var(--wash);cursor:grab}",
 
 /* ---- misc ---- */
-".ms-list{max-height:262px;overflow:auto;border:1px solid var(--line);border-radius:12px;background:#fff;position:absolute;z-index:40;min-width:246px;width:max-content;max-width:320px;box-shadow:0 14px 34px rgba(27,42,24,.18);padding:6px;display:flex;flex-direction:column;gap:3px;margin-top:4px}",
+".ms-list{max-height:262px;overflow:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface);position:absolute;z-index:40;min-width:246px;width:max-content;max-width:320px;box-shadow:0 14px 34px var(--shadow2);padding:6px;display:flex;flex-direction:column;gap:3px;margin-top:4px}",
 ".ms-opt{display:flex;gap:9px;align-items:center;padding:5px 9px;cursor:pointer;font-size:13px;min-height:36px;border-radius:9px;border:1px solid transparent;background:transparent;width:100%;text-align:left;font-family:var(--font);color:var(--ink)}",
 ".ms-opt:hover{background:var(--wash);border-color:var(--line)}",
-".ms-opt.on{background:var(--ink);color:#fff;border-color:var(--ink)}",
-".ms-opt .tick{width:16px;height:16px;border-radius:5px;border:1.5px solid var(--line);display:grid;place-items:center;font-size:10px;color:transparent;background:#fff;flex:0 0 auto}",
-".ms-opt.on .tick{background:var(--green);border-color:var(--green);color:#14260A}",
+".ms-opt.on{background:var(--sel);color:var(--selfg);border-color:var(--sel)}",
+".ms-opt .tick{width:16px;height:16px;border-radius:5px;border:1.5px solid var(--line);display:grid;place-items:center;font-size:10px;color:transparent;background:var(--surface);flex:0 0 auto}",
+".ms-opt.on .tick{background:var(--green);border-color:var(--green);color:var(--onlight)}",
 ".ms-sep{height:1px;background:var(--line);margin:3px 2px}",
 ".rel{position:relative}",
 ".pillbar{display:flex;gap:5px;flex-wrap:wrap}",
-".pill{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 11px;font-size:12.5px;font-weight:600;cursor:pointer;min-height:32px}",
-".pill.on{background:var(--ink);color:#fff;border-color:var(--ink)}",
+".pill{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 11px;font-size:12.5px;font-weight:600;cursor:pointer;min-height:32px;color:var(--ink)}",
+".pill:hover{border-color:var(--deep);background:var(--wash)}",
+".pill.on{background:var(--sel);color:var(--selfg);border-color:var(--sel)}",
+".pill .badge{background:var(--amber);color:#fff;border-radius:999px;font-size:10.5px;font-weight:700;padding:0 5px;margin-left:5px}",
 ".hidden{display:none}",
+/* small popover menu (duplicate an entry, replace an attachment) */
+".pop{position:absolute;right:0;top:100%;z-index:60;background:var(--surface);border:1px solid var(--line);border-radius:11px;box-shadow:0 14px 34px var(--shadow2);padding:5px;display:flex;flex-direction:column;gap:2px;min-width:190px}",
+".pop button{background:transparent;border:0;border-radius:8px;padding:8px 10px;text-align:left;font:600 12.5px var(--font);color:var(--ink);cursor:pointer;min-height:36px;white-space:nowrap}",
+".pop button:hover{background:var(--wash)}",
+".pop .ph{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:6px 10px 3px}",
+/* attachment row */
+".att{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);background:var(--wash);border-radius:999px;padding:2px 4px 2px 10px;font-size:12.5px;font-weight:600;color:var(--deep);max-width:100%}",
+".att .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:190px}",
+".att button{border:0;background:transparent;color:var(--muted);cursor:pointer;border-radius:50%;width:24px;height:24px;display:grid;place-items:center;font-size:12px;flex:0 0 auto}",
+".att button:hover{background:var(--surface);color:var(--err)}",
+".att button.rep:hover{color:var(--deep)}",
+
+/* ================= §14.4 mobile shell — phones and small tablets ================= */
+".mob{display:flex;flex-direction:column;height:100%;overflow:hidden;background:var(--paper)}",
+".mob>.mtop{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--chrome);color:var(--chrometx);flex:0 0 auto}",
+".mob>.mbody{flex:1;min-height:0;overflow:auto;padding:12px 12px 18px;display:flex;flex-direction:column;gap:10px;-webkit-overflow-scrolling:touch}",
+/* every direct child of the scrolling mbody must keep its natural height —
+   otherwise a child with its own overflow (like the .mseg filter row, a
+   scroll container) gets an automatic min-height of 0 and the flex layout
+   crushes it to fit, instead of letting mbody itself scroll (the classic
+   flexbox min-size:auto bug). */
+".mob>.mbody>*{flex-shrink:0}",
+".mnav{display:flex;flex:0 0 auto;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}",
+".mnav button{flex:1;min-height:56px;background:transparent;border:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font:600 10.5px var(--font);color:var(--muted);cursor:pointer;position:relative}",
+".mnav button .ic{font-size:19px;line-height:1}",
+".mnav button.on{color:var(--deep)}",
+".mnav button.on .ic{transform:translateY(-1px)}",
+".mnav .badge{position:absolute;top:7px;right:calc(50% - 20px);background:var(--amber);color:#fff;border-radius:999px;font-size:10px;font-weight:700;min-width:17px;height:17px;padding:0 4px;display:grid;place-items:center}",
+".mcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:11px 12px;display:flex;flex-direction:column;gap:7px;box-shadow:0 1px 2px var(--shadow)}",
+".mcard .mhead{display:flex;align-items:flex-start;gap:8px}",
+".mcard .mt{font-weight:600;font-size:14px;line-height:1.3;flex:1;min-width:0;overflow-wrap:anywhere}",
+".mrow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;color:var(--muted)}",
+".mtitle{font:600 17px/1.2 var(--font);margin:0}",
+/* the timer — the one control the phone build is built around */
+".timer{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:12px;align-items:stretch;box-shadow:0 2px 10px var(--shadow)}",
+".timer .clock{font:700 42px/1 var(--mono);text-align:center;letter-spacing:.02em;font-variant-numeric:tabular-nums}",
+".timer .sub{text-align:center;font-size:12px;color:var(--muted)}",
+".bigbtn{min-height:60px;border-radius:16px;border:0;font:700 17px var(--font);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;width:100%}",
+".bigbtn.go{background:var(--green);color:var(--onlight)}",
+".bigbtn.go:active{background:var(--deep);color:var(--deepfg)}",
+".bigbtn.stop{background:var(--err);color:#fff}",
+".bigbtn.gh{background:var(--surface);border:1px solid var(--line);color:var(--ink)}",
+/* bottom sheet */
+".sheet{position:fixed;inset:0;z-index:120;display:flex;flex-direction:column;justify-content:flex-end;background:var(--ovl)}",
+".sheet>.sh{background:var(--surface);border-radius:20px 20px 0 0;max-height:92vh;display:flex;flex-direction:column;overflow:hidden}",
+".sheet>.sh>header{display:flex;align-items:center;gap:9px;padding:12px 14px;border-bottom:1px solid var(--line);background:var(--wash);flex:0 0 auto}",
+".sheet>.sh>.sb{padding:13px 14px;overflow:auto;flex:1;min-height:0;display:flex;flex-direction:column;gap:10px}",
+".sheet>.sh>footer{display:flex;gap:8px;padding:11px 14px calc(11px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--surface2);flex:0 0 auto}",
+".sheet .grab{width:38px;height:4px;border-radius:999px;background:var(--line);margin:7px auto 0}",
+".mseg{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}",
+".mseg::-webkit-scrollbar{display:none}",
+".mfld input,.mfld select,.mfld textarea{min-height:46px;font-size:16px}",
+".mday{display:flex;flex-direction:column;gap:6px}",
+".mday>h5{margin:0;font:700 12.5px var(--font);color:var(--muted);display:flex;justify-content:space-between;align-items:center;letter-spacing:.02em}",
 
 /* ---- §14.3 responsive: stack below 1024px ---- */
 "@media(max-width:1024px){",
@@ -18548,7 +18690,9 @@ var CSS = [
 ".grid2,.grid3,.grid4{grid-template-columns:1fr}",
 ".week{grid-template-columns:1fr}",
 ".who .nm{display:none}",
-"}"
+".modal{border-radius:14px}",
+"}",
+"@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}"
 ].join("\n");
 
 /* ================= shared widgets ================= */
@@ -18583,6 +18727,38 @@ function Btn(p) {
   return h("button", Object.assign(o, { type: p.type || "button", className: "btn" + (p.kind ? " " + p.kind : "") + (p.sm ? " sm" : "") + (p.className ? " " + p.className : "") }), p.children);
 }
 function Chip(p) { return h("span", { className: "chip " + (p.k || "gr"), title: p.title, style: p.style }, p.children); }
+
+/* §7.2 — click a work-order code to copy it. execCommand is the fallback for
+   browsers that refuse the async clipboard outside a secure context (file://). */
+function fallbackCopy(t, done) {
+  try {
+    var ta = document.createElement("textarea");
+    ta.value = t; ta.setAttribute("readonly", "");
+    ta.style.position = "fixed"; ta.style.top = "-1000px"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, ta.value.length);
+    var ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    if (ok) done(); else toast("Could not reach the clipboard.", "error");
+  } catch (e) { toast("Could not reach the clipboard.", "error"); }
+}
+function copyText(t) {
+  if (!t) return;
+  var done = function () { toast("\u29c9 " + t + " copied to the clipboard.", "ok"); };
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(t).then(done, function () { fallbackCopy(t, done); });
+      return;
+    }
+  } catch (e) {}
+  fallbackCopy(t, done);
+}
+function CopyCell(p) {
+  if (!p.value) return h("span", { className: "cap" }, "\u2014");
+  return h("button", {
+    className: "copy", title: "Click to copy " + p.value,
+    onClick: function (ev) { ev.stopPropagation(); copyText(p.value); }
+  }, h("span", { className: "tnum" }, p.value), h("span", { className: "ci", "aria-hidden": "true" }, "\u29c9"));
+}
 function StatusDot(p) { return h("span", { className: "dot", style: { background: p.color } }); }
 
 function Modal(p) {
@@ -18751,6 +18927,7 @@ function hoursChips(e) {
   return h("span", { className: "row", style: { gap: 4 } },
     Number(e.red) ? h(Chip, { k: "red", title: "Red · company hours" }, num(e.red), " R") : null,
     Number(e.yellow) ? h(Chip, { k: "yel", title: "Yellow · client hours" }, num(e.yellow), " Y") : null,
+    Number(e.blue) ? h(Chip, { k: "blue", title: "Blue · management hours" }, num(e.blue), " B") : null,
     Number(e.day) ? h(Chip, { k: e.type === "Sick" ? "mut" : "gr", style: { background: e.type === "Sick" ? "rgba(156,140,232,.15)" : "rgba(63,169,126,.14)", color: e.type === "Sick" ? "#5A48B8" : "#1F7A57", borderColor: e.type === "Sick" ? "rgba(156,140,232,.4)" : "rgba(63,169,126,.4)" } }, num(e.day), " d") : null);
 }
 function statusBadge(e) {
@@ -18819,7 +18996,7 @@ function SignIn(p) {
 
   return h("div", { className: "auth" },
     h("div", { className: "authcard" },
-      h(AuthLogo, { sub: "Version 7 · standalone build" }),
+      h(AuthLogo, { sub: "Version 7.1 · standalone build" }),
 
       st.mode === "forgot"
         ? h("div", { className: "col", style: { gap: 12 } },
@@ -18948,7 +19125,7 @@ function SignUp(p) {
       st.step === 1 ? h("div", { className: "col", style: { gap: 9 } },
         h("div", { className: "grid2" },
           h(Inp, { label: "Full name (English)", req: true, id: "su-n", value: st.fullName, err: st.errs.fullName, onChange: function (e) { up("fullName", e.target.value); } }),
-          h(Inp, { label: "Full name (Hebrew, optional)", id: "su-nh", value: st.fullNameHe, dir: "rtl", onChange: function (e) { up("fullNameHe", e.target.value); } })),
+          h(Inp, { label: "Full name (Hebrew, optional)", id: "su-nh", value: st.fullNameHe, className: "he", onChange: function (e) { up("fullNameHe", e.target.value); } })),
         h(Inp, { label: "Company email", req: true, id: "su-e", value: st.email, placeholder: "name" + DOMAIN, err: st.errs.email, onChange: function (e) { up("email", e.target.value); } }),
         h("label", { className: "row", style: { gap: 7, fontSize: 13, fontWeight: 600, minHeight: 44 } },
           h("input", { type: "checkbox", checked: st.useMs, onChange: function (e) { up("useMs", e.target.checked); } }),
@@ -19054,7 +19231,7 @@ function PendingActivation(p) {
 function blankEntry(userId) {
   return {
     id: null, date: todayStr(), type: "Work", start: "09:00", end: "17:00",
-    red: 0, yellow: 0, day: 0, assignee: userId,
+    red: 0, yellow: 0, blue: 0, day: 0, assignee: userId,
     clientId: "", projectId: "", workOrderId: "", taskId: "",
     client: "", project: "", workOrder: "", task: "",
     hourType: "yellow", projectStatus: "", description: "", notes: "",
@@ -19065,7 +19242,7 @@ function blankEntry(userId) {
 }
 function toForm(e) {
   var f = Object.assign(blankEntry(e.assignee), e);
-  f.hourType = Number(e.red) > 0 ? "red" : "yellow";
+  f.hourType = Number(e.red) > 0 ? "red" : Number(e.blue) > 0 ? "blue" : "yellow";
   f.freeClient = !!(!e.clientId && e.client);
   f.freeProject = !!(!e.projectId && e.project);
   f.freeWO = !!(!e.workOrderId && e.workOrder);
@@ -19110,7 +19287,7 @@ function validateEntry(db, f, viewer) {
     if (!f.start || !f.end || hrs <= 0) e.end = "End time must be later than start time.";
   }
   if (!String(f.description || "").trim()) e.description = "Add a short description of the work.";
-  if (f.type === "Work" && f.hourType === "yellow") {
+  if (f.type === "Work" && (f.hourType === "yellow" || f.hourType === "blue")) {
     if (!f.clientId && !(f.freeClient && f.client)) e.client = "Select a client, or switch this entry to Red · Company.";
     if (!f.projectId && !(f.freeProject && f.project)) e.project = "Select a project.";
     var proj = byId(db.projects, f.projectId);
@@ -19146,6 +19323,7 @@ function formToEntry(db, f) {
     start: f.type === "Work" ? f.start : "", end: f.type === "Work" ? f.end : "",
     red: f.type === "Work" && f.hourType === "red" ? hrs : 0,
     yellow: f.type === "Work" && f.hourType === "yellow" ? hrs : 0,
+    blue: f.type === "Work" && f.hourType === "blue" ? hrs : 0,
     day: f.type === "Work" ? 0 : 1,
     assignee: f.assignee,
     clientId: f.type === "Work" && !f.freeClient ? (f.clientId || null) : null,
@@ -19182,6 +19360,7 @@ function EntryForm(p) {
     }
     if (k === "workOrderId") n.taskId = "";
     if (k === "type" && v !== "Work") { n.hourType = "yellow"; }
+    if (n.hourType === "blue" && !can(viewer, "reportBlueTime")) n.hourType = "yellow";
     set(n);
     var ne = Object.assign({}, errs); delete ne[k];
     if (k === "start" || k === "end") { delete ne.start; delete ne.end; }
@@ -19258,19 +19437,24 @@ function EntryForm(p) {
                 type: "button", role: "radio", "aria-checked": f.hourType === "yellow" ? "true" : "false",
                 className: f.hourType === "yellow" ? "on y" : "", title: "Yellow · Client — billable, drawn from the project budget",
                 onClick: function () { up("hourType", "yellow"); }
-              }, h("span", { className: "dot", style: { background: f.hourType === "yellow" ? "#3B2A05" : C.yellow } }), "Yellow")))
+              }, h("span", { className: "dot", style: { background: f.hourType === "yellow" ? "#3B2A05" : C.yellow } }), "Yellow"),
+              can(viewer, "reportBlueTime") ? h("button", {
+                type: "button", role: "radio", "aria-checked": f.hourType === "blue" ? "true" : "false",
+                className: f.hourType === "blue" ? "on b" : "", title: "Blue · Management — time spent managing a client's projects and tasks. Attributed to the client, but drawn from neither your allowance nor the project budget.",
+                onClick: function () { up("hourType", "blue"); }
+              }, h("span", { className: "dot", style: { background: f.hourType === "blue" ? "#fff" : C.blue } }), "Blue") : null))
         ]
     ),
     isDayType || f.hourType === "red" && false ? null : null,
     isDayType ? null : h("div", { className: "band" },
       h(ListOrFree, {
-        label: "Client", req: f.hourType === "yellow", cls: "grow", err: errs.client,
+        label: "Client", req: f.hourType !== "red", cls: "grow", err: errs.client,
         free: f.freeClient, value: f.clientId, freeValue: f.client, options: opts.clients,
         onFreeToggle: function (v) { set(Object.assign({}, f, { freeClient: v, clientId: "", client: "" })); },
         onChange: function (v) { up("clientId", v); }, onFreeChange: function (v) { up("client", v); }
       }),
       h(ListOrFree, {
-        label: "Project", req: f.hourType === "yellow", cls: "grow", err: errs.project,
+        label: "Project", req: f.hourType !== "red", cls: "grow", err: errs.project,
         free: f.freeProject, value: f.projectId, freeValue: f.project, options: opts.projects,
         onFreeToggle: function (v) { set(Object.assign({}, f, { freeProject: v, projectId: "", project: "" })); },
         onChange: function (v) { up("projectId", v); }, onFreeChange: function (v) { up("project", v); }
@@ -19298,6 +19482,64 @@ function EntryForm(p) {
         h("div", { className: "row", style: { gap: 6 } },
           p.onCancel ? h(Btn, { onClick: p.onCancel }, "Cancel") : null,
           h(Btn, { kind: "p", onClick: save }, p.saveLabel || (f.id ? "Save changes" : "Add entry"))))));
+}
+
+/* ---------- the one path an entry takes into the store (§7.2, §8) ----------
+   Desktop Time Log, the duplicate action and the mobile timer all go through
+   this, so the entitlement engine and approval routing can never diverge. */
+function commitEntry(mutate, user, form, after) {
+  mutate(function (d) {
+    var e = formToEntry(d, form);
+    var verdict = entitlementCheck(d, e);
+    var wasEdit = !!form.id;
+    if (!wasEdit || form.status === "pending") {
+      e.status = verdict.status; e.statusReason = verdict.reason; e.softFlag = verdict.softFlag;
+      if (verdict.status === "pending") e.submittedAt = nowISO();
+    } else {
+      /* an approver editing a registered entry keeps it registered */
+      e.status = form.status; e.statusReason = form.statusReason; e.softFlag = verdict.softFlag;
+    }
+    if (wasEdit) {
+      var i = d.entries.findIndex(function (x) { return x.id === form.id; });
+      var before = i >= 0 ? d.entries[i] : null;
+      if (i >= 0) d.entries[i] = e;
+      audit(d, user.id, "Entry edited", "entries", e.id, before, e);
+    } else {
+      d.entries.unshift(e);
+      audit(d, user.id, "Entry created", "entries", e.id, null, e);
+    }
+    if (e.status === "pending") {
+      raiseApproval(d, verdict.reason === "Unlisted item" ? "New list item" : "Time entry", "entries", e.id, e.assignee, verdict.reason, verdict.escalate);
+    }
+    e.__soft = verdict.softFlag;
+    return e;
+  }, function (e) {
+    if (e.status === "pending") toast("Saved as Pending \u2014 " + e.statusReason + ". It is excluded from totals until an approver decides.", "");
+    else if (e.softFlag) toast("Entry registered and flagged: a long day.", "");
+    else toast("Entry registered.", "ok");
+    if (after) after(e);
+  });
+}
+
+/* ---------- duplicate menu (§7.4) ---------- */
+function DupMenu(p) {
+  var st = useState(false), open = st[0], setOpen = st[1];
+  var ref = useRef(null);
+  useEffect(function () {
+    var f = function (ev) { if (ref.current && !ref.current.contains(ev.target)) setOpen(false); };
+    document.addEventListener("mousedown", f);
+    return function () { document.removeEventListener("mousedown", f); };
+  }, []);
+  return h("span", { className: "rel", ref: ref, style: { display: "inline-flex" } },
+    h(Btn, {
+      sm: true, kind: "t", className: "tap", title: "Duplicate this entry",
+      "aria-expanded": open ? "true" : "false", "aria-haspopup": "menu",
+      onClick: function () { setOpen(!open); }
+    }, "\u29c9"),
+    open ? h("div", { className: "pop", role: "menu" },
+      h("div", { className: "ph" }, "Duplicate to"),
+      h("button", { role: "menuitem", onClick: function () { setOpen(false); p.onPick(1); } }, "The next day"),
+      h("button", { role: "menuitem", onClick: function () { setOpen(false); p.onPick(7); } }, "The next week")) : null);
 }
 
 /* ---------- the Time Log tab ---------- */
@@ -19331,47 +19573,18 @@ function TimeLogTab(p) {
   /* Pending rows are excluded from every total shown on screen — §7.2 */
   var counted = rows.filter(function (e) { return e.status === "registered" || e.status === "locked"; });
   var tot = counted.reduce(function (a, e) {
-    a.red += Number(e.red) || 0; a.yellow += Number(e.yellow) || 0;
+    a.red += Number(e.red) || 0; a.yellow += Number(e.yellow) || 0; a.blue += Number(e.blue) || 0;
     if (e.type === "Sick") a.sick += Number(e.day) || 0;
     if (e.type === "Vacation") a.vac += Number(e.day) || 0;
     return a;
-  }, { red: 0, yellow: 0, sick: 0, vac: 0 });
-  var pendHrs = rows.filter(function (e) { return e.status === "pending"; }).reduce(function (a, e) { return a + (Number(e.red) || 0) + (Number(e.yellow) || 0); }, 0);
+  }, { red: 0, yellow: 0, blue: 0, sick: 0, vac: 0 });
+  var pendHrs = rows.filter(function (e) { return e.status === "pending"; }).reduce(function (a, e) { return a + (Number(e.red) || 0) + (Number(e.yellow) || 0) + (Number(e.blue) || 0); }, 0);
 
   var teamOpts = db.users.filter(function (u) { return visibleUserIds(db, user, "viewOthersTime").indexOf(u.id) >= 0 || u.id === user.id; })
     .map(function (u) { return { value: u.id, label: u.fullName + (u.isActive ? "" : " (inactive)") }; });
 
   function saveEntry(form) {
-    p.mutate(function (d) {
-      var e = formToEntry(d, form);
-      var verdict = entitlementCheck(d, e);
-      var wasEdit = !!form.id;
-      if (!wasEdit || form.status === "pending") {
-        e.status = verdict.status; e.statusReason = verdict.reason; e.softFlag = verdict.softFlag;
-        if (verdict.status === "pending") e.submittedAt = nowISO();
-      } else {
-        /* an approver editing a registered entry keeps it registered */
-        e.status = form.status; e.statusReason = form.statusReason; e.softFlag = verdict.softFlag;
-      }
-      if (wasEdit) {
-        var i = d.entries.findIndex(function (x) { return x.id === form.id; });
-        var before = i >= 0 ? d.entries[i] : null;
-        if (i >= 0) d.entries[i] = e;
-        audit(d, user.id, "Entry edited", "entries", e.id, before, e);
-      } else {
-        d.entries.unshift(e);
-        audit(d, user.id, "Entry created", "entries", e.id, null, e);
-      }
-      if (e.status === "pending") {
-        raiseApproval(d, verdict.reason === "Unlisted item" ? "New list item" : "Time entry", "entries", e.id, e.assignee, verdict.reason, verdict.escalate);
-      }
-      return e;
-    }, function (e) {
-      setEditing(null); bump(formKey + 1);
-      if (e.status === "pending") toast("Saved as Pending — " + e.statusReason + ". It is excluded from totals until an approver decides.", "");
-      else if (e.softFlag) toast("Entry registered and flagged: over " + (db.settings.dailySoftLimit || 9) + " hours that day.", "");
-      else toast("Entry registered.", "ok");
-    });
+    commitEntry(p.mutate, user, form, function () { setEditing(null); bump(formKey + 1); });
   }
   function delEntry(e) {
     var snapshot = JSON.parse(JSON.stringify(e));
@@ -19381,6 +19594,20 @@ function TimeLogTab(p) {
       audit(d, user.id, "Entry deleted", "entries", e.id, snapshot, null);
     });
     toast("Entry deleted.", "", { label: "Undo", fn: function () { p.mutate(function (d) { d.entries.unshift(snapshot); audit(d, user.id, "Entry delete undone", "entries", snapshot.id, null, snapshot); }); } });
+  }
+  /* §7.4 — duplicate an entry forward, then re-run the entitlement engine on the copy */
+  function dupEntry(e, days) {
+    var d = s2d(e.date); d.setDate(d.getDate() + days);
+    var nd = d2s(d);
+    if (nd > todayStr()) { toast("That date has not happened yet — plan it in the Week Planner instead.", "error"); return; }
+    var form = toForm(Object.assign({}, e, {
+      id: null, date: nd, status: "registered", statusReason: "", submittedAt: null,
+      approvedBy: null, approvedAt: null, decisionNote: "", softFlag: false
+    }));
+    var bad = validateEntry(db, form, user);
+    var keys = Object.keys(bad);
+    if (keys.length) { toast("Not duplicated \u2014 " + bad[keys[0]], "error"); return; }
+    saveEntry(form);
   }
   function cycleProjectStatus(e) {
     if (!canEditEntry(db, user, e)) return;
@@ -19401,7 +19628,7 @@ function TimeLogTab(p) {
       return {
         date: e.date, employee: userName(db, e.assignee), type: e.type,
         start: e.start, end: e.end, red: Number(e.red) || 0, yellow: Number(e.yellow) || 0,
-        day: Number(e.day) || 0,
+        blue: Number(e.blue) || 0, day: Number(e.day) || 0,
         client: e.clientId ? nameOf(db.clients, e.clientId) : (e.client || ""),
         project: e.projectId ? nameOf(db.projects, e.projectId) : (e.project || ""),
         workOrder: e.workOrderId ? nameOf(db.workOrders, e.workOrderId, "code") : (e.workOrder || ""),
@@ -19415,6 +19642,7 @@ function TimeLogTab(p) {
       { key: "type", label: "Type", width: 11 }, { key: "start", label: "Start", width: 9 }, { key: "end", label: "End", width: 9 },
       { key: "red", label: "Red h", type: "number", accent: "red", total: true, width: 10 },
       { key: "yellow", label: "Yellow h", type: "number", accent: "yellow", total: true, width: 11 },
+      { key: "blue", label: "Blue h", type: "number", total: true, width: 10 },
       { key: "day", label: "Days", type: "number", total: true, width: 8 },
       { key: "client", label: "Client" }, { key: "project", label: "Project" },
       { key: "workOrder", label: "Work order", width: 18 }, { key: "task", label: "Task" },
@@ -19449,7 +19677,8 @@ function TimeLogTab(p) {
         h("div", { className: "grow" }),
         h(Chip, { k: "red" }, "Red ", num(tot.red), " h"),
         h(Chip, { k: "yel" }, "Yellow ", num(tot.yellow), " h"),
-        h(Chip, { k: "gr" }, "Total ", num(tot.red + tot.yellow), " h"),
+        tot.blue ? h(Chip, { k: "blue" }, "Blue ", num(tot.blue), " h") : null,
+        h(Chip, { k: "gr" }, "Total ", num(tot.red + tot.yellow + tot.blue), " h"),
         tot.sick ? h(Chip, { k: "mut" }, "Sick ", num(tot.sick), " d") : null,
         tot.vac ? h(Chip, { k: "mut" }, "Vacation ", num(tot.vac), " d") : null,
         pendHrs ? h(Chip, { k: "amber", title: "Excluded from the totals until approved" }, "In approval ", num(pendHrs), " h") : null,
@@ -19472,22 +19701,24 @@ function TimeLogTab(p) {
     h("div", { className: "panel scroll" },
       rows.length === 0
         ? h("div", { className: "empty" }, "No entries for ", MONTHS_FULL[m], " ", y, " with these filters.")
-        : h("table", { className: "tbl" },
+        : h("table", { className: "tbl mid" },
             h("thead", null, h("tr", null,
               ["Date", "Employee", "Type", "Time", "Hours", "Client", "Project", "Work order", "Task", "Project status", "Description", ""].map(function (c, i) {
-                return h("th", { key: i, className: c === "Hours" ? "num" : "" }, c);
+                return h("th", { key: i, className: c === "Hours" ? "hrs" : "" }, c);
               }))),
             h("tbody", null, rows.map(function (e) {
               var editable = canEditEntry(db, user, e);
               return h("tr", { key: e.id, className: e.status === "pending" ? "pend" : e.status === "cancelled" ? "canc" : "" },
-                h("td", { style: { whiteSpace: "nowrap" } }, h("span", { className: "mono" }, il(e.date)), h("div", { className: "cap" }, DOW[s2d(e.date).getDay()])),
+                h("td", { style: { whiteSpace: "nowrap" } },
+                  h("span", { className: "tnum" }, il(e.date)),
+                  h("span", { className: "cap", style: { marginLeft: 6 } }, DOW[s2d(e.date).getDay()])),
                 h("td", null, userName(db, e.assignee)),
                 h("td", null, e.type === "Work" ? h("span", { className: "cap" }, "Work") : h(Chip, { k: "mut", style: { background: (e.type === "Sick" ? C.sick : C.vacation) + "22", color: e.type === "Sick" ? "#5A48B8" : "#1F7A57", borderColor: (e.type === "Sick" ? C.sick : C.vacation) + "66" } }, e.type)),
-                h("td", { className: "mono", style: { whiteSpace: "nowrap" } }, e.start ? e.start + "–" + e.end : "—"),
-                h("td", { className: "num" }, hoursChips(e)),
+                h("td", { className: "tnum", style: { whiteSpace: "nowrap" } }, e.start ? e.start + "–" + e.end : "—"),
+                h("td", { className: "hrs" }, hoursChips(e)),
                 h("td", null, e.clientId ? nameOf(db.clients, e.clientId) : e.client ? h("span", { title: "Typed by the employee — not in the master list" }, e.client, " ", h(Chip, { k: "amber" }, "new")) : "—"),
                 h("td", null, e.projectId ? nameOf(db.projects, e.projectId) : e.project ? h("span", null, e.project, " ", h(Chip, { k: "amber" }, "new")) : "—"),
-                h("td", { className: "mono", style: { fontSize: 12 } }, e.workOrderId ? nameOf(db.workOrders, e.workOrderId, "code") : e.workOrder || "—"),
+                h("td", null, h(CopyCell, { value: e.workOrderId ? nameOf(db.workOrders, e.workOrderId, "code") : (e.workOrder || "") })),
                 h("td", null, e.taskId ? nameOf(db.tasks, e.taskId, "title") : "—"),
                 h("td", null, h("span", { onClick: function () { cycleProjectStatus(e); }, style: { cursor: editable ? "pointer" : "default" }, title: editable ? "Click to change" : "" }, psChip(e.projectStatus) || h("span", { className: "cap" }, "—"))),
                 h("td", null, h("div", { className: "row", style: { gap: 6 } }, statusBadge(e), h("span", null, e.description)),
@@ -19496,6 +19727,7 @@ function TimeLogTab(p) {
                   e.status === "cancelled" && e.decisionNote ? h("div", { className: "cap", style: { color: C.error, fontWeight: 600 } }, "Declined: ", e.decisionNote) : null),
                 h("td", { style: { whiteSpace: "nowrap" } },
                   editable ? h(Btn, { sm: true, kind: "t", className: "tap", title: "Edit", onClick: function () { setEditing(e); window.scrollTo(0, 0); } }, "✎") : null,
+                  can(user, "reportOwnTime") && e.type === "Work" ? h(DupMenu, { onPick: function (days) { dupEntry(e, days); } }) : null,
                   editable ? h(Btn, { sm: true, kind: "t", className: "tap", title: "Delete", onClick: function () { delEntry(e); } }, "🗑") : null));
             })))));
 }
@@ -19507,11 +19739,11 @@ function TimeLogTab(p) {
 
 function taskConsumed(db, taskId) {
   return db.entries.filter(function (e) { return e.taskId === taskId && e.status === "registered"; })
-    .reduce(function (a, e) { return a + (Number(e.yellow) || 0) + (Number(e.red) || 0); }, 0);
+    .reduce(function (a, e) { return a + (Number(e.yellow) || 0) + (Number(e.red) || 0) + (Number(e.blue) || 0); }, 0);
 }
 function taskConsumedBy(db, taskId, userId) {
   return db.entries.filter(function (e) { return e.taskId === taskId && e.assignee === userId && e.status === "registered"; })
-    .reduce(function (a, e) { return a + (Number(e.yellow) || 0) + (Number(e.red) || 0); }, 0);
+    .reduce(function (a, e) { return a + (Number(e.yellow) || 0) + (Number(e.red) || 0) + (Number(e.blue) || 0); }, 0);
 }
 function taskAssigneeIds(db, taskId) {
   return db.taskAssignees.filter(function (t) { return t.taskId === taskId; }).map(function (t) { return t.userId; });
@@ -19815,8 +20047,8 @@ function PlannerTab(p) {
   var plans = db.planned.filter(function (x) { return x.userId === who && days.indexOf(x.date) >= 0; });
   var actuals = db.entries.filter(function (e) { return e.assignee === who && days.indexOf(e.date) >= 0 && e.status === "registered"; });
 
-  var plannedTotal = plans.reduce(function (a, x) { return a + (Number(x.red) || 0) + (Number(x.yellow) || 0); }, 0);
-  var actualTotal = actuals.reduce(function (a, e) { return a + (Number(e.red) || 0) + (Number(e.yellow) || 0); }, 0);
+  var plannedTotal = plans.reduce(function (a, x) { return a + (Number(x.red) || 0) + (Number(x.yellow) || 0) + (Number(x.blue) || 0); }, 0);
+  var actualTotal = actuals.reduce(function (a, e) { return a + (Number(e.red) || 0) + (Number(e.yellow) || 0) + (Number(e.blue) || 0); }, 0);
   var whoUser = byId(db.users, who) || user;
   var capacity = Number(whoUser.weeklyHours || 42) * (count / 7);
 
@@ -19834,19 +20066,7 @@ function PlannerTab(p) {
     }, seed || {}));
   }
   function savePlan(f) {
-    var hrs = derivedHours(f.start, f.end);
-    if (hrs <= 0) { toast("End time must be later than start time.", "error"); return; }
-    p.mutate(function (d) {
-      var rec = {
-        id: f.id || uid("pl"), userId: f.userId, date: f.date, start: f.start, end: f.end,
-        red: f.hourType === "red" ? hrs : 0, yellow: f.hourType === "red" ? 0 : hrs,
-        clientId: f.clientId || null, projectId: f.projectId || null, workOrderId: f.workOrderId || null,
-        taskId: f.taskId || null, description: f.description
-      };
-      var i = d.planned.findIndex(function (x) { return x.id === rec.id; });
-      if (i >= 0) d.planned[i] = rec; else d.planned.push(rec);
-      audit(d, user.id, (i >= 0 ? "Plan updated" : "Plan created") + " for " + userName(d, rec.userId), "planned_entries", rec.id, null, rec);
-    });
+    if (!savePlanned(p.mutate, user, f)) return;
     if (f.userId !== user.id) toast(userName(db, f.userId) + " has been notified of the change to their plan.", "ok");
     setModal(null);
   }
@@ -19867,8 +20087,8 @@ function PlannerTab(p) {
   function doExport() {
     var rows = plans.map(function (x) {
       var act = actuals.filter(function (e) { return e.date === x.date && e.projectId === x.projectId; })
-        .reduce(function (a, e) { return a + (Number(e.red) || 0) + (Number(e.yellow) || 0); }, 0);
-      var pl = (Number(x.red) || 0) + (Number(x.yellow) || 0);
+        .reduce(function (a, e) { return a + (Number(e.red) || 0) + (Number(e.yellow) || 0) + (Number(e.blue) || 0); }, 0);
+      var pl = (Number(x.red) || 0) + (Number(x.yellow) || 0) + (Number(x.blue) || 0);
       return {
         date: x.date, employee: userName(db, x.userId), start: x.start, end: x.end,
         planned: pl, actual: act, variance: Math.round((act - pl) * 100) / 100,
@@ -19926,8 +20146,8 @@ function PlannerTab(p) {
       h("div", { className: "week", style: vmode === "month" ? { gridTemplateRows: "repeat(4,minmax(150px,1fr))", height: "auto" } : { height: "100%" } },
         days.map(function (ds2) {
           var dayPlans = plans.filter(function (x) { return x.date === ds2; });
-          var dayActual = actuals.filter(function (e) { return e.date === ds2; }).reduce(function (a, e) { return a + (Number(e.red) || 0) + (Number(e.yellow) || 0); }, 0);
-          var dayPlanned = dayPlans.reduce(function (a, x) { return a + (Number(x.red) || 0) + (Number(x.yellow) || 0); }, 0);
+          var dayActual = actuals.filter(function (e) { return e.date === ds2; }).reduce(function (a, e) { return a + (Number(e.red) || 0) + (Number(e.yellow) || 0) + (Number(e.blue) || 0); }, 0);
+          var dayPlanned = dayPlans.reduce(function (a, x) { return a + (Number(x.red) || 0) + (Number(x.yellow) || 0) + (Number(x.blue) || 0); }, 0);
           return h("div", {
             key: ds2, className: "day" + (ds2 === todayStr() ? " today" : ""),
             onDragOver: function (e) { e.preventDefault(); },
@@ -19949,7 +20169,7 @@ function PlannerTab(p) {
                 return h("div", {
                   key: x.id, className: "pcard", draggable: true,
                   onDragStart: function () { setDrag(x.id); },
-                  onClick: function () { setModal(Object.assign({}, x, { hourType: Number(x.red) ? "red" : "yellow" })); }
+                  onClick: function () { setModal(Object.assign({}, x, { hourType: Number(x.red) ? "red" : Number(x.blue) ? "blue" : "yellow" })); }
                 },
                   h("div", { className: "mono", style: { fontWeight: 700 } }, x.start, "–", x.end),
                   h("div", null, x.projectId ? nameOf(db.projects, x.projectId) : "—"),
@@ -19962,6 +20182,26 @@ function PlannerTab(p) {
 
     modal ? h(PlanEditor, { db: db, user: user, value: modal, onSave: savePlan, onClose: function () { setModal(null); },
       onDelete: function (f) { p.mutate(function (d) { d.planned = d.planned.filter(function (x) { return x.id !== f.id; }); }); setModal(null); } }) : null);
+}
+
+/* the one path a planned entry takes into the store (§11) */
+function savePlanned(mutate, user, f) {
+  var hrs = derivedHours(f.start, f.end);
+  if (hrs <= 0) { toast("End time must be later than start time.", "error"); return false; }
+  mutate(function (d) {
+    var rec = {
+      id: f.id || uid("pl"), userId: f.userId, date: f.date, start: f.start, end: f.end,
+      red: f.hourType === "red" ? hrs : 0,
+      yellow: f.hourType === "yellow" ? hrs : 0,
+      blue: f.hourType === "blue" ? hrs : 0,
+      clientId: f.clientId || null, projectId: f.projectId || null, workOrderId: f.workOrderId || null,
+      taskId: f.taskId || null, description: f.description
+    };
+    var i = d.planned.findIndex(function (x) { return x.id === rec.id; });
+    if (i >= 0) d.planned[i] = rec; else d.planned.push(rec);
+    audit(d, user.id, (i >= 0 ? "Plan updated" : "Plan created") + " for " + userName(d, rec.userId), "planned_entries", rec.id, null, rec);
+  });
+  return true;
 }
 
 function PlanEditor(p) {
@@ -19990,7 +20230,7 @@ function PlanEditor(p) {
         h(Inp, { label: "End", type: "time", step: 300, value: f.end, onChange: function (e) { up("end", e.target.value); } })),
       h("div", { className: "row" },
         h("span", { className: "cap" }, "Derived hours"), h("b", { className: "mono" }, num(derivedHours(f.start, f.end)))),
-      h(Sel, { label: "Hour type", value: f.hourType, options: [{ value: "yellow", label: "Yellow · Client" }, { value: "red", label: "Red · Company" }], onChange: function (e) { up("hourType", e.target.value); } }),
+      h(Sel, { label: "Hour type", value: f.hourType, options: [{ value: "yellow", label: "Yellow · Client" }, { value: "red", label: "Red · Company" }].concat(can(p.user, "reportBlueTime") ? [{ value: "blue", label: "Blue · Management" }] : []), onChange: function (e) { up("hourType", e.target.value); } }),
       h(Sel, { label: "Client", value: f.clientId || "", placeholder: "—", options: db.clients.map(function (c) { return { value: c.id, label: c.name }; }), onChange: function (e) { up("clientId", e.target.value); } }),
       h(Sel, { label: "Project", value: f.projectId || "", placeholder: "—", options: projects.map(function (x) { return { value: x.id, label: x.name }; }), onChange: function (e) { up("projectId", e.target.value); } }),
       h("div", { className: "grid2" },
@@ -20157,7 +20397,7 @@ function ApprovalsTab(p) {
             a.status !== "pending" ? h(Chip, { k: a.status === "approved" ? "gr" : "err" }, a.status) : null),
           h("div", { className: "cap" }, "Raised ", new Date(a.createdAt).toLocaleString("en-GB"), " · routed to ", userName(db, a.assignedTo))),
         e ? h("div", { className: "col", style: { alignItems: "flex-end" } },
-          h("b", { className: "mono", style: { fontSize: 17 } }, num((Number(e.red) || 0) + (Number(e.yellow) || 0)), " h"),
+          h("b", { className: "mono", style: { fontSize: 17 } }, num((Number(e.red) || 0) + (Number(e.yellow) || 0) + (Number(e.blue) || 0)), " h"),
           h("span", { className: "cap mono" }, il(e.date), e.start ? " · " + e.start + "–" + e.end : "")) : null,
         x ? h("div", { className: "col", style: { alignItems: "flex-end" } },
           h("b", { className: "mono", style: { fontSize: 17 } }, money(x.amount, x.currency)),
@@ -20309,6 +20549,50 @@ function RequestHoursModal(p) {
 var CURRENCIES = ["₪", "$", "€"];
 var REIMB = ["Submitted", "Approved", "Paid", "Rejected"];
 
+/* §12.1 — evidence attachments. Each one can be replaced in place or removed;
+   the hidden per-row input is clicked from inside the button's own handler so the
+   file picker still counts as a user gesture. */
+function AttachField(p) {
+  var idRef = useRef(null);
+  if (!idRef.current) idRef.current = uid("att");
+  var base = idRef.current, list = p.value || [];
+  var meta = function (file) { return { name: file.name, size: file.size, type: file.type || "" }; };
+  return h(Field, { label: p.label, err: p.err, cls: p.cls },
+    h("div", { className: "col", style: { gap: 7 } },
+      h("input", {
+        type: "file", accept: "image/*,.pdf", id: base + "-add",
+        onChange: function (e) {
+          var file = e.target.files && e.target.files[0]; if (!file) return;
+          p.onChange(list.concat([meta(file)])); e.target.value = "";
+        }
+      }),
+      list.length
+        ? h("div", { className: "row", style: { gap: 6 } }, list.map(function (a, i) {
+            return h("span", { key: i, className: "att" },
+              h("span", { className: "nm", title: a.name + (a.size ? " \u00b7 " + Math.round(a.size / 1024) + " KB" : "") }, "\ud83d\udcce ", a.name),
+              h("input", {
+                type: "file", accept: "image/*,.pdf", id: base + "-r" + i, className: "hidden",
+                onChange: function (e) {
+                  var file = e.target.files && e.target.files[0]; if (!file) return;
+                  var n = list.slice(); n[i] = meta(file); p.onChange(n); e.target.value = "";
+                  toast("Attachment replaced.", "ok");
+                }
+              }),
+              h("button", {
+                type: "button", className: "rep", title: "Replace " + a.name, "aria-label": "Replace " + a.name,
+                onClick: function () { var el = document.getElementById(base + "-r" + i); if (el) el.click(); }
+              }, "\u27f3"),
+              h("button", {
+                type: "button", title: "Remove " + a.name, "aria-label": "Remove " + a.name,
+                onClick: function () {
+                  var before = list.slice(), n = list.slice(); n.splice(i, 1); p.onChange(n);
+                  toast("Attachment removed.", "", { label: "Undo", fn: function () { p.onChange(before); } });
+                }
+              }, "\u2715"));
+          }))
+        : h("span", { className: "cap" }, "No evidence attached yet.")));
+}
+
 function ExpensesTab(p) {
   var db = p.db, user = p.user;
   var baseYear = new Date().getFullYear();
@@ -20429,13 +20713,11 @@ function ExpensesTab(p) {
         h(Sel, { label: "Work order", value: f.workOrderId, placeholder: "—", options: db.workOrders.filter(function (w) { return w.projectId === f.projectId; }).map(function (w) { return { value: w.id, label: w.code }; }), onChange: function (e) { up("workOrderId", e.target.value); } }),
         h(Inp, { label: "Description", req: true, cls: "wide", err: errs.description, value: f.description, onChange: function (e) { up("description", e.target.value); } }),
         h(Inp, { label: "Notes", value: f.notes, onChange: function (e) { up("notes", e.target.value); } }),
-        h(Field, { label: "Evidence" + (etype && etype.requiresEvidence ? " (required)" : ""), err: errs.attachments, cls: "grow" },
-          h("div", { className: "row", style: { gap: 6 } },
-            h("input", { type: "file", accept: "image/*,.pdf", onChange: function (e) {
-              var file = e.target.files && e.target.files[0]; if (!file) return;
-              up("attachments", (f.attachments || []).concat([{ name: file.name, size: file.size }]));
-            } }),
-            (f.attachments || []).map(function (a, i) { return h(Chip, { key: i, k: "gr" }, "📎 ", a.name); }))),
+        h(AttachField, {
+          label: "Evidence" + (etype && etype.requiresEvidence ? " (required)" : ""),
+          err: errs.attachments, cls: "grow", value: f.attachments || [],
+          onChange: function (v) { up("attachments", v); }
+        }),
         h("div", { className: "fld", style: { flex: "0 0 auto" } }, h("label", null, " "),
           h("div", { className: "row", style: { gap: 6 } },
             f.id ? h(Btn, { onClick: function () { set(blank); setErrs({}); } }, "Cancel") : null,
@@ -20466,7 +20748,9 @@ function ExpensesTab(p) {
                 h("td", { className: "num" }, x.vkind === "money" ? money(x.amount, x.currency) : num(x.hours) + " h"),
                 h("td", null, x.clientId ? nameOf(db.clients, x.clientId) : "—", x.projectId ? h("div", { className: "cap" }, nameOf(db.projects, x.projectId)) : null),
                 h("td", { className: "mono", style: { fontSize: 12 } }, x.workOrderId ? nameOf(db.workOrders, x.workOrderId, "code") : "—"),
-                h("td", null, (x.attachments || []).length ? h(Chip, { k: "gr" }, "📎 ", x.attachments.length) : h("span", { className: "cap" }, "—")),
+                h("td", null, (x.attachments || []).length
+                  ? h(Btn, { sm: true, kind: "t", title: (x.attachments || []).map(function (a) { return a.name; }).join("\n") + "\n\nOpen the expense to replace or remove attachments.", onClick: function () { set(Object.assign({}, x)); window.scrollTo(0, 0); } }, "\ud83d\udcce ", String(x.attachments.length))
+                  : h("span", { className: "cap" }, "\u2014")),
                 h("td", null, can(user, "approveExpenses")
                   ? h("select", { value: x.status, onChange: function (e) { setStatus(x, e.target.value); }, className: "minisel" }, REIMB.map(function (s) { return h("option", { key: s, value: s }, s); }))
                   : h(Chip, { k: x.status === "Paid" ? "gr" : x.status === "Rejected" ? "err" : x.status === "Approved" ? "teal" : "amber" }, x.status)),
@@ -20478,13 +20762,17 @@ function ExpensesTab(p) {
 }
 
 /* =====================================================================
-   §12.2 — Budgets and work orders
+   §12.2 — Management: budgets, work orders and the company's master records.
+   V7.1 — this tab was called "Budgets" up to V7. The record-keeping sections
+   that used to sit in the ⚙ window are rendered here by MgmtPanel (§12.5).
    ===================================================================== */
 var BASES = ["Money", "Hours", "Pages", "Words", "Custom"];
 
-function BudgetsTab(p) {
+function ManagementTab(p) {
   var db = p.db, user = p.user;
-  var ts = useState("budgets"), tab = ts[0], setTab = ts[1];
+  var sections = mgmtSectionsFor(user);
+  var ts = useState(sections.length ? sections[0].k : "budgets"), tab = ts[0], setTab = ts[1];
+  if (!sections.some(function (x) { return x.k === tab; })) tab = sections.length ? sections[0].k : "budgets";
   var es = useState(null), editing = es[0], setEditing = es[1];
   var ws = useState(null), woEdit = ws[0], setWoEdit = ws[1];
   var hs = useState(null), history = hs[0], setHistory = hs[1];
@@ -20577,15 +20865,18 @@ function BudgetsTab(p) {
     }], "galil-budgets-all.xlsx");
   }
 
-  if (!can(user, "viewBudgets")) return h("div", { className: "page" }, h("div", { className: "banner mut panel pad" }, "Budget values are not visible to your role. Access is governed by the permission matrix, and enforced server-side."));
+  if (!sections.length) return h("div", { className: "page" }, h("div", { className: "banner mut panel pad" }, "Your role carries no management rights. Access is governed by the permission matrix, and enforced server-side."));
 
   return h("div", { className: "page" },
     h("div", { className: "panel pad row", style: { gap: 9 } },
       h("div", { className: "pillbar" },
-        h("button", { className: "pill" + (tab === "budgets" ? " on" : ""), onClick: function () { setTab("budgets"); } }, "Budgets"),
-        h("button", { className: "pill" + (tab === "wos" ? " on" : ""), onClick: function () { setTab("wos"); } }, "Work orders")),
+        sections.map(function (sc) {
+          var bdg = mgmtBadge(db, user, sc.k);
+          return h("button", { key: sc.k, className: "pill" + (tab === sc.k ? " on" : ""), onClick: function () { setTab(sc.k); } },
+            sc.label, bdg ? h("span", { className: "badge" }, bdg) : null);
+        })),
       h("div", { className: "grow" }),
-      can(user, "excelExport") ? h(Btn, { sm: true, onClick: doExport }, "⬇ Export") : null,
+      can(user, "excelExport") && (tab === "budgets" || tab === "wos") ? h(Btn, { sm: true, onClick: doExport }, "⬇ Export") : null,
       editable && tab === "budgets" ? h(Btn, { kind: "p", sm: true, onClick: function () { setEditing({ id: null, clientId: "", projectId: "", workOrderId: "", basis: "Hours", currency: "₪", amount: "", rate: "", hours: "", units: "", unitName: "", produced: 0, notes: "", history: [] }); } }, "+ New budget") : null,
       can(user, "createWorkOrders") && tab === "wos" ? h(Btn, { kind: "p", sm: true, onClick: function () { setWoEdit({ id: null, projectId: "", code: "", title: "", status: "Active", contractRef: "", startDate: todayStr(), endDate: "", notes: "", budgetHours: "" }); } }, "+ New work order") : null),
 
@@ -20631,7 +20922,7 @@ function BudgetsTab(p) {
         h("tbody", null, wos.map(function (w) {
           var pr = byId(db.projects, w.projectId) || {};
           var b = db.budgets.filter(function (x) { return x.workOrderId === w.id; })[0];
-          var used = b ? budgetConsumed(db, b) : db.entries.filter(function (e) { return e.workOrderId === w.id && e.status === "registered"; }).reduce(function (a, e) { return a + (Number(e.yellow) || 0); }, 0);
+          var used = b ? budgetConsumed(db, b) : db.entries.filter(function (e) { return e.workOrderId === w.id && e.status === "registered"; }).reduce(function (a, e) { return a + (Number(e.yellow) || 0) + (Number(e.blue) || 0); }, 0);
           return h("tr", { key: w.id },
             h("td", { className: "mono", style: { fontWeight: 700 } }, w.code),
             h("td", null, w.title),
@@ -20644,6 +20935,10 @@ function BudgetsTab(p) {
               b && b.hours ? h(Bar, { used: used, total: b.hours, style: { width: 76 } }) : null, num(used), " h")),
             h("td", null, can(user, "createWorkOrders") ? h(Btn, { sm: true, kind: "t", className: "tap", onClick: function () { setWoEdit(Object.assign({ budgetHours: b ? b.hours : "" }, w)); } }, "✎") : null));
         })))) : null,
+
+    ["budgets", "wos"].indexOf(tab) < 0
+      ? h("div", { className: "panel pad scroll" }, h(MgmtPanel, { db: db, user: user, mutate: p.mutate, section: tab }))
+      : null,
 
     editing ? h(BudgetEditor, { db: db, value: editing, onSave: saveBudget, onClose: function () { setEditing(null); },
       onDelete: function (f) { p.mutate(function (d) { d.budgets = d.budgets.filter(function (x) { return x.id !== f.id; }); audit(d, user.id, "Budget deleted", "budgets", f.id, f, null); }); setEditing(null); } }) : null,
@@ -20764,7 +21059,8 @@ function DashboardTab(p) {
 
   var red = entries.reduce(function (a, e) { return a + (Number(e.red) || 0); }, 0);
   var yellow = entries.reduce(function (a, e) { return a + (Number(e.yellow) || 0); }, 0);
-  var total = red + yellow;
+  var blue = entries.reduce(function (a, e) { return a + (Number(e.blue) || 0); }, 0);
+  var total = red + yellow + blue;
   var util = total ? (yellow / total) * 100 : 0;
   var sick = entries.filter(function (e) { return e.type === "Sick"; }).reduce(function (a, e) { return a + (Number(e.day) || 0); }, 0);
   var vac = entries.filter(function (e) { return e.type === "Vacation"; }).reduce(function (a, e) { return a + (Number(e.day) || 0); }, 0);
@@ -20774,22 +21070,22 @@ function DashboardTab(p) {
   /* series */
   var byDate = {};
   entries.forEach(function (e) {
-    if (!byDate[e.date]) byDate[e.date] = { date: e.date, red: 0, yellow: 0 };
-    byDate[e.date].red += Number(e.red) || 0; byDate[e.date].yellow += Number(e.yellow) || 0;
+    if (!byDate[e.date]) byDate[e.date] = { date: e.date, red: 0, yellow: 0, blue: 0 };
+    byDate[e.date].red += Number(e.red) || 0; byDate[e.date].yellow += Number(e.yellow) || 0; byDate[e.date].blue += Number(e.blue) || 0;
   });
   var series = Object.keys(byDate).sort().map(function (k) {
     var r = byDate[k];
-    return { name: pad(s2d(k).getDate()) + "/" + pad(s2d(k).getMonth() + 1), red: Math.round(r.red * 10) / 10, yellow: Math.round(r.yellow * 10) / 10 };
+    return { name: pad(s2d(k).getDate()) + "/" + pad(s2d(k).getMonth() + 1), red: Math.round(r.red * 10) / 10, yellow: Math.round(r.yellow * 10) / 10, blue: Math.round(r.blue * 10) / 10 };
   });
   var byClient = {};
   entries.forEach(function (e) {
     var n = e.clientId ? nameOf(db.clients, e.clientId) : (e.client || "Unassigned");
-    byClient[n] = (byClient[n] || 0) + (Number(e.red) || 0) + (Number(e.yellow) || 0);
+    byClient[n] = (byClient[n] || 0) + (Number(e.red) || 0) + (Number(e.yellow) || 0) + (Number(e.blue) || 0);
   });
   var clientRows = Object.keys(byClient).map(function (k) { return { name: k, v: byClient[k] }; }).sort(function (a, b) { return b.v - a.v; });
   var maxClient = clientRows.reduce(function (a, x) { return Math.max(a, x.v); }, 1);
 
-  var plannedTotal = plannedIn.reduce(function (a, x) { return a + (Number(x.red) || 0) + (Number(x.yellow) || 0); }, 0);
+  var plannedTotal = plannedIn.reduce(function (a, x) { return a + (Number(x.red) || 0) + (Number(x.yellow) || 0) + (Number(x.blue) || 0); }, 0);
 
   /* §12.3 manager cockpit */
   var cockpit = null;
@@ -20801,7 +21097,7 @@ function DashboardTab(p) {
       var sow = startOfWeek(new Date()), days = [];
       for (var i = 0; i < 7; i++) { var d = new Date(sow); d.setDate(sow.getDate() + i); days.push(d2s(d)); }
       var pl = db.planned.filter(function (x) { return x.userId === u.id && days.indexOf(x.date) >= 0; })
-        .reduce(function (a, x) { return a + (Number(x.red) || 0) + (Number(x.yellow) || 0); }, 0);
+        .reduce(function (a, x) { return a + (Number(x.red) || 0) + (Number(x.yellow) || 0) + (Number(x.blue) || 0); }, 0);
       return pl > Number(u.weeklyHours || 42);
     });
     var overdue = db.tasks.filter(isOverdue);
@@ -20825,6 +21121,7 @@ function DashboardTab(p) {
         { key: "client", label: "Client" }, { key: "project", label: "Project" }, { key: "workOrder", label: "Work order", width: 18 },
         { key: "task", label: "Task" }, { key: "red", label: "Red h", type: "number", accent: "red", total: true },
         { key: "yellow", label: "Yellow h", type: "number", accent: "yellow", total: true },
+        { key: "blue", label: "Blue h", type: "number", total: true },
         { key: "description", label: "Description", width: 44 }],
       rows: entries.map(function (e) {
         return {
@@ -20832,7 +21129,7 @@ function DashboardTab(p) {
           client: e.clientId ? nameOf(db.clients, e.clientId) : e.client, project: e.projectId ? nameOf(db.projects, e.projectId) : e.project,
           workOrder: e.workOrderId ? nameOf(db.workOrders, e.workOrderId, "code") : "",
           task: e.taskId ? nameOf(db.tasks, e.taskId, "title") : "",
-          red: Number(e.red) || 0, yellow: Number(e.yellow) || 0, description: e.description
+          red: Number(e.red) || 0, yellow: Number(e.yellow) || 0, blue: Number(e.blue) || 0, description: e.description
         };
       })
     }], "galil-dashboard-all.xlsx");
@@ -20865,6 +21162,7 @@ function DashboardTab(p) {
         h("div", { className: "stat" }, h("div", { className: "k" }, "Total hours"), h("div", { className: "v" }, num(total))),
         h("div", { className: "stat" }, h("div", { className: "k" }, "Red · company"), h("div", { className: "v", style: { color: C.red } }, fmt(red))),
         h("div", { className: "stat" }, h("div", { className: "k" }, "Yellow · client"), h("div", { className: "v", style: { color: "#8A6410" } }, fmt(yellow))),
+        blue ? h("div", { className: "stat" }, h("div", { className: "k" }, "Blue · management"), h("div", { className: "v", style: { color: C.blue } }, fmt(blue))) : null,
         h("div", { className: "stat" }, h("div", { className: "k" }, "Utilisation"), h("div", { className: "v", style: { color: C.deep } }, num(util, 0), "%"), h("div", { className: "s" }, "Yellow of total")),
         h("div", { className: "stat" }, h("div", { className: "k" }, "Sick days"), h("div", { className: "v", style: { color: C.sick } }, num(sick))),
         h("div", { className: "stat" }, h("div", { className: "k" }, "Vacation days"), h("div", { className: "v", style: { color: C.vacation } }, num(vac))),
@@ -20881,7 +21179,8 @@ function DashboardTab(p) {
               h(YAxis, { stroke: C.muted }),
               h(Tooltip, null),
               h(Area, { type: "monotone", dataKey: "yellow", stackId: "1", stroke: C.yellow, fill: C.yellow, fillOpacity: .55, name: "Yellow" }),
-              h(Area, { type: "monotone", dataKey: "red", stackId: "1", stroke: C.red, fill: C.red, fillOpacity: .5, name: "Red" })))
+              h(Area, { type: "monotone", dataKey: "red", stackId: "1", stroke: C.red, fill: C.red, fillOpacity: .5, name: "Red" }),
+              h(Area, { type: "monotone", dataKey: "blue", stackId: "1", stroke: C.blue, fill: C.blue, fillOpacity: .45, name: "Blue" })))
             : h("div", { className: "empty" }, "No hours in this range."))),
 
       h("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 } },
@@ -20894,13 +21193,14 @@ function DashboardTab(p) {
               h("span", { className: "mono cap", style: { minWidth: 62, textAlign: "right" } }, fmt(r.v), pctMode ? "" : " h"));
           })) : h("div", { className: "empty" }, "No data.")),
         h("div", { className: "panel pad" },
-          h("div", { className: "h3", style: { marginBottom: 8 } }, "Red against Yellow · plan against actual"),
+          h("div", { className: "h3", style: { marginBottom: 8 } }, "Hour split · plan against actual"),
           h("div", { className: "col", style: { gap: 10 } },
             h("div", null,
-              h("div", { className: "row cap", style: { justifyContent: "space-between" } }, h("span", null, "Red / Yellow split"), h("span", { className: "mono" }, num(red), " / ", num(yellow))),
+              h("div", { className: "row cap", style: { justifyContent: "space-between" } }, h("span", null, "Red / Yellow" + (blue ? " / Blue" : "") + " split"), h("span", { className: "mono" }, num(red), " / ", num(yellow), blue ? " / " + num(blue) : "")),
               h("div", { className: "bar", style: { height: 16 } },
                 h("i", { style: { width: (total ? red / total * 100 : 0) + "%", background: C.red } }),
-                h("i", { style: { width: (total ? yellow / total * 100 : 0) + "%", background: C.yellow } }))),
+                h("i", { style: { width: (total ? yellow / total * 100 : 0) + "%", background: C.yellow } }),
+                h("i", { style: { width: (total ? blue / total * 100 : 0) + "%", background: C.blue } }))),
             h("div", null,
               h("div", { className: "row cap", style: { justifyContent: "space-between" } }, h("span", null, "Planned against actual"), h("span", { className: "mono" }, num(plannedTotal), " planned · ", num(total), " actual")),
               h("div", { className: "bar", style: { height: 16 } },
@@ -21001,8 +21301,17 @@ function LibraryTab(p) {
 </script>
 <script>"use strict";
 /* =====================================================================
-   §12.5 — Lists and data administration (single settings modal, 1180 px)
-   plus §6.3 activation, §13 audit log and §4.2 permission matrix view
+   §12.5 — Management and System administration.
+
+   V7.1 splits the old single settings window in two:
+
+   · Management  — a main tab. Everything that is day-to-day operational work on
+     the company's records: budgets, work orders, people, pending activation,
+     assignments and allowances, clients, projects, expense types and the
+     verification queue.
+   · System administration — the ⚙ window. Only what governs the installation
+     itself: company settings, backup and restore, the audit log, and the
+     read-only roles and permissions reference.
    ===================================================================== */
 
 function usageCount(db, kind, id) {
@@ -21014,39 +21323,267 @@ function usageCount(db, kind, id) {
   return 0;
 }
 
-function AdminModal(p) {
-  var db = p.db, user = p.user;
-  var ts = useState("people"), tab = ts[0], setTab = ts[1];
+/* ---------- shared master-list editor ---------- */
+function ListEditor(pp) {
+  var db = pp.db, user = pp.user, kind = pp.kind, fields = pp.fields || [];
+  var ns = useState({}), draft = ns[0], setDraft = ns[1];
+  function addItem(obj) { pp.mutate(function (d) { d[kind].push(obj); audit(d, user.id, "Added to " + kind, kind, obj.id, null, obj); }); }
+  function renameItem(id, field, value) {
+    pp.mutate(function (d) { var o = byId(d[kind], id); if (o) { var b = o[field]; o[field] = value; audit(d, user.id, "Renamed " + kind + ": " + b + " → " + value, kind, id, null, null); } });
+  }
+  function removeItem(id) {
+    if (usageCount(db, kind, id) > 0) { toast("That item is referenced by saved records and cannot be removed.", "error"); return; }
+    pp.mutate(function (d) { d[kind] = d[kind].filter(function (x) { return x.id !== id; }); audit(d, user.id, "Removed from " + kind, kind, id, null, null); });
+    toast("Removed.", "");
+  }
+  return h("div", { className: "col", style: { gap: 9 } },
+    pp.canEdit && fields.length ? h("div", { className: "band" },
+      fields.map(function (f) {
+        return f.type === "select"
+          ? h(Sel, { key: f.key, label: f.label, value: draft[f.key] || "", placeholder: "—", options: f.options(db), onChange: function (e) { var n = Object.assign({}, draft); n[f.key] = e.target.value; setDraft(n); } })
+          : h(Inp, { key: f.key, label: f.label, type: f.type || "text", value: draft[f.key] || "", onChange: function (e) { var n = Object.assign({}, draft); n[f.key] = e.target.value; setDraft(n); } });
+      }),
+      h("div", { className: "fld", style: { flex: "0 0 auto" } }, h("label", null, " "),
+        h(Btn, { kind: "p", onClick: function () {
+          var o = pp.make(draft); if (!o) return;
+          addItem(o); setDraft({}); toast("Added.", "ok");
+        } }, "+ Add"))) : null,
+    h("div", { style: { overflowX: "auto" } },
+      h("table", { className: "tbl mid" },
+        h("thead", null, h("tr", null, pp.cols.map(function (c, i) { return h("th", { key: i }, c); }), h("th", null, "Used by"), pp.canEdit ? h("th", null, "") : null)),
+        h("tbody", null, (db[kind] || []).map(function (o) {
+          return h("tr", { key: o.id },
+            pp.row(o).map(function (cell, i) { return h("td", { key: i }, cell); }),
+            h("td", { className: "num" }, h(Chip, { k: "mut" }, usageCount(db, kind, o.id), " records")),
+            pp.canEdit ? h("td", { style: { whiteSpace: "nowrap" } },
+              h(Btn, { sm: true, kind: "t", className: "tap", title: "Rename", onClick: function () {
+                var v = window.prompt("New name", o[pp.nameField || "name"]);
+                if (v) renameItem(o.id, pp.nameField || "name", v);
+              } }, "✎"),
+              h(Btn, { sm: true, kind: "t", className: "tap", title: "Remove", onClick: function () { removeItem(o.id); } }, "🗑")) : null);
+        })))));
+}
+
+/* ---------- the Management sections ---------- */
+var MGMT_SECTIONS = [
+  { k: "budgets",      label: "Budgets",                  show: function (u) { return can(u, "viewBudgets"); } },
+  { k: "wos",          label: "Work orders",              show: function (u) { return can(u, "viewBudgets") || can(u, "createWorkOrders") || can(u, "manageClientsProjects"); } },
+  { k: "people",       label: "People",                   show: function (u) { return can(u, "assignTasks") || can(u, "manageClientsProjects") || can(u, "manageEmployeesRoles"); } },
+  { k: "activation",   label: "Pending activation",       show: function (u) { return can(u, "manageEmployeesRoles"); } },
+  { k: "assignments",  label: "Assignments & allowances", show: function (u) { return can(u, "assignTasks") || can(u, "manageClientsProjects"); } },
+  { k: "clients",      label: "Clients",                  show: function (u) { return can(u, "assignTasks") || can(u, "manageClientsProjects") || can(u, "viewBudgets"); } },
+  { k: "projects",     label: "Projects",                 show: function (u) { return can(u, "assignTasks") || can(u, "manageClientsProjects") || can(u, "viewBudgets"); } },
+  { k: "expenseTypes", label: "Expense types",            show: function (u) { return can(u, "manageClientsProjects") || can(u, "manageEmployeesRoles") || can(u, "approveExpenses"); } },
+  { k: "verify",       label: "Verification queue",       show: function (u) { return can(u, "manageClientsProjects"); } }
+];
+function mgmtSectionsFor(user) { return MGMT_SECTIONS.filter(function (s) { return s.show(user); }); }
+function canOpenManagement(user) { return mgmtSectionsFor(user).length > 0; }
+function mgmtBadge(db, user, k) {
+  if (k === "activation") return db.users.filter(function (u) { return u.pendingActivation; }).length;
+  if (k === "verify") return db.clients.filter(function (c) { return !c.isVerified; }).length + db.projects.filter(function (x) { return !x.isVerified; }).length;
+  return 0;
+}
+
+/* Renders one Management section. Used by the Management tab. */
+function MgmtPanel(p) {
+  var db = p.db, user = p.user, section = p.section;
   var isAdmin = can(user, "manageEmployeesRoles");
   var canLists = can(user, "manageClientsProjects");
+
+  if (section === "people") return h(ListEditor, {
+    db: db, user: user, mutate: p.mutate, kind: "users", canEdit: false,
+    cols: ["Name", "Email", "Role", "Team", "Manager", "Status"],
+    row: function (u) {
+      return [
+        h("div", null, h("b", null, u.fullName), u.fullNameHe ? h("div", { className: "cap he" }, u.fullNameHe) : null),
+        h("span", { className: "cap" }, u.email),
+        isAdmin ? h("select", { value: u.role, onChange: function (e) {
+            var v = e.target.value;
+            p.mutate(function (d) { var t = byId(d.users, u.id); if (t) { var b = t.role; t.role = v; audit(d, user.id, "Role change " + b + " → " + v + " for " + t.fullName, "users", u.id, null, null); } });
+          }, className: "minisel" },
+            ROLES.map(function (r) { return h("option", { key: r.code, value: r.code }, r.name); }))
+          : h(Chip, { k: "gr" }, roleName(u.role)),
+        u.teamId ? nameOf(db.teams, u.teamId) : "—",
+        u.managerId ? userName(db, u.managerId) : "—",
+        h("div", { className: "row", style: { gap: 5 } },
+          u.pendingActivation ? h(Chip, { k: "amber" }, "pending") : u.isActive ? h(Chip, { k: "gr" }, "active") : h(Chip, { k: "mut" }, "Inactive"),
+          isAdmin && !u.pendingActivation ? h(Btn, { sm: true, kind: "t", onClick: function () {
+            p.mutate(function (d) { var t = byId(d.users, u.id); if (t) { t.isActive = !t.isActive; audit(d, user.id, (t.isActive ? "Activated " : "Deactivated ") + t.fullName, "users", u.id, null, null); } });
+          } }, u.isActive ? "Deactivate" : "Reactivate") : null)
+      ];
+    },
+    fields: [], make: function () { return null; }
+  });
+
+  if (section === "activation") return h("div", { className: "col", style: { gap: 9 } },
+    h("div", { className: "cap" }, "New accounts appear here. Confirm or change the requested role, assign the person to a team and to their initial projects, then activate."),
+    db.users.filter(function (u) { return u.pendingActivation; }).length === 0 ? h("div", { className: "empty panel" }, "Nothing awaiting activation.") : null,
+    db.users.filter(function (u) { return u.pendingActivation; }).map(function (u) {
+      return h("div", { key: u.id, className: "panel pad col", style: { gap: 8, borderLeft: "4px solid " + C.amber } },
+        h("div", { className: "row" },
+          h("span", { className: "avatar" }, initialsOf(u.fullName)),
+          h("div", { className: "grow col", style: { gap: 1 } },
+            h("b", null, u.fullName), h("span", { className: "cap" }, u.email),
+            h("span", { className: "cap" }, u.jobTitle, " · ", u.department, " · from ", il(u.startDate))),
+          h(Chip, { k: "amber" }, "requested ", roleName(u.requestedRole || u.role))),
+        h("div", { className: "band" },
+          h(Sel, { label: "Confirm role", id: "act-role-" + u.id, defaultValue: u.requestedRole || u.role, options: ROLES.map(function (r) { return { value: r.code, label: r.name }; }), onChange: function () {} }),
+          h(Sel, { label: "Team", id: "act-team-" + u.id, defaultValue: u.teamId || "", placeholder: "—", options: db.teams.map(function (t) { return { value: t.id, label: t.name }; }), onChange: function () {} }),
+          h(Sel, { label: "Initial project", id: "act-proj-" + u.id, defaultValue: "", placeholder: "—", options: db.projects.map(function (x) { return { value: x.id, label: x.name }; }), onChange: function () {} }),
+          h(Inp, { label: "Allowance (h)", id: "act-allow-" + u.id, type: "number", defaultValue: "", onChange: function () {} }),
+          h("div", { className: "fld", style: { flex: "0 0 auto" } }, h("label", null, " "),
+            h("div", { className: "row", style: { gap: 6 } },
+              h(Btn, { kind: "p", onClick: function () {
+                var role = (document.getElementById("act-role-" + u.id) || {}).value;
+                var team = (document.getElementById("act-team-" + u.id) || {}).value;
+                var proj = (document.getElementById("act-proj-" + u.id) || {}).value;
+                var allow = (document.getElementById("act-allow-" + u.id) || {}).value;
+                p.mutate(function (d) {
+                  var t = byId(d.users, u.id); if (!t) return;
+                  t.role = role || t.role; t.teamId = team || null; t.isActive = true; t.pendingActivation = false; t.requestedRole = null;
+                  if (proj) d.assignments.push({ id: uid("a"), userId: t.id, projectId: proj, workOrderId: null, allowanceHours: allow === "" ? null : Number(allow), grantedBy: user.id, grantedAt: nowISO() });
+                  d.approvals.forEach(function (a) { if (a.entityTable === "users" && a.entityId === t.id && a.status === "pending") { a.status = "approved"; a.decidedBy = user.id; a.decidedAt = nowISO(); } });
+                  audit(d, user.id, "Activated " + t.fullName + " as " + t.role, "users", t.id, null, null);
+                });
+                toast(u.fullName + " activated.", "ok");
+              } }, "Activate"),
+              h(Btn, { kind: "d", onClick: function () {
+                p.mutate(function (d) { var t = byId(d.users, u.id); if (t) { t.pendingActivation = false; t.isActive = false; audit(d, user.id, "Rejected sign-up " + t.fullName, "users", t.id, null, null); } });
+                toast("Sign-up rejected.", "");
+              } }, "Reject")))));
+    }));
+
+  if (section === "assignments") return h("div", { className: "col", style: { gap: 9 } },
+    h("div", { className: "cap" }, "Allowance is set per assignment, not per person. Zero means “assigned but not yet funded” — every entry goes to approval. Blank means unlimited within the project budget."),
+    canLists || can(user, "assignTasks") ? h("div", { className: "band" },
+      h(Sel, { label: "Person", id: "asg-u", options: db.users.filter(function (u) { return u.isActive; }).map(function (u) { return { value: u.id, label: u.fullName }; }), onChange: function () {} }),
+      h(Sel, { label: "Project", id: "asg-p", options: db.projects.map(function (x) { return { value: x.id, label: nameOf(db.clients, x.clientId) + " — " + x.name }; }), onChange: function () {} }),
+      h(Sel, { label: "Work order", id: "asg-w", placeholder: "— project level —", options: db.workOrders.map(function (w) { return { value: w.id, label: w.code }; }), onChange: function () {} }),
+      h(Inp, { label: "Allowance (h)", id: "asg-h", type: "number", placeholder: "blank = unlimited", onChange: function () {} }),
+      h("div", { className: "fld", style: { flex: "0 0 auto" } }, h("label", null, " "),
+        h(Btn, { kind: "p", onClick: function () {
+          var u = (document.getElementById("asg-u") || {}).value, pr = (document.getElementById("asg-p") || {}).value;
+          var w = (document.getElementById("asg-w") || {}).value, hh = (document.getElementById("asg-h") || {}).value;
+          if (!u || !pr) { toast("Pick a person and a project.", "error"); return; }
+          p.mutate(function (d) {
+            d.assignments.push({ id: uid("a"), userId: u, projectId: pr, workOrderId: w || null, allowanceHours: hh === "" ? null : Number(hh), grantedBy: user.id, grantedAt: nowISO() });
+            audit(d, user.id, "Assignment granted", "assignments", "-", null, null);
+          });
+          toast("Assignment created.", "ok");
+        } }, "+ Assign"))) : null,
+    h("div", { style: { overflowX: "auto" } },
+      h("table", { className: "tbl mid" },
+        h("thead", null, h("tr", null, ["Person", "Project", "Work order", "Allowance", "Consumed", "In approval", "Remaining", ""].map(function (c, i) { return h("th", { key: i, className: ["Allowance", "Consumed", "In approval"].indexOf(c) >= 0 ? "num" : "" }, c); }))),
+        h("tbody", null, db.assignments.map(function (a) {
+          var used = consumedOn(db, a.userId, a), pend = pendingOn(db, a.userId, a);
+          var unlimited = a.allowanceHours === null || a.allowanceHours === undefined || a.allowanceHours === "";
+          var pct = unlimited ? 0 : (used / (Number(a.allowanceHours) || 1)) * 100;
+          return h("tr", { key: a.id },
+            h("td", { style: { whiteSpace: "nowrap" } }, userName(db, a.userId)),
+            h("td", { style: { whiteSpace: "nowrap" } }, nameOf(db.projects, a.projectId)),
+            h("td", null, h(CopyCell, { value: a.workOrderId ? nameOf(db.workOrders, a.workOrderId, "code") : "" })),
+            h("td", { className: "num" }, h("input", {
+              type: "number", defaultValue: unlimited ? "" : a.allowanceHours, placeholder: "∞", className: "miniinp", style: { width: 78 },
+              onBlur: function (e) {
+                var v = e.target.value === "" ? null : Number(e.target.value);
+                p.mutate(function (d) { var t = byId(d.assignments, a.id); if (t) { var b = t.allowanceHours; t.allowanceHours = v; audit(d, user.id, "Allowance " + b + " → " + v, "assignments", a.id, null, null); } });
+              }
+            })),
+            h("td", { className: "num" }, num(used)),
+            h("td", { className: "num", style: { color: C.amber } }, num(pend)),
+            h("td", { style: { whiteSpace: "nowrap" } }, unlimited ? h("span", { className: "cap" }, "∞")
+              : h("div", { className: "row", style: { gap: 8, flexWrap: "nowrap", justifyContent: "flex-end" } },
+                  h("span", { className: "tnum", style: { minWidth: 42, textAlign: "right" } }, num(Number(a.allowanceHours) - used), " h"),
+                  h(Bar, { used: used, pending: pend, total: a.allowanceHours, style: { width: 84 } }),
+                  h("span", { style: { minWidth: 54, display: "inline-flex", justifyContent: "flex-end" } },
+                    pct >= 75 ? h(Chip, { k: pct >= 100 ? "err" : pct >= 90 ? "amber" : "gr" }, num(pct, 0), "%") : null))),
+            h("td", null, canLists || can(user, "assignTasks") ? h(Btn, { sm: true, kind: "t", className: "tap", title: "Remove assignment", onClick: function () {
+              p.mutate(function (d) { d.assignments = d.assignments.filter(function (x) { return x.id !== a.id; }); audit(d, user.id, "Assignment removed", "assignments", a.id, null, null); });
+            } }, "🗑") : null));
+        })))));
+
+  if (section === "clients") return h(ListEditor, {
+    db: db, user: user, mutate: p.mutate, kind: "clients", canEdit: canLists, nameField: "name",
+    cols: ["Name", "Initials", "Contact", "Verified"],
+    row: function (c) {
+      return [c.name, h("span", { className: "tnum" }, c.initials), c.contactName ? c.contactName + " · " + c.contactEmail : "—",
+        c.isVerified ? h(Chip, { k: "gr" }, "verified") : h(Chip, { k: "amber" }, "unverified")];
+    },
+    fields: [{ key: "name", label: "Client name" }, { key: "initials", label: "Initials" }, { key: "contactName", label: "Contact" }, { key: "contactEmail", label: "Contact email" }],
+    make: function (d2) {
+      if (!d2.name) { toast("Enter a client name.", "error"); return null; }
+      return { id: uid("c"), name: d2.name, initials: (d2.initials || initialsOf(d2.name)).toUpperCase(), isInternal: false, contactName: d2.contactName || "", contactEmail: d2.contactEmail || "", notes: "", isVerified: true };
+    }
+  });
+
+  if (section === "projects") return h(ListEditor, {
+    db: db, user: user, mutate: p.mutate, kind: "projects", canEdit: canLists, nameField: "name",
+    cols: ["Project", "Client", "Status", "Owner", "WO tracked"],
+    row: function (x) {
+      return [x.name, nameOf(db.clients, x.clientId), psChip(x.status), x.ownerUserId ? userName(db, x.ownerUserId) : "—",
+        x.isWoTracked ? h(Chip, { k: "teal" }, "yes") : h("span", { className: "cap" }, "no")];
+    },
+    fields: [
+      { key: "name", label: "Project name" },
+      { key: "clientId", label: "Client", type: "select", options: function (d2) { return d2.clients.map(function (c) { return { value: c.id, label: c.name }; }); } },
+      { key: "status", label: "Status", type: "select", options: function () { return PROJECT_STATUSES.map(function (s) { return { value: s, label: s }; }); } },
+      { key: "ownerUserId", label: "Owner", type: "select", options: function (d2) { return d2.users.filter(function (u) { return ["PM", "TL", "OPS", "CEO"].indexOf(u.role) >= 0; }).map(function (u) { return { value: u.id, label: u.fullName }; }); } }
+    ],
+    make: function (d2) {
+      if (!d2.name || !d2.clientId) { toast("Enter a name and pick a client.", "error"); return null; }
+      return { id: uid("p"), clientId: d2.clientId, name: d2.name, status: d2.status || "Active", ownerUserId: d2.ownerUserId || user.id, startDate: todayStr(), endDate: null, isWoTracked: false, notes: "", isVerified: true };
+    }
+  });
+
+  if (section === "expenseTypes") return h(ListEditor, {
+    db: db, user: user, mutate: p.mutate, kind: "expenseTypes", canEdit: isAdmin, nameField: "name",
+    cols: ["Type", "Evidence required", "Auto-approval ceiling"],
+    row: function (t) {
+      return [t.name,
+        h("label", { className: "row", style: { gap: 6 } }, h("input", { type: "checkbox", checked: !!t.requiresEvidence, disabled: !isAdmin, onChange: function (e) { var v = e.target.checked; p.mutate(function (d) { var o = byId(d.expenseTypes, t.id); if (o) o.requiresEvidence = v; }); } }), t.requiresEvidence ? "required" : "optional"),
+        h("input", { type: "number", defaultValue: t.ceiling == null ? "" : t.ceiling, disabled: !isAdmin, className: "miniinp", style: { width: 92 }, onBlur: function (e) { var v = e.target.value === "" ? null : Number(e.target.value); p.mutate(function (d) { var o = byId(d.expenseTypes, t.id); if (o) o.ceiling = v; }); } })];
+    },
+    fields: [{ key: "name", label: "Expense type" }, { key: "ceiling", label: "Ceiling", type: "number" }],
+    make: function (d2) { if (!d2.name) return null; return { id: uid("et"), name: d2.name, requiresEvidence: false, ceiling: d2.ceiling === "" || d2.ceiling === undefined ? null : Number(d2.ceiling) }; }
+  });
+
+  if (section === "verify") return h("div", { className: "col", style: { gap: 9 } },
+    h("div", { className: "cap" }, "Items added by employees wait here until a manager confirms them."),
+    (function () {
+      var pendC = db.clients.filter(function (c) { return !c.isVerified; });
+      var pendP = db.projects.filter(function (x) { return !x.isVerified; });
+      if (!pendC.length && !pendP.length) return h("div", { className: "empty panel" }, "Nothing to verify.");
+      return h("div", { style: { overflowX: "auto" } }, h("table", { className: "tbl mid" },
+        h("thead", null, h("tr", null, ["Kind", "Name", "Context", ""].map(function (c, i) { return h("th", { key: i }, c); }))),
+        h("tbody", null,
+          pendC.map(function (c) {
+            return h("tr", { key: c.id }, h("td", null, "Client"), h("td", null, c.name), h("td", null, "—"),
+              h("td", null, h(Btn, { sm: true, kind: "p", onClick: function () { p.mutate(function (d) { var o = byId(d.clients, c.id); if (o) o.isVerified = true; audit(d, user.id, "Client verified: " + o.name, "clients", c.id, null, null); }); toast("Confirmed.", "ok"); } }, "Confirm")));
+          }),
+          pendP.map(function (x) {
+            return h("tr", { key: x.id }, h("td", null, "Project"), h("td", null, x.name), h("td", null, nameOf(db.clients, x.clientId)),
+              h("td", null, h(Btn, { sm: true, kind: "p", onClick: function () { p.mutate(function (d) { var o = byId(d.projects, x.id); if (o) o.isVerified = true; audit(d, user.id, "Project verified: " + o.name, "projects", x.id, null, null); }); toast("Confirmed.", "ok"); } }, "Confirm")));
+          }))));
+    })());
+
+  return null;
+}
+
+/* ---------- ⚙ System administration ---------- */
+function AdminModal(p) {
+  var db = p.db, user = p.user;
+  var isAdmin = can(user, "manageEmployeesRoles");
   var fileRef = useRef(null), listRef = useRef(null);
   var ps = useState(null), preview = ps[0], setPreview = ps[1];
 
   var TABS = [
-    { k: "people", label: "People", show: true },
-    { k: "activation", label: "Pending activation", show: isAdmin, badge: db.users.filter(function (u) { return u.pendingActivation; }).length },
-    { k: "assignments", label: "Assignments & allowances", show: can(user, "assignTasks") || canLists },
-    { k: "clients", label: "Clients", show: true },
-    { k: "projects", label: "Projects", show: true },
-    { k: "workOrders", label: "Work orders", show: true },
-    { k: "expenseTypes", label: "Expense types", show: true },
     { k: "roles", label: "Roles & permissions", show: true },
-    { k: "verify", label: "Verification queue", show: canLists, badge: db.clients.filter(function (c) { return !c.isVerified; }).length + db.projects.filter(function (x) { return !x.isVerified; }).length },
     { k: "settings", label: "Company settings", show: isAdmin },
     { k: "data", label: "Backup & restore", show: can(user, "backupRestore") },
     { k: "audit", label: "Audit log", show: can(user, "viewAuditLog") }
   ].filter(function (t) { return t.show; });
 
-  /* ---------- data operations ---------- */
-  function addItem(kind, obj) { p.mutate(function (d) { d[kind].push(obj); audit(d, user.id, "Added to " + kind, kind, obj.id, null, obj); }); }
-  function renameItem(kind, id, field, value) {
-    p.mutate(function (d) { var o = byId(d[kind], id); if (o) { var b = o[field]; o[field] = value; audit(d, user.id, "Renamed " + kind + ": " + b + " → " + value, kind, id, null, null); } });
-  }
-  function removeItem(kind, id) {
-    if (usageCount(db, kind, id) > 0) { toast("That item is referenced by saved records and cannot be removed.", "error"); return; }
-    p.mutate(function (d) { d[kind] = d[kind].filter(function (x) { return x.id !== id; }); audit(d, user.id, "Removed from " + kind, kind, id, null, null); });
-    toast("Removed.", "");
-  }
+  var ts = useState(TABS.length ? TABS[0].k : "roles"), tab = ts[0], setTab = ts[1];
 
   function downloadBackup() { exportJSON(wrap(db), "galil-workdesk-backup-" + todayStr() + ".json"); }
   function readFile(ref, cb) {
@@ -21084,216 +21621,20 @@ function AdminModal(p) {
     setPreview(null);
   }
 
-  function ListEditor(pp) {
-    var kind = pp.kind, fields = pp.fields;
-    var ns = useState({}), draft = ns[0], setDraft = ns[1];
-    return h("div", { className: "col", style: { gap: 9 } },
-      pp.canEdit ? h("div", { className: "band" },
-        fields.map(function (f) {
-          return f.type === "select"
-            ? h(Sel, { key: f.key, label: f.label, value: draft[f.key] || "", placeholder: "—", options: f.options(db), onChange: function (e) { var n = Object.assign({}, draft); n[f.key] = e.target.value; setDraft(n); } })
-            : h(Inp, { key: f.key, label: f.label, type: f.type || "text", value: draft[f.key] || "", onChange: function (e) { var n = Object.assign({}, draft); n[f.key] = e.target.value; setDraft(n); } });
-        }),
-        h("div", { className: "fld", style: { flex: "0 0 auto" } }, h("label", null, " "),
-          h(Btn, { kind: "p", onClick: function () {
-            var o = pp.make(draft); if (!o) return;
-            addItem(kind, o); setDraft({}); toast("Added.", "ok");
-          } }, "+ Add"))) : null,
-      h("table", { className: "tbl" },
-        h("thead", null, h("tr", null, pp.cols.map(function (c, i) { return h("th", { key: i }, c); }), h("th", null, "Used by"), pp.canEdit ? h("th", null, "") : null)),
-        h("tbody", null, (db[kind] || []).map(function (o) {
-          return h("tr", { key: o.id },
-            pp.row(o).map(function (cell, i) { return h("td", { key: i }, cell); }),
-            h("td", { className: "num" }, h(Chip, { k: "mut" }, usageCount(db, kind, o.id), " records")),
-            pp.canEdit ? h("td", { style: { whiteSpace: "nowrap" } },
-              h(Btn, { sm: true, kind: "t", className: "tap", title: "Rename", onClick: function () {
-                var v = window.prompt("New name", o[pp.nameField || "name"]);
-                if (v) renameItem(kind, o.id, pp.nameField || "name", v);
-              } }, "✎"),
-              h(Btn, { sm: true, kind: "t", className: "tap", title: "Remove", onClick: function () { removeItem(kind, o.id); } }, "🗑")) : null);
-        }))));
-  }
-
-  return h(Modal, { title: "Lists & data administration", onClose: p.onClose,
+  return h(Modal, { title: "System administration", onClose: p.onClose,
     head: h("div", { className: "cap" }, "Signed in as ", user.fullName, " · ", roleName(user.role)) },
+    h("div", { className: "banner gr", style: { marginBottom: 12 } },
+      "ℹ People, clients, projects, work orders, assignments, expense types and the verification queue now live on the ",
+      h("b", null, " Management "), " tab."),
     h("div", { style: { display: "flex", gap: 14, minHeight: 460 } },
       h("div", { className: "col", style: { gap: 3, flex: "0 0 210px" } },
         TABS.map(function (t) {
           return h("button", {
-            key: t.k, className: "btn", style: {
-              justifyContent: "space-between", background: tab === t.k ? C.ink : "#fff",
-              color: tab === t.k ? "#fff" : C.ink, borderColor: tab === t.k ? C.ink : C.line
-            }, onClick: function () { setTab(t.k); }
+            key: t.k, className: "btn" + (tab === t.k ? " on" : ""), style: { justifyContent: "space-between" },
+            onClick: function () { setTab(t.k); }
           }, t.label, t.badge ? h(Chip, { k: "amber" }, t.badge) : null);
         })),
       h("div", { className: "grow", style: { minWidth: 0, overflow: "auto", maxHeight: "68vh" } },
-
-        tab === "people" ? h(ListEditor, {
-          kind: "users", canEdit: false,
-          cols: ["Name", "Email", "Role", "Team", "Manager", "Status"],
-          row: function (u) {
-            return [
-              h("div", null, h("b", null, u.fullName), u.fullNameHe ? h("div", { className: "cap", dir: "rtl" }, u.fullNameHe) : null),
-              h("span", { className: "mono", style: { fontSize: 12 } }, u.email),
-              isAdmin ? h("select", { value: u.role, onChange: function (e) {
-                  var v = e.target.value;
-                  p.mutate(function (d) { var t = byId(d.users, u.id); if (t) { var b = t.role; t.role = v; audit(d, user.id, "Role change " + b + " → " + v + " for " + t.fullName, "users", u.id, null, null); } });
-                }, className: "minisel" },
-                  ROLES.map(function (r) { return h("option", { key: r.code, value: r.code }, r.name); }))
-                : h(Chip, { k: "gr" }, roleName(u.role)),
-              u.teamId ? nameOf(db.teams, u.teamId) : "—",
-              u.managerId ? userName(db, u.managerId) : "—",
-              h("div", { className: "row", style: { gap: 5 } },
-                u.pendingActivation ? h(Chip, { k: "amber" }, "pending") : u.isActive ? h(Chip, { k: "gr" }, "active") : h(Chip, { k: "mut" }, "Inactive"),
-                isAdmin && !u.pendingActivation ? h(Btn, { sm: true, kind: "t", onClick: function () {
-                  p.mutate(function (d) { var t = byId(d.users, u.id); if (t) { t.isActive = !t.isActive; audit(d, user.id, (t.isActive ? "Activated " : "Deactivated ") + t.fullName, "users", u.id, null, null); } });
-                } }, u.isActive ? "Deactivate" : "Reactivate") : null)
-            ];
-          },
-          fields: [], make: function () { return null; }
-        }) : null,
-
-        tab === "activation" ? h("div", { className: "col", style: { gap: 9 } },
-          h("div", { className: "cap" }, "New accounts appear here. Confirm or change the requested role, assign the person to a team and to their initial projects, then activate."),
-          db.users.filter(function (u) { return u.pendingActivation; }).length === 0 ? h("div", { className: "empty" }, "Nothing awaiting activation.") : null,
-          db.users.filter(function (u) { return u.pendingActivation; }).map(function (u) {
-            return h("div", { key: u.id, className: "panel pad col", style: { gap: 8, borderLeft: "4px solid " + C.amber } },
-              h("div", { className: "row" },
-                h("span", { className: "avatar" }, initialsOf(u.fullName)),
-                h("div", { className: "grow col", style: { gap: 1 } },
-                  h("b", null, u.fullName), h("span", { className: "cap mono" }, u.email),
-                  h("span", { className: "cap" }, u.jobTitle, " · ", u.department, " · from ", il(u.startDate))),
-                h(Chip, { k: "amber" }, "requested ", roleName(u.requestedRole || u.role))),
-              h("div", { className: "band" },
-                h(Sel, { label: "Confirm role", id: "act-role-" + u.id, defaultValue: u.requestedRole || u.role, options: ROLES.map(function (r) { return { value: r.code, label: r.name }; }), onChange: function () {} }),
-                h(Sel, { label: "Team", id: "act-team-" + u.id, defaultValue: u.teamId || "", placeholder: "—", options: db.teams.map(function (t) { return { value: t.id, label: t.name }; }), onChange: function () {} }),
-                h(Sel, { label: "Initial project", id: "act-proj-" + u.id, defaultValue: "", placeholder: "—", options: db.projects.map(function (x) { return { value: x.id, label: x.name }; }), onChange: function () {} }),
-                h(Inp, { label: "Allowance (h)", id: "act-allow-" + u.id, type: "number", defaultValue: "", onChange: function () {} }),
-                h("div", { className: "fld", style: { flex: "0 0 auto" } }, h("label", null, " "),
-                  h("div", { className: "row", style: { gap: 6 } },
-                    h(Btn, { kind: "p", onClick: function () {
-                      var role = (document.getElementById("act-role-" + u.id) || {}).value;
-                      var team = (document.getElementById("act-team-" + u.id) || {}).value;
-                      var proj = (document.getElementById("act-proj-" + u.id) || {}).value;
-                      var allow = (document.getElementById("act-allow-" + u.id) || {}).value;
-                      p.mutate(function (d) {
-                        var t = byId(d.users, u.id); if (!t) return;
-                        t.role = role || t.role; t.teamId = team || null; t.isActive = true; t.pendingActivation = false; t.requestedRole = null;
-                        if (proj) d.assignments.push({ id: uid("a"), userId: t.id, projectId: proj, workOrderId: null, allowanceHours: allow === "" ? null : Number(allow), grantedBy: user.id, grantedAt: nowISO() });
-                        d.approvals.forEach(function (a) { if (a.entityTable === "users" && a.entityId === t.id && a.status === "pending") { a.status = "approved"; a.decidedBy = user.id; a.decidedAt = nowISO(); } });
-                        audit(d, user.id, "Activated " + t.fullName + " as " + t.role, "users", t.id, null, null);
-                      });
-                      toast(u.fullName + " activated.", "ok");
-                    } }, "Activate"),
-                    h(Btn, { kind: "d", onClick: function () {
-                      p.mutate(function (d) { var t = byId(d.users, u.id); if (t) { t.pendingActivation = false; t.isActive = false; audit(d, user.id, "Rejected sign-up " + t.fullName, "users", t.id, null, null); } });
-                      toast("Sign-up rejected.", "");
-                    } }, "Reject")))));
-          })) : null,
-
-        tab === "assignments" ? h("div", { className: "col", style: { gap: 9 } },
-          h("div", { className: "cap" }, "Allowance is set per assignment, not per person. Zero means “assigned but not yet funded” — every entry goes to approval. Blank means unlimited within the project budget."),
-          h("div", { className: "band" },
-            h(Sel, { label: "Person", id: "asg-u", options: db.users.filter(function (u) { return u.isActive; }).map(function (u) { return { value: u.id, label: u.fullName }; }), onChange: function () {} }),
-            h(Sel, { label: "Project", id: "asg-p", options: db.projects.map(function (x) { return { value: x.id, label: nameOf(db.clients, x.clientId) + " — " + x.name }; }), onChange: function () {} }),
-            h(Sel, { label: "Work order", id: "asg-w", placeholder: "— project level —", options: db.workOrders.map(function (w) { return { value: w.id, label: w.code }; }), onChange: function () {} }),
-            h(Inp, { label: "Allowance (h)", id: "asg-h", type: "number", placeholder: "blank = unlimited", onChange: function () {} }),
-            h("div", { className: "fld", style: { flex: "0 0 auto" } }, h("label", null, " "),
-              h(Btn, { kind: "p", onClick: function () {
-                var u = (document.getElementById("asg-u") || {}).value, pr = (document.getElementById("asg-p") || {}).value;
-                var w = (document.getElementById("asg-w") || {}).value, hh = (document.getElementById("asg-h") || {}).value;
-                if (!u || !pr) { toast("Pick a person and a project.", "error"); return; }
-                p.mutate(function (d) {
-                  d.assignments.push({ id: uid("a"), userId: u, projectId: pr, workOrderId: w || null, allowanceHours: hh === "" ? null : Number(hh), grantedBy: user.id, grantedAt: nowISO() });
-                  audit(d, user.id, "Assignment granted", "assignments", "-", null, null);
-                });
-                toast("Assignment created.", "ok");
-              } }, "+ Assign"))),
-          h("table", { className: "tbl" },
-            h("thead", null, h("tr", null, ["Person", "Project", "Work order", "Allowance", "Consumed", "In approval", "Remaining", ""].map(function (c, i) { return h("th", { key: i, className: ["Allowance", "Consumed", "In approval", "Remaining"].indexOf(c) >= 0 ? "num" : "" }, c); }))),
-            h("tbody", null, db.assignments.map(function (a) {
-              var used = consumedOn(db, a.userId, a), pend = pendingOn(db, a.userId, a);
-              var unlimited = a.allowanceHours === null || a.allowanceHours === undefined || a.allowanceHours === "";
-              return h("tr", { key: a.id },
-                h("td", null, userName(db, a.userId)),
-                h("td", null, nameOf(db.projects, a.projectId)),
-                h("td", { className: "mono", style: { fontSize: 12 } }, a.workOrderId ? nameOf(db.workOrders, a.workOrderId, "code") : "—"),
-                h("td", { className: "num" }, h("input", {
-                  type: "number", defaultValue: unlimited ? "" : a.allowanceHours, placeholder: "∞", className: "miniinp", style: { width: 78 },
-                  onBlur: function (e) {
-                    var v = e.target.value === "" ? null : Number(e.target.value);
-                    p.mutate(function (d) { var t = byId(d.assignments, a.id); if (t) { var b = t.allowanceHours; t.allowanceHours = v; audit(d, user.id, "Allowance " + b + " → " + v, "assignments", a.id, null, null); } });
-                  }
-                })),
-                h("td", { className: "num" }, num(used)),
-                h("td", { className: "num", style: { color: C.amber } }, num(pend)),
-                h("td", { className: "num" }, unlimited ? "∞" : h("div", { className: "row", style: { gap: 6, justifyContent: "flex-end" } }, h(Bar, { used: used, pending: pend, total: a.allowanceHours, style: { width: 66 } }), num(Number(a.allowanceHours) - used))),
-                h("td", null, h(Btn, { sm: true, kind: "t", className: "tap", onClick: function () {
-                  p.mutate(function (d) { d.assignments = d.assignments.filter(function (x) { return x.id !== a.id; }); audit(d, user.id, "Assignment removed", "assignments", a.id, null, null); });
-                } }, "🗑")));
-            })))) : null,
-
-        tab === "clients" ? h(ListEditor, {
-          kind: "clients", canEdit: canLists, nameField: "name",
-          cols: ["Name", "Initials", "Contact", "Verified"],
-          row: function (c) {
-            return [c.name, h("span", { className: "mono" }, c.initials), c.contactName ? c.contactName + " · " + c.contactEmail : "—",
-              c.isVerified ? h(Chip, { k: "gr" }, "verified") : h(Chip, { k: "amber" }, "unverified")];
-          },
-          fields: [{ key: "name", label: "Client name" }, { key: "initials", label: "Initials" }, { key: "contactName", label: "Contact" }, { key: "contactEmail", label: "Contact email" }],
-          make: function (d2) {
-            if (!d2.name) { toast("Enter a client name.", "error"); return null; }
-            return { id: uid("c"), name: d2.name, initials: (d2.initials || initialsOf(d2.name)).toUpperCase(), isInternal: false, contactName: d2.contactName || "", contactEmail: d2.contactEmail || "", notes: "", isVerified: true };
-          }
-        }) : null,
-
-        tab === "projects" ? h(ListEditor, {
-          kind: "projects", canEdit: canLists, nameField: "name",
-          cols: ["Project", "Client", "Status", "Owner", "WO tracked"],
-          row: function (x) {
-            return [x.name, nameOf(db.clients, x.clientId), psChip(x.status), x.ownerUserId ? userName(db, x.ownerUserId) : "—",
-              x.isWoTracked ? h(Chip, { k: "teal" }, "yes") : h("span", { className: "cap" }, "no")];
-          },
-          fields: [
-            { key: "name", label: "Project name" },
-            { key: "clientId", label: "Client", type: "select", options: function (d2) { return d2.clients.map(function (c) { return { value: c.id, label: c.name }; }); } },
-            { key: "status", label: "Status", type: "select", options: function () { return PROJECT_STATUSES.map(function (s) { return { value: s, label: s }; }); } },
-            { key: "ownerUserId", label: "Owner", type: "select", options: function (d2) { return d2.users.filter(function (u) { return ["PM", "TL", "OPS", "CEO"].indexOf(u.role) >= 0; }).map(function (u) { return { value: u.id, label: u.fullName }; }); } }
-          ],
-          make: function (d2) {
-            if (!d2.name || !d2.clientId) { toast("Enter a name and pick a client.", "error"); return null; }
-            return { id: uid("p"), clientId: d2.clientId, name: d2.name, status: d2.status || "Active", ownerUserId: d2.ownerUserId || user.id, startDate: todayStr(), endDate: null, isWoTracked: false, notes: "", isVerified: true };
-          }
-        }) : null,
-
-        tab === "workOrders" ? h(ListEditor, {
-          kind: "workOrders", canEdit: can(user, "createWorkOrders"), nameField: "title",
-          cols: ["Code", "Title", "Project", "Status", "Contract ref"],
-          row: function (w) { return [h("span", { className: "mono", style: { fontWeight: 700 } }, w.code), w.title, nameOf(db.projects, w.projectId), h(Chip, { k: "gr" }, w.status), h("span", { className: "mono", style: { fontSize: 12 } }, w.contractRef || "—")]; },
-          fields: [
-            { key: "projectId", label: "Project", type: "select", options: function (d2) { return d2.projects.map(function (x) { return { value: x.id, label: x.name }; }); } },
-            { key: "code", label: "Code" }, { key: "title", label: "Title" }, { key: "contractRef", label: "Contract ref" }
-          ],
-          make: function (d2) {
-            if (!d2.projectId || !d2.title) { toast("Pick a project and give a title.", "error"); return null; }
-            var pr = byId(db.projects, d2.projectId), cl = pr ? byId(db.clients, pr.clientId) : null;
-            var code = d2.code || ("WO-" + (cl ? cl.initials : "GEN") + "-" + String(100000 + db.workOrders.length * 23).slice(0, 6));
-            if (!/^WO-[A-Z]{2,5}-\d{6}$/.test(code)) { toast("Code must be WO-[client initials]-[6 digits].", "error"); return null; }
-            return { id: uid("w"), projectId: d2.projectId, code: code.toUpperCase(), title: d2.title, status: "Active", contractRef: d2.contractRef || "", startDate: todayStr(), endDate: null, notes: "" };
-          }
-        }) : null,
-
-        tab === "expenseTypes" ? h(ListEditor, {
-          kind: "expenseTypes", canEdit: isAdmin, nameField: "name",
-          cols: ["Type", "Evidence required", "Auto-approval ceiling"],
-          row: function (t) {
-            return [t.name,
-              h("label", { className: "row", style: { gap: 6 } }, h("input", { type: "checkbox", checked: !!t.requiresEvidence, disabled: !isAdmin, onChange: function (e) { var v = e.target.checked; p.mutate(function (d) { var o = byId(d.expenseTypes, t.id); if (o) o.requiresEvidence = v; }); } }), t.requiresEvidence ? "required" : "optional"),
-              h("input", { type: "number", defaultValue: t.ceiling == null ? "" : t.ceiling, disabled: !isAdmin, className: "miniinp", style: { width: 92 }, onBlur: function (e) { var v = e.target.value === "" ? null : Number(e.target.value); p.mutate(function (d) { var o = byId(d.expenseTypes, t.id); if (o) o.ceiling = v; }); } })];
-          },
-          fields: [{ key: "name", label: "Expense type" }, { key: "ceiling", label: "Ceiling", type: "number" }],
-          make: function (d2) { if (!d2.name) return null; return { id: uid("et"), name: d2.name, requiresEvidence: false, ceiling: d2.ceiling === "" || d2.ceiling === undefined ? null : Number(d2.ceiling) }; }
-        }) : null,
 
         tab === "roles" ? h("div", { className: "col", style: { gap: 10 } },
           h("div", { className: "cap" }, "Y permitted · O own records only · T own team only · P own projects only · – denied. In the cloud build every rule below is enforced by PostgreSQL Row Level Security, not by the browser."),
@@ -21304,32 +21645,13 @@ function AdminModal(p) {
                 return h("tr", { key: cap },
                   h("td", null, PERM_LABELS[cap] || cap),
                   PERM[cap].map(function (v, i) {
-                    return h("td", { key: i, style: { textAlign: "center", fontWeight: 700, color: v === "-" ? "#C9CFC5" : v === "Y" ? C.deep : C.teal, background: ROLE_ORDER[i] === user.role ? C.wash : null } }, v === "-" ? "–" : v);
+                    return h("td", { key: i, style: { textAlign: "center", fontWeight: 700, color: v === "-" ? C.muted : v === "Y" ? C.deep : C.teal, background: ROLE_ORDER[i] === user.role ? C.wash : null } }, v === "-" ? "–" : v);
                   }));
               })))),
           h("div", { className: "col", style: { gap: 5 } }, ROLES.map(function (r) {
-            return h("div", { key: r.code, className: "panel pad row", style: { gap: 9, background: r.code === user.role ? C.wash : "#fff" } },
-              h(Chip, { k: "gr" }, r.code), h("b", { style: { minWidth: 150 } }, r.name), h("span", { className: "cap grow" }, r.desc));
+            return h("div", { key: r.code, className: "panel pad row", style: { gap: 9 } },
+              h(Chip, { k: r.code === user.role ? "gr" : "mut" }, r.code), h("b", { style: { minWidth: 150 } }, r.name), h("span", { className: "cap grow" }, r.desc));
           }))) : null,
-
-        tab === "verify" ? h("div", { className: "col", style: { gap: 9 } },
-          h("div", { className: "cap" }, "Items added by employees wait here until a manager confirms them."),
-          (function () {
-            var pendC = db.clients.filter(function (c) { return !c.isVerified; });
-            var pendP = db.projects.filter(function (x) { return !x.isVerified; });
-            if (!pendC.length && !pendP.length) return h("div", { className: "empty" }, "Nothing to verify.");
-            return h("table", { className: "tbl" },
-              h("thead", null, h("tr", null, ["Kind", "Name", "Context", ""].map(function (c, i) { return h("th", { key: i }, c); }))),
-              h("tbody", null,
-                pendC.map(function (c) {
-                  return h("tr", { key: c.id }, h("td", null, "Client"), h("td", null, c.name), h("td", null, "—"),
-                    h("td", null, h(Btn, { sm: true, kind: "p", onClick: function () { p.mutate(function (d) { var o = byId(d.clients, c.id); if (o) o.isVerified = true; }); } }, "Confirm")));
-                }),
-                pendP.map(function (x) {
-                  return h("tr", { key: x.id }, h("td", null, "Project"), h("td", null, x.name), h("td", null, nameOf(db.clients, x.clientId)),
-                    h("td", null, h(Btn, { sm: true, kind: "p", onClick: function () { p.mutate(function (d) { var o = byId(d.projects, x.id); if (o) o.isVerified = true; }); } }, "Confirm")));
-                })));
-          })()) : null,
 
         tab === "settings" ? h("div", { className: "col", style: { gap: 11 } },
           h("div", { className: "grid3" },
@@ -21373,10 +21695,10 @@ function AdminModal(p) {
               " object that holds every entity. Without that data wrapper, entries are silently skipped on restore — so this build validates the wrapper and reports the record count before writing anything."),
             h("pre", {
               className: "mono",
-              style: { margin: 0, padding: "10px 12px", background: "#fff", border: "1px solid " + C.line, borderRadius: 10, fontSize: 12, lineHeight: 1.5, overflowX: "auto", color: C.ink }
+              style: { margin: 0, padding: "10px 12px", background: "var(--surface)", border: "1px solid " + C.line, borderRadius: 10, fontSize: 12, lineHeight: 1.5, overflowX: "auto" }
             }, '{\n  "app":      "galil-workdesk",\n  "version":  7,\n  "exported": "2026-09-05T08:14:00.000Z",\n  "data": { "entries": […], "projects": […], … }\n}'),
             h("p", { style: { margin: 0, fontSize: 13, maxWidth: "72ch" } },
-              "Every entry must carry ", h("span", { className: "mono" }, "id, date, type, start, end, client, project, red, yellow, day, assignee, description, notes"),
+              "Every entry must carry ", h("span", { className: "mono" }, "id, date, type, start, end, client, project, red, yellow, blue, day, assignee, description, notes"),
               " — and, from V7, ", h("span", { className: "mono" }, "workOrder, task, status, statusReason, approvedBy, approvedAt"), ".")),
           h("div", { className: "grid2" },
             h("div", { className: "panel pad col", style: { gap: 8 } },
@@ -21403,16 +21725,16 @@ function AdminModal(p) {
 
         tab === "audit" ? h("div", { className: "col", style: { gap: 8 } },
           h("div", { className: "cap" }, "Append-only. Every sign-in, sign-out, role change and approval action is recorded with actor, timestamp and IP."),
-          h("table", { className: "tbl" },
+          h("div", { style: { overflowX: "auto" } }, h("table", { className: "tbl" },
             h("thead", null, h("tr", null, ["When", "Actor", "Action", "Entity", "IP"].map(function (c, i) { return h("th", { key: i }, c); }))),
             h("tbody", null, db.audit.slice(0, 400).map(function (a) {
               return h("tr", { key: a.id },
-                h("td", { className: "mono", style: { whiteSpace: "nowrap", fontSize: 12 } }, new Date(a.at).toLocaleString("en-GB")),
+                h("td", { className: "tnum", style: { whiteSpace: "nowrap", fontSize: 12 } }, new Date(a.at).toLocaleString("en-GB")),
                 h("td", null, a.actorId === "system" ? "system" : userName(db, a.actorId)),
                 h("td", null, a.action),
-                h("td", { className: "mono", style: { fontSize: 12 } }, a.entityTable, a.entityId && a.entityId !== "-" ? " · " + String(a.entityId).slice(0, 14) : ""),
-                h("td", { className: "mono", style: { fontSize: 12 } }, a.ip));
-            })))) : null)),
+                h("td", { className: "tnum", style: { fontSize: 12 } }, a.entityTable, a.entityId && a.entityId !== "-" ? " · " + String(a.entityId).slice(0, 14) : ""),
+                h("td", { className: "tnum", style: { fontSize: 12 } }, a.ip));
+            }))))) : null)),
 
     preview ? h(Modal, {
       title: preview.mode === "restore" ? "Confirm restore" : "Confirm list import", size: "sm",
@@ -21426,8 +21748,598 @@ function AdminModal(p) {
         Object.keys(preview.counts).filter(function (k) {
           return preview.mode === "restore" || ["clients", "projects", "workOrders", "expenseTypes", "teams"].indexOf(k) >= 0;
         }).map(function (k) {
-          return h("tr", { key: k }, h("td", null, k), h("td", { className: "num mono" }, preview.counts[k]));
+          return h("tr", { key: k }, h("td", null, k), h("td", { className: "num" }, preview.counts[k]));
         })))) : null);
+}
+</script>
+<script>"use strict";
+/* =====================================================================
+   §14.4 — the phone build.
+
+   Below MOBILE_BREAKPOINT the application renders a different shell: one
+   column, a bottom navigation bar, native date and time pickers, 44 px+ tap
+   targets, and a running timer as the primary way to report time. It is the
+   same data and the same rules — every write goes through commitEntry,
+   savePlanned and the entitlement engine, exactly as the desktop build does.
+
+   The Dashboard is deliberately absent: its charts and cross-filters are not
+   usable on a phone. Management and System administration are reachable only
+   by switching to the desktop layout, which the More sheet offers.
+   ===================================================================== */
+var MOBILE_BREAKPOINT = 820;
+var TIMER_KEY = "galil-workdesk-timer";
+
+function isNarrow() {
+  try { return window.innerWidth <= MOBILE_BREAKPOINT; } catch (e) { return false; }
+}
+function readViewPref() {
+  try { var v = localStorage.getItem(VIEW_KEY); if (["auto", "mobile", "desktop"].indexOf(v) >= 0) return v; } catch (e) {}
+  return "auto";
+}
+function writeViewPref(v) { try { localStorage.setItem(VIEW_KEY, v); } catch (e) {} }
+
+/* round a clock time to the nearest 5 minutes, so it matches the desktop dropdowns */
+function round5(d) {
+  var m = Math.round(d.getMinutes() / 5) * 5, hh = d.getHours();
+  if (m === 60) { m = 0; hh = (hh + 1) % 24; }
+  return pad(hh) + ":" + pad(m);
+}
+function hhmmss(ms) {
+  var t = Math.max(0, Math.floor(ms / 1000));
+  return pad(Math.floor(t / 3600)) + ":" + pad(Math.floor(t / 60) % 60) + ":" + pad(t % 60);
+}
+
+/* ---------- bottom sheet ---------- */
+function Sheet(p) {
+  useEffect(function () {
+    var f = function (e) { if (e.key === "Escape" && p.onClose) p.onClose(); };
+    window.addEventListener("keydown", f); return function () { window.removeEventListener("keydown", f); };
+  }, [p.onClose]);
+  return h("div", { className: "sheet", onMouseDown: function (e) { if (e.target === e.currentTarget && p.onClose) p.onClose(); } },
+    h("div", { className: "sh", role: "dialog", "aria-modal": "true", "aria-label": p.title },
+      h("div", { className: "grab", "aria-hidden": "true" }),
+      h("header", null, h("div", { className: "h2 grow" }, p.title),
+        h("button", { className: "iconbtn ink", onClick: p.onClose, "aria-label": "Close" }, "✕")),
+      h("div", { className: "sb mfld" }, p.children),
+      p.footer ? h("footer", null, p.footer) : null));
+}
+
+/* ---------- the report-time sheet ---------- */
+function MobileEntrySheet(p) {
+  var db = p.db, user = p.user;
+  var s = useState(p.value), f = s[0], set = s[1];
+  var es = useState({}), errs = es[0], setErrs = es[1];
+  var up = function (k, v) {
+    var n = Object.assign({}, f); n[k] = v;
+    if (k === "clientId") { n.projectId = ""; n.workOrderId = ""; n.taskId = ""; }
+    if (k === "projectId") {
+      n.workOrderId = ""; n.taskId = "";
+      var pr = byId(db.projects, v); if (pr) { n.clientId = pr.clientId; n.projectStatus = n.projectStatus || pr.status; }
+    }
+    if (k === "workOrderId") n.taskId = "";
+    if (k === "type" && v !== "Work") n.hourType = "yellow";
+    if (n.hourType === "blue" && !can(user, "reportBlueTime")) n.hourType = "yellow";
+    set(n);
+    var ne = Object.assign({}, errs); delete ne[k];
+    if (k === "clientId") delete ne.client;
+    if (k === "projectId") delete ne.project;
+    if (k === "start" || k === "end") { delete ne.start; delete ne.end; }
+    setErrs(ne);
+  };
+  var opts = optionsFor(db, f, user);
+  var hrs = derivedHours(f.start, f.end);
+  var day = f.type !== "Work";
+
+  function save() {
+    var v = Object.assign({}, f);
+    var e = validateEntry(db, v, user);
+    setErrs(e);
+    if (Object.keys(e).length) { toast(e[Object.keys(e)[0]], "error"); return; }
+    commitEntry(p.mutate, user, v, function () { p.onSaved(); });
+  }
+
+  return h(Sheet, {
+    title: f.id ? "Edit entry" : "Report time", onClose: p.onClose,
+    footer: [h(Btn, { key: "c", onClick: p.onClose, style: { flex: 1 } }, "Cancel"),
+             h(Btn, { key: "s", kind: "p", onClick: save, style: { flex: 2 } }, f.id ? "Save changes" : "Save entry")]
+  },
+    h(Field, { label: "Date", err: errs.date, req: true },
+      h("input", { type: "date", value: f.date, max: todayStr(), onChange: function (e) { up("date", e.target.value); } })),
+    h(Sel, { label: "Type", value: f.type, options: ["Work", "Sick", "Vacation"], onChange: function (e) { up("type", e.target.value); } }),
+    day ? h(Field, { label: "Days" }, h("input", { className: "ro", readOnly: true, value: "1 day" }))
+      : h("div", { className: "col", style: { gap: 6 } },
+          h("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9 } },
+            h(Field, { key: "s", label: "Start", err: errs.start },
+              h("input", { type: "time", step: 300, value: f.start, onChange: function (e) { up("start", e.target.value); } })),
+            h(Field, { key: "e", label: "End", err: errs.end },
+              h("input", { type: "time", step: 300, value: f.end, onChange: function (e) { up("end", e.target.value); } }))),
+          h("div", { className: "row", style: { gap: 6 } },
+            h("span", { className: "cap" }, "Hours"),
+            h(Chip, { k: "gr" }, num(hrs), " h"),
+            h("span", { className: "cap" }, "rounded to the nearest half hour"))),
+    day ? null : h("div", { className: "fld" },
+      h("label", null, "Hour type"),
+      h("div", { className: "seg", role: "radiogroup", "aria-label": "Hour type", style: { height: 46, width: "100%" } },
+        h("button", { type: "button", role: "radio", "aria-checked": f.hourType === "red" ? "true" : "false", style: { flex: 1, justifyContent: "center" },
+          className: f.hourType === "red" ? "on r" : "", onClick: function () { up("hourType", "red"); } },
+          h("span", { className: "dot", style: { background: f.hourType === "red" ? "#fff" : C.red } }), "Red"),
+        h("button", { type: "button", role: "radio", "aria-checked": f.hourType === "yellow" ? "true" : "false", style: { flex: 1, justifyContent: "center" },
+          className: f.hourType === "yellow" ? "on y" : "", onClick: function () { up("hourType", "yellow"); } },
+          h("span", { className: "dot", style: { background: f.hourType === "yellow" ? "#3B2A05" : C.yellow } }), "Yellow"),
+        can(user, "reportBlueTime") ? h("button", { type: "button", role: "radio", "aria-checked": f.hourType === "blue" ? "true" : "false", style: { flex: 1, justifyContent: "center" },
+          className: f.hourType === "blue" ? "on b" : "", onClick: function () { up("hourType", "blue"); } },
+          h("span", { className: "dot", style: { background: f.hourType === "blue" ? "#fff" : C.blue } }), "Blue") : null)),
+    day ? null : h(Sel, { label: "Client", req: f.hourType !== "red", err: errs.client, value: f.clientId, placeholder: "Select…", options: opts.clients, onChange: function (e) { up("clientId", e.target.value); } }),
+    day ? null : h(Sel, { label: "Project", req: f.hourType !== "red", err: errs.project, value: f.projectId, placeholder: "Select…", options: opts.projects, onChange: function (e) { up("projectId", e.target.value); } }),
+    day ? null : h(Sel, { label: "Work order", err: errs.workOrder, value: f.workOrderId, placeholder: opts.workOrders.length ? "Select…" : "— none on this project —", options: opts.workOrders, disabled: !f.projectId, onChange: function (e) { up("workOrderId", e.target.value); } }),
+    day ? null : h(Sel, { label: "Task", value: f.taskId, placeholder: opts.tasks.length ? "— none —" : "— no assigned task —", options: opts.tasks, onChange: function (e) { up("taskId", e.target.value); } }),
+    h(Inp, { label: "Description", req: true, err: errs.description, value: f.description, placeholder: f.type === "Work" ? "What did you work on?" : "Optional note", onChange: function (e) { up("description", e.target.value); } }),
+    h(Inp, { label: "Notes", value: f.notes, placeholder: "Optional", onChange: function (e) { up("notes", e.target.value); } }));
+}
+
+/* ---------- Time: the timer, then this month's entries ---------- */
+function MobileTime(p) {
+  var db = p.db, user = p.user;
+  var ts = useState(function () {
+    try { var raw = localStorage.getItem(TIMER_KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+  });
+  var timer = ts[0], setTimer = ts[1];
+  var ns = useState(Date.now()), now = ns[0], setNow = ns[1];
+  var sh = useState(null), sheet = sh[0], setSheet = sh[1];
+
+  useEffect(function () {
+    if (!timer) return;
+    var iv = setInterval(function () { setNow(Date.now()); }, 1000);
+    return function () { clearInterval(iv); };
+  }, [timer]);
+
+  function persistTimer(v) {
+    setTimer(v);
+    try { if (v) localStorage.setItem(TIMER_KEY, JSON.stringify(v)); else localStorage.removeItem(TIMER_KEY); } catch (e) {}
+  }
+  function start() {
+    var d = new Date();
+    persistTimer({ at: d.getTime(), date: d2s(d), start: round5(d) });
+    toast("Timer started at " + round5(d) + ".", "ok");
+  }
+  function stop() {
+    var d = new Date();
+    var end = round5(d);
+    var form = Object.assign(blankEntry(user.id), {
+      date: timer.date, start: timer.start, end: end,
+      hourType: "yellow", description: ""
+    });
+    if (derivedHours(timer.start, end) <= 0) {
+      toast("Less than half an hour on the clock — set the times by hand.", "");
+      form.end = m2t((t2m(timer.start) + 30) % 1440);
+    }
+    persistTimer(null);
+    setSheet(form);
+  }
+
+  var mine = db.entries.filter(function (e) { return canSeeEntry(db, user, e); })
+    .filter(function (e) { return String(e.date).slice(0, 7) === todayStr().slice(0, 7); })
+    .sort(function (a, b) { return a.date === b.date ? String(b.start).localeCompare(String(a.start)) : b.date.localeCompare(a.date); });
+  var today = mine.filter(function (e) { return e.date === todayStr(); });
+  var tot = mine.filter(function (e) { return e.status === "registered" || e.status === "locked"; })
+    .reduce(function (a, e) { a.r += Number(e.red) || 0; a.y += Number(e.yellow) || 0; a.b += Number(e.blue) || 0; return a; }, { r: 0, y: 0, b: 0 });
+  var todayTot = today.filter(function (e) { return e.status !== "cancelled"; })
+    .reduce(function (a, e) { return a + (Number(e.red) || 0) + (Number(e.yellow) || 0) + (Number(e.blue) || 0); }, 0);
+
+  var reportRights = can(user, "reportOwnTime");
+
+  return h(React.Fragment, null,
+    reportRights ? h("div", { className: "timer" },
+      timer
+        ? h(React.Fragment, null,
+            h("div", { className: "clock" }, hhmmss(now - timer.at)),
+            h("div", { className: "sub" }, "Running since ", timer.start, " on ", il(timer.date)),
+            h("button", { className: "bigbtn stop", onClick: stop }, "■ Stop and report"),
+            h("button", { className: "bigbtn gh", style: { minHeight: 44, fontSize: 14 }, onClick: function () { persistTimer(null); toast("Timer discarded.", ""); } }, "Discard the timer"))
+        : h(React.Fragment, null,
+            h("div", { className: "clock", style: { color: "var(--muted)" } }, num(todayTot), " h"),
+            h("div", { className: "sub" }, "reported today · ", ilLong(todayStr())),
+            h("button", { className: "bigbtn go", onClick: start }, "▶ Start the timer"),
+            h("button", { className: "bigbtn gh", style: { minHeight: 44, fontSize: 14 }, onClick: function () { setSheet(blankEntry(user.id)); } }, "Report without the timer"))) : null,
+
+    h("div", { className: "mrow", style: { justifyContent: "space-between" } },
+      h("h2", { className: "mtitle" }, MONTHS_FULL[new Date().getMonth()]),
+      h("div", { className: "row", style: { gap: 5 } },
+        h(Chip, { k: "red" }, num(tot.r), " R"),
+        h(Chip, { k: "yel" }, num(tot.y), " Y"),
+        tot.b ? h(Chip, { k: "blue" }, num(tot.b), " B") : null)),
+
+    mine.length === 0 ? h("div", { className: "mcard" }, h("span", { className: "cap" }, "Nothing reported this month yet.")) : null,
+    mine.map(function (e) {
+      var editable = canEditEntry(db, user, e);
+      return h("div", { key: e.id, className: "mcard" },
+        h("div", { className: "mhead" },
+          h("div", { className: "mt" }, e.description || h("span", { className: "cap" }, "—")),
+          hoursChips(e)),
+        h("div", { className: "mrow" },
+          h("span", { className: "tnum" }, il(e.date)), h("span", null, DOW[s2d(e.date).getDay()]),
+          e.start ? h("span", { className: "tnum" }, e.start, "–", e.end) : null,
+          statusBadge(e)),
+        (e.clientId || e.projectId || e.workOrderId) ? h("div", { className: "mrow" },
+          e.clientId ? h("span", null, nameOf(db.clients, e.clientId)) : null,
+          e.projectId ? h("span", null, "› ", nameOf(db.projects, e.projectId)) : null,
+          e.workOrderId ? h(CopyCell, { value: nameOf(db.workOrders, e.workOrderId, "code") }) : null) : null,
+        e.status === "pending" && e.statusReason ? h("div", { className: "mrow", style: { color: C.amber, fontWeight: 600 } }, "Reason: ", e.statusReason) : null,
+        h("div", { className: "row", style: { gap: 6 } },
+          editable ? h(Btn, { sm: true, onClick: function () { setSheet(toForm(e)); } }, "✎ Edit") : null,
+          reportRights && e.type === "Work" ? h(Btn, { sm: true, onClick: function () { p.onDuplicate(e, 1); } }, "⧉ Next day") : null,
+          reportRights && e.type === "Work" ? h(Btn, { sm: true, onClick: function () { p.onDuplicate(e, 7); } }, "⧉ Next week") : null,
+          editable ? h(Btn, { sm: true, kind: "d", onClick: function () { p.onDelete(e); } }, "🗑") : null));
+    }),
+
+    sheet ? h(MobileEntrySheet, {
+      db: db, user: user, mutate: p.mutate, value: sheet,
+      onClose: function () { setSheet(null); }, onSaved: function () { setSheet(null); }
+    }) : null);
+}
+
+/* ---------- Week Planner ---------- */
+function MobilePlanner(p) {
+  var db = p.db, user = p.user;
+  var os = useState(0), off = os[0], setOff = os[1];
+  var ms = useState(null), modal = ms[0], setModal = ms[1];
+
+  var sow = startOfWeek(new Date()); sow.setDate(sow.getDate() + off * 7);
+  var days = [];
+  for (var i = 0; i < 7; i++) { var d = new Date(sow); d.setDate(sow.getDate() + i); days.push(d2s(d)); }
+  var plans = db.planned.filter(function (x) { return x.userId === user.id && days.indexOf(x.date) >= 0; });
+  var actuals = db.entries.filter(function (e) { return e.assignee === user.id && days.indexOf(e.date) >= 0 && e.status !== "cancelled"; });
+  var planned = plans.reduce(function (a, x) { return a + (Number(x.red) || 0) + (Number(x.yellow) || 0) + (Number(x.blue) || 0); }, 0);
+  var actual = actuals.reduce(function (a, e) { return a + (Number(e.red) || 0) + (Number(e.yellow) || 0) + (Number(e.blue) || 0); }, 0);
+  var cap = Number(user.weeklyHours || db.settings.weeklyHours || 42);
+
+  return h(React.Fragment, null,
+    h("div", { className: "mrow", style: { justifyContent: "space-between" } },
+      h("div", { className: "row", style: { gap: 4 } },
+        h("button", { className: "iconbtn ink", onClick: function () { setOff(off - 1); }, "aria-label": "Previous week" }, "‹"),
+        h("b", null, il(days[0]), " – ", il(days[6])),
+        h("button", { className: "iconbtn ink", onClick: function () { setOff(off + 1); }, "aria-label": "Next week" }, "›")),
+      h(Btn, { sm: true, kind: "t", onClick: function () { setOff(0); } }, "This week")),
+    h("div", { className: "row", style: { gap: 6 } },
+      h(Chip, { k: "teal" }, "Planned ", num(planned), " h"),
+      h(Chip, { k: "gr" }, "Actual ", num(actual), " h"),
+      h(Chip, { k: planned > cap ? "amber" : "mut" }, "Capacity ", num(cap), " h")),
+    planned > cap ? h("div", { className: "banner amber" }, "⚠ This week is planned past your contracted hours.") : null,
+
+    days.map(function (ds) {
+      var dayPlans = plans.filter(function (x) { return x.date === ds; });
+      var dayAct = actuals.filter(function (e) { return e.date === ds; }).reduce(function (a, e) { return a + (Number(e.red) || 0) + (Number(e.yellow) || 0) + (Number(e.blue) || 0); }, 0);
+      var dayPl = dayPlans.reduce(function (a, x) { return a + (Number(x.red) || 0) + (Number(x.yellow) || 0) + (Number(x.blue) || 0); }, 0);
+      return h("div", { key: ds, className: "mday" },
+        h("h5", null,
+          h("span", null, DOW_FULL[s2d(ds).getDay()], " · ", il(ds), ds === todayStr() ? "  • today" : ""),
+          h("span", { className: "tnum" }, num(dayPl), " p / ", num(dayAct), " a")),
+        dayPlans.map(function (x) {
+          return h("div", { key: x.id, className: "mcard", style: { borderLeft: "3px solid " + (Number(x.red) ? C.red : Number(x.blue) ? C.blue : C.teal) },
+            onClick: function () { setModal(Object.assign({}, x, { hourType: Number(x.red) ? "red" : Number(x.blue) ? "blue" : "yellow" })); } },
+            h("div", { className: "mhead" },
+              h("div", { className: "mt" }, x.description || "Planned block"),
+              h("span", { className: "tnum" }, num((Number(x.red) || 0) + (Number(x.yellow) || 0) + (Number(x.blue) || 0)), " h")),
+            h("div", { className: "mrow" },
+              h("span", { className: "tnum" }, x.start, "–", x.end),
+              x.projectId ? h("span", null, nameOf(db.projects, x.projectId)) : null));
+        }),
+        h(Btn, { sm: true, kind: "t", onClick: function () {
+          setModal({ id: null, userId: user.id, date: ds, start: "09:00", end: "17:00", hourType: "yellow", clientId: "", projectId: "", workOrderId: "", taskId: "", description: "" });
+        } }, "+ plan this day"));
+    }),
+
+    modal ? h(PlanEditor, {
+      db: db, user: user, value: modal,
+      onSave: function (f) { if (savePlanned(p.mutate, user, f)) { setModal(null); toast("Plan saved.", "ok"); } },
+      onClose: function () { setModal(null); },
+      onDelete: function (f) { p.mutate(function (d) { d.planned = d.planned.filter(function (x) { return x.id !== f.id; }); }); setModal(null); }
+    }) : null);
+}
+
+/* ---------- Tasks ---------- */
+function MobileTasks(p) {
+  var db = p.db, user = p.user;
+  var vs = useState("mine"), view = vs[0], setView = vs[1];
+  var fs = useState(""), status = fs[0], setStatus = fs[1];
+  var es = useState(null), editing = es[0], setEditing = es[1];
+
+  var scope = taskScope(db, user);
+  var list = scope.filter(function (t) {
+    if (view === "mine" && taskAssigneeIds(db, t.id).indexOf(user.id) < 0) return false;
+    if (status && t.status !== status) return false;
+    return true;
+  }).sort(function (a, b) { return String(a.dueDate || "9999").localeCompare(String(b.dueDate || "9999")); });
+
+  function move(t, v) {
+    if (v === t.status) return;
+    if (["Done", "Cancelled"].indexOf(v) < 0 && taskIsBlocked(db, t)) { toast("This task is blocked by a dependency that is not Done.", "error"); return; }
+    p.mutate(function (d) {
+      var rec = byId(d.tasks, t.id); if (!rec) return;
+      var before = rec.status; rec.status = v;
+      audit(d, user.id, "Task status: " + before + " → " + v, "tasks", t.id, null, null);
+      d.tasks.forEach(function (x) {
+        if ((x.dependencies || []).indexOf(t.id) >= 0 && x.status === "Blocked" && !taskIsBlocked(d, x)) x.status = "To do";
+      });
+    });
+    toast("Task moved to " + v + ".", "ok");
+  }
+
+  return h(React.Fragment, null,
+    h("div", { className: "mseg" },
+      h("button", { className: "pill" + (view === "mine" ? " on" : ""), onClick: function () { setView("mine"); } }, "My tasks"),
+      h("button", { className: "pill" + (view === "all" ? " on" : ""), onClick: function () { setView("all"); } }, "All I can see")),
+    h("div", { className: "mseg" },
+      h("button", { className: "pill" + (!status ? " on" : ""), onClick: function () { setStatus(""); } }, "Any status"),
+      TASK_STATUSES.map(function (sname) {
+        return h("button", { key: sname, className: "pill" + (status === sname ? " on" : ""), onClick: function () { setStatus(sname); } }, sname);
+      })),
+    list.length === 0 ? h("div", { className: "mcard" }, h("span", { className: "cap" }, "No tasks match.")) : null,
+    list.map(function (t) {
+      var cons = taskConsumed(db, t.id);
+      return h("div", { key: t.id, className: "mcard", style: { borderLeft: "3px solid " + (TS_COLOR[t.status] || C.muted) } },
+        h("div", { className: "mhead" },
+          h("div", { className: "mt" }, t.title),
+          h(Chip, { k: "mut", style: { background: PR_COLOR[t.priority] + "1E", color: PR_COLOR[t.priority], borderColor: PR_COLOR[t.priority] + "55" } }, t.priority)),
+        h("div", { className: "mrow" },
+          h("span", null, nameOf(db.projects, t.projectId)),
+          t.dueDate ? h("span", { className: "tnum", style: isOverdue(t) ? { color: C.error, fontWeight: 700 } : null }, "due ", il(t.dueDate)) : null,
+          h("span", { className: "tnum" }, num(cons), t.allowanceHours ? " / " + num(t.allowanceHours) : "", " h")),
+        h("div", { className: "row", style: { gap: 6 } },
+          h("select", { className: "minisel", style: { minHeight: 40, flex: 1 }, value: t.status, "aria-label": "Status of " + t.title,
+            onChange: function (e) { move(t, e.target.value); } },
+            TASK_STATUSES.map(function (sname) { return h("option", { key: sname, value: sname }, sname); })),
+          can(user, "createTasks") || can(user, "assignTasks") ? h(Btn, { sm: true, onClick: function () { setEditing(Object.assign({}, t, { assignees: taskAssigneeIds(db, t.id) })); } }, "✎") : null));
+    }),
+    editing ? h(TaskEditor, {
+      db: db, user: user, value: editing,
+      onSave: function (f) {
+        p.mutate(function (d) {
+          var rec = Object.assign({}, f); delete rec.assignees;
+          var i = d.tasks.findIndex(function (x) { return x.id === rec.id; });
+          if (i >= 0) { audit(d, user.id, "Task edited", "tasks", rec.id, d.tasks[i], rec); d.tasks[i] = rec; }
+          d.taskAssignees = d.taskAssignees.filter(function (x) { return x.taskId !== rec.id; });
+          (f.assignees || []).forEach(function (uidv) { d.taskAssignees.push({ id: uid("ta"), taskId: rec.id, userId: uidv }); });
+        });
+        setEditing(null); toast("Task saved.", "ok");
+      },
+      onDelete: function (f) { p.mutate(function (d) { d.tasks = d.tasks.filter(function (x) { return x.id !== f.id; }); }); setEditing(null); },
+      onClose: function () { setEditing(null); }
+    }) : null);
+}
+
+/* ---------- Expenses ---------- */
+function MobileExpenses(p) {
+  var db = p.db, user = p.user;
+  var blank = {
+    id: null, userId: user.id, date: todayStr(), time: "12:00", etype: "", vkind: "money",
+    currency: "₪", amount: "", hours: "", clientId: "", projectId: "", workOrderId: "",
+    description: "", notes: "", attachments: [], status: "Submitted"
+  };
+  var sh = useState(null), sheet = sh[0], setSheet = sh[1];
+  var scope = visibleUserIds(db, user, "viewOthersTime");
+  var rows = db.expenses.filter(function (x) { return x.userId === user.id || scope.indexOf(x.userId) >= 0; })
+    .sort(function (a, b) { return b.date.localeCompare(a.date); }).slice(0, 80);
+
+  return h(React.Fragment, null,
+    can(user, "reportExpenses") ? h(Btn, { kind: "p", style: { minHeight: 48, width: "100%" }, onClick: function () { setSheet(Object.assign({}, blank)); } }, "+ Report an expense") : null,
+    rows.length === 0 ? h("div", { className: "mcard" }, h("span", { className: "cap" }, "No expenses recorded.")) : null,
+    rows.map(function (x) {
+      var own = x.userId === user.id;
+      return h("div", { key: x.id, className: "mcard" },
+        h("div", { className: "mhead" },
+          h("div", { className: "mt" }, x.description || x.etype),
+          h("b", { className: "tnum" }, x.vkind === "money" ? money(x.amount, x.currency) : num(x.hours) + " h")),
+        h("div", { className: "mrow" },
+          h("span", { className: "tnum" }, il(x.date)),
+          h("span", null, x.etype),
+          x.projectId ? h("span", null, nameOf(db.projects, x.projectId)) : null,
+          h(Chip, { k: x.status === "Paid" ? "gr" : x.status === "Rejected" ? "err" : x.status === "Approved" ? "teal" : "amber" }, x.status),
+          (x.attachments || []).length ? h(Chip, { k: "mut" }, "📎 ", String(x.attachments.length)) : null),
+        own || can(user, "approveExpenses") ? h("div", { className: "row", style: { gap: 6 } },
+          h(Btn, { sm: true, onClick: function () { setSheet(Object.assign({}, x)); } }, "✎ Edit"),
+          h(Btn, { sm: true, kind: "d", onClick: function () {
+            var snap = JSON.parse(JSON.stringify(x));
+            p.mutate(function (d) { d.expenses = d.expenses.filter(function (z) { return z.id !== x.id; }); audit(d, user.id, "Expense deleted", "expenses", x.id, snap, null); });
+            toast("Expense deleted.", "", { label: "Undo", fn: function () { p.mutate(function (d) { d.expenses.unshift(snap); }); } });
+          } }, "🗑")) : null);
+    }),
+    sheet ? h(MobileExpenseSheet, { db: db, user: user, mutate: p.mutate, value: sheet, onClose: function () { setSheet(null); } }) : null);
+}
+
+function MobileExpenseSheet(p) {
+  var db = p.db, user = p.user;
+  var s = useState(p.value), f = s[0], set = s[1];
+  var es = useState({}), errs = es[0], setErrs = es[1];
+  var up = function (k, v) {
+    var n = Object.assign({}, f); n[k] = v;
+    if (k === "clientId") { n.projectId = ""; n.workOrderId = ""; }
+    if (k === "projectId") n.workOrderId = "";
+    set(n); var ne = Object.assign({}, errs); delete ne[k]; setErrs(ne);
+  };
+  var etype = db.expenseTypes.filter(function (t) { return t.name === f.etype; })[0];
+
+  function save() {
+    var e = {};
+    if (!f.etype) e.etype = "Select an expense type.";
+    if (!String(f.description).trim()) e.description = "Describe the expense.";
+    if (f.vkind === "money" && !Number(f.amount)) e.amount = "Enter an amount.";
+    if (f.vkind === "hours" && !Number(f.hours)) e.hours = "Enter the number of hours.";
+    if (etype && etype.requiresEvidence && !(f.attachments || []).length) e.attachments = "This expense type requires an evidence attachment.";
+    setErrs(e);
+    if (Object.keys(e).length) { toast(e[Object.keys(e)[0]], "error"); return; }
+    var over = etype && etype.ceiling != null && f.vkind === "money" && Number(f.amount) > Number(etype.ceiling);
+    p.mutate(function (d) {
+      var rec = Object.assign({}, f, { id: f.id || uid("x"), amount: Number(f.amount) || 0, hours: Number(f.hours) || 0 });
+      rec.status = over ? "Submitted" : (rec.status === "Paid" ? "Paid" : "Approved");
+      var i = d.expenses.findIndex(function (x) { return x.id === rec.id; });
+      if (i >= 0) { audit(d, user.id, "Expense edited", "expenses", rec.id, d.expenses[i], rec); d.expenses[i] = rec; }
+      else { d.expenses.unshift(rec); audit(d, user.id, "Expense created", "expenses", rec.id, null, rec); }
+      if (over) raiseApproval(d, "Expense", "expenses", rec.id, rec.userId, "Above the auto-approval ceiling for " + rec.etype);
+    });
+    toast(over ? "Above the ceiling for " + f.etype + " — sent to approval." : "Expense recorded.", "ok");
+    p.onClose();
+  }
+
+  return h(Sheet, {
+    title: f.id ? "Edit expense" : "Report an expense", onClose: p.onClose,
+    footer: [h(Btn, { key: "c", onClick: p.onClose, style: { flex: 1 } }, "Cancel"),
+             h(Btn, { key: "s", kind: "p", onClick: save, style: { flex: 2 } }, f.id ? "Save changes" : "Add expense")]
+  },
+    h("div", { className: "grid2" },
+      h(Inp, { label: "Date", type: "date", value: f.date, onChange: function (e) { up("date", e.target.value); } }),
+      h(Inp, { label: "Time", type: "time", value: f.time, onChange: function (e) { up("time", e.target.value); } })),
+    h(Sel, { label: "Expense type", req: true, err: errs.etype, value: f.etype, placeholder: "Select…", options: db.expenseTypes.map(function (t) { return { value: t.name, label: t.name + (t.ceiling != null ? " (ceiling " + t.ceiling + ")" : "") }; }), onChange: function (e) { up("etype", e.target.value); } }),
+    h("div", { className: "grid2" },
+      h(Sel, { label: "Value kind", value: f.vkind, options: [{ value: "money", label: "Money" }, { value: "hours", label: "Hours" }], onChange: function (e) { up("vkind", e.target.value); } }),
+      f.vkind === "money" ? h(Sel, { key: "c", label: "Currency", value: f.currency, options: CURRENCIES, onChange: function (e) { up("currency", e.target.value); } }) : null),
+    f.vkind === "money"
+      ? h(Inp, { key: "a", label: "Amount", req: true, type: "number", step: "0.01", err: errs.amount, value: f.amount, onChange: function (e) { up("amount", e.target.value); } })
+      : h(Inp, { key: "hh", label: "Hours", req: true, type: "number", step: "0.5", err: errs.hours, value: f.hours, onChange: function (e) { up("hours", e.target.value); } }),
+    h(Sel, { label: "Client", value: f.clientId, placeholder: "—", options: db.clients.map(function (c) { return { value: c.id, label: c.name }; }), onChange: function (e) { up("clientId", e.target.value); } }),
+    h(Sel, { label: "Project", value: f.projectId, placeholder: "—", options: db.projects.filter(function (x) { return !f.clientId || x.clientId === f.clientId; }).map(function (x) { return { value: x.id, label: x.name }; }), onChange: function (e) { up("projectId", e.target.value); } }),
+    h(Sel, { label: "Work order", value: f.workOrderId, placeholder: "—", options: db.workOrders.filter(function (w) { return w.projectId === f.projectId; }).map(function (w) { return { value: w.id, label: w.code }; }), onChange: function (e) { up("workOrderId", e.target.value); } }),
+    h(Inp, { label: "Description", req: true, err: errs.description, value: f.description, onChange: function (e) { up("description", e.target.value); } }),
+    h(Inp, { label: "Notes", value: f.notes, onChange: function (e) { up("notes", e.target.value); } }),
+    h(AttachField, {
+      label: "Evidence" + (etype && etype.requiresEvidence ? " (required)" : ""), err: errs.attachments,
+      value: f.attachments || [], onChange: function (v) { up("attachments", v); }
+    }),
+    etype && etype.requiresEvidence ? h("div", { className: "banner amber" }, "⚠ ", etype.name, " requires an evidence attachment.") : null);
+}
+
+/* ---------- Library ---------- */
+function MobileLibrary(p) {
+  var db = p.db, user = p.user;
+  if (!can(user, "libraryRead")) return h("div", { className: "mcard" }, h("span", { className: "cap" }, "The Library is not available to your role."));
+  var qs = useState(""), q = qs[0], setQ = qs[1];
+  var items = db.library.filter(function (x) {
+    if (!q) return true;
+    var s2 = (x.title + " " + (x.body || "") + " " + (x.tags || []).join(" ")).toLowerCase();
+    return s2.indexOf(q.toLowerCase()) >= 0;
+  });
+  return h(React.Fragment, null,
+    h(Inp, { label: "Search the library", value: q, placeholder: "Title, body or tag", onChange: function (e) { setQ(e.target.value); } }),
+    items.length === 0 ? h("div", { className: "mcard" }, h("span", { className: "cap" }, db.library.length === 0 ? "No library items yet." : "Nothing matches your search.")) : null,
+    items.map(function (x) {
+      return h("div", { key: x.id, className: "mcard" },
+        h("div", { className: "mt" }, x.title),
+        h("div", { className: "mrow" },
+          (x.tags || []).map(function (t, i) { return h(Chip, { key: i, k: "mut" }, t); }),
+          h("span", { className: "tnum" }, il(String(x.updatedAt || x.createdAt || todayStr()).slice(0, 10)))),
+        h("div", { style: { fontSize: 13, whiteSpace: "pre-wrap" } }, String(x.body || "").slice(0, 600)));
+    }));
+}
+
+/* ---------- the mobile shell ---------- */
+var MOBILE_TABS = [
+  { k: "time", label: "Time", icon: "⏱" },
+  { k: "planner", label: "Plan", icon: "🗓" },
+  { k: "tasks", label: "Tasks", icon: "✓" },
+  { k: "expenses", label: "Expenses", icon: "🧾" },
+  { k: "more", label: "More", icon: "☰" }
+];
+
+function MobileApp(p) {
+  var db = p.db, user = p.user;
+  var ts = useState("time"), tab = ts[0], setTab = ts[1];
+  var ms = useState(null), sheet = ms[0], setSheet = ms[1];
+
+  var allowed = MOBILE_TABS.filter(function (t) {
+    if (t.k === "time") return can(user, "reportOwnTime") || can(user, "viewOthersTime");
+    if (t.k === "planner") return can(user, "planOwnWeek");
+    if (t.k === "tasks") return user.role !== "VIEW";
+    if (t.k === "expenses") return can(user, "reportExpenses") || can(user, "approveExpenses");
+    return true;
+  });
+  /* "approvals" and "library" are reached through the More sheet, not the bottom
+     bar, so they are never in MOBILE_TABS — but a valid tab all the same. */
+  var moreTabs = [];
+  if (can(user, "libraryRead")) moreTabs.push("library");
+  if (can(user, "approveTime") || can(user, "approveExpenses")) moreTabs.push("approvals");
+  if (allowed.concat(moreTabs.map(function (k) { return { k: k }; })).every(function (t) { return t.k !== tab; })) {
+    tab = allowed.length ? allowed[0].k : "more";
+  }
+
+  var approvals = openApprovalsFor(db, user).length;
+  var overdue = overdueCount(db, user);
+
+  function delEntry(e) {
+    var snapshot = JSON.parse(JSON.stringify(e));
+    p.mutate(function (d) {
+      d.entries = d.entries.filter(function (x) { return x.id !== e.id; });
+      d.approvals = d.approvals.filter(function (a) { return !(a.entityTable === "entries" && a.entityId === e.id && a.status === "pending"); });
+      audit(d, user.id, "Entry deleted", "entries", e.id, snapshot, null);
+    });
+    toast("Entry deleted.", "", { label: "Undo", fn: function () { p.mutate(function (d) { d.entries.unshift(snapshot); }); } });
+  }
+  function dupEntry(e, days) {
+    var d = s2d(e.date); d.setDate(d.getDate() + days);
+    var nd = d2s(d);
+    if (nd > todayStr()) { toast("That date has not happened yet — plan it in the Week Planner instead.", "error"); return; }
+    var form = toForm(Object.assign({}, e, {
+      id: null, date: nd, status: "registered", statusReason: "", submittedAt: null,
+      approvedBy: null, approvedAt: null, decisionNote: "", softFlag: false
+    }));
+    var bad = validateEntry(db, form, user), keys = Object.keys(bad);
+    if (keys.length) { toast("Not duplicated — " + bad[keys[0]], "error"); return; }
+    commitEntry(p.mutate, user, form);
+  }
+
+  var common = { db: db, user: user, mutate: p.mutate };
+
+  var body =
+    tab === "time" ? h(MobileTime, Object.assign({ onDelete: delEntry, onDuplicate: dupEntry }, common)) :
+    tab === "planner" ? h(MobilePlanner, common) :
+    tab === "tasks" ? h(MobileTasks, common) :
+    tab === "expenses" ? h(MobileExpenses, common) :
+    tab === "approvals" ? h(ApprovalsTab, common) :
+    tab === "library" ? h(MobileLibrary, common) :
+    h("div", { className: "mcard" }, h("span", { className: "cap" }, "Choose something from the More menu."));
+
+  return h("div", { className: "mob" },
+    h("div", { className: "mtop" },
+      h(Mark, { style: { width: 26, height: 22 } }),
+      h("div", { className: "grow", style: { lineHeight: 1.1 } },
+        h("b", { style: { letterSpacing: ".14em", fontSize: 13 } }, "GALIL"),
+        h("div", { style: { fontSize: 10, color: "var(--chromesoft)" } }, "WorkDesk · V7.1")),
+      h("button", {
+        className: "iconbtn", onClick: function () { p.setTheme(p.theme === "dark" ? "light" : "dark"); },
+        "aria-label": p.theme === "dark" ? "Switch to the light theme" : "Switch to the dark theme"
+      }, p.theme === "dark" ? "☀" : "☾"),
+      h("button", { className: "iconbtn", onClick: function () { setSheet("profile"); }, "aria-label": "My profile" },
+        h("span", { className: "avatar", style: { width: 28, height: 28, fontSize: 11 } }, initialsOf(user.fullName)))),
+
+    h("div", { className: "mbody" },
+      tab === "approvals" || tab === "library" ? h("div", { className: "mrow" },
+        h(Btn, { sm: true, kind: "t", onClick: function () { setTab("more"); } }, "‹ More"),
+        /* ApprovalsTab (reused from the desktop build) already renders its own
+           "Approvals" heading, so this row only adds one for Library. */
+        tab === "library" ? h("h2", { className: "mtitle" }, "Library") : null) : null,
+      body),
+
+    h("div", { className: "mnav", role: "tablist" },
+      allowed.map(function (t) {
+        var badge = t.k === "tasks" ? overdue : t.k === "more" ? approvals : 0;
+        var on = tab === t.k || (t.k === "more" && ["approvals", "library", "more"].indexOf(tab) >= 0);
+        return h("button", {
+          key: t.k, role: "tab", "aria-selected": on ? "true" : "false", className: on ? "on" : "",
+          onClick: function () { if (t.k === "more") setSheet("more"); else setTab(t.k); }
+        }, h("span", { className: "ic", "aria-hidden": "true" }, t.icon), t.label,
+           badge ? h("span", { className: "badge" }, badge) : null);
+      })),
+
+    sheet === "more" ? h(Sheet, { title: "More", onClose: function () { setSheet(null); } },
+      h(Btn, { style: { minHeight: 48, justifyContent: "flex-start" }, onClick: function () { setSheet(null); setTab("library"); } }, "📚  Library"),
+      can(user, "approveTime") || can(user, "approveExpenses") ? h(Btn, { style: { minHeight: 48, justifyContent: "flex-start" }, onClick: function () { setSheet(null); setTab("approvals"); } }, "✔  Approvals", approvals ? h(Chip, { k: "amber" }, approvals) : null) : null,
+      h(Btn, { style: { minHeight: 48, justifyContent: "flex-start" }, onClick: function () { setSheet("mywork"); } }, "◱  My assignments and allowances"),
+      h(Btn, { style: { minHeight: 48, justifyContent: "flex-start" }, onClick: function () { setSheet("profile"); } }, "👤  My profile"),
+      h("div", { className: "sep" }),
+      h("div", { className: "cap" }, "The Dashboard, Management and System administration are laid out for a larger screen. Switch to the desktop layout to reach them — this phone will keep that choice."),
+      h(Btn, { kind: "p", style: { minHeight: 48 }, onClick: function () { p.onForceDesktop(); } }, "🖥  Switch to the desktop layout")) : null,
+
+    sheet === "mywork" ? h(MyWork, Object.assign({ onClose: function () { setSheet(null); } }, common)) : null,
+    sheet === "profile" ? h(Profile, { db: db, user: user, onClose: function () { setSheet(null); }, onSignOut: p.onSignOut }) : null);
 }
 </script>
 <script>"use strict";
@@ -21440,7 +22352,7 @@ var TABS = [
   { k: "planner",  label: "Week Planner",need: "planOwnWeek" },
   { k: "tasks",    label: "Tasks",       need: null },
   { k: "expenses", label: "Expenses",    need: null },
-  { k: "budgets",  label: "Budgets",     need: "viewBudgets" },
+  { k: "management", label: "Management", need: null },
   { k: "approvals",label: "Approvals",   need: "approveTime" },
   { k: "dashboard",label: "Dashboard",   need: "dashboardOwn" },
   { k: "library",  label: "Library",     need: "libraryRead" }
@@ -21450,26 +22362,33 @@ function MyWork(p) {
   var db = p.db, user = p.user;
   var rs = useState(null), req = rs[0], setReq = rs[1];
   var mine = db.assignments.filter(function (a) { return a.userId === user.id; });
-  if (!mine.length) return null;
-  return h(Modal, { title: "My assignments and allowances", size: "md", onClose: p.onClose },
-    h("table", { className: "tbl" },
-      h("thead", null, h("tr", null, ["Project", "Work order", "Allowance", "Consumed", "In approval", "Remaining", ""].map(function (c, i) { return h("th", { key: i, className: i > 1 && i < 6 ? "num" : "" }, c); }))),
+  if (!mine.length) return h(Modal, { title: "My assignments and allowances", size: "md", onClose: p.onClose },
+    h("div", { className: "empty" }, "You hold no project or work-order assignments yet."),
+    h("div", { className: "cap", style: { textAlign: "center" } }, "Yellow time on an unassigned project is accepted, but routed to approval. A manager grants assignments under Management \u2192 Assignments & allowances."));
+  return h(Modal, { title: "My assignments and allowances", size: "lg", onClose: p.onClose },
+    h("div", { style: { overflowX: "auto" } },
+    h("table", { className: "tbl mid" },
+      h("thead", null, h("tr", null, ["Project", "Work order", "Allowance", "Consumed", "In approval", "Remaining", ""].map(function (c, i) { return h("th", { key: i, className: i > 1 && i < 5 ? "num" : "" }, c); }))),
       h("tbody", null, mine.map(function (a) {
         var used = consumedOn(db, user.id, a), pend = pendingOn(db, user.id, a);
         var unlimited = a.allowanceHours === null || a.allowanceHours === undefined || a.allowanceHours === "";
         var pct = unlimited ? 0 : (used / (Number(a.allowanceHours) || 1)) * 100;
         return h("tr", { key: a.id },
-          h("td", null, nameOf(db.projects, a.projectId), h("div", { className: "cap" }, nameOf(db.clients, (byId(db.projects, a.projectId) || {}).clientId))),
-          h("td", { className: "mono", style: { fontSize: 12 } }, a.workOrderId ? nameOf(db.workOrders, a.workOrderId, "code") : "—"),
-          h("td", { className: "num" }, unlimited ? "∞" : num(a.allowanceHours)),
+          h("td", { style: { whiteSpace: "nowrap" } },
+            h("span", null, nameOf(db.projects, a.projectId)),
+            h("div", { className: "cap" }, nameOf(db.clients, (byId(db.projects, a.projectId) || {}).clientId))),
+          h("td", null, h(CopyCell, { value: a.workOrderId ? nameOf(db.workOrders, a.workOrderId, "code") : "" })),
+          h("td", { className: "num" }, unlimited ? "\u221e" : num(a.allowanceHours)),
           h("td", { className: "num" }, num(used)),
           h("td", { className: "num", style: { color: C.amber } }, num(pend)),
-          h("td", { className: "num" }, unlimited ? "—" : h("div", { className: "row", style: { gap: 6, justifyContent: "flex-end" } },
-            h(Bar, { used: used, pending: pend, total: a.allowanceHours, style: { width: 80 } }),
-            h("span", null, num(Number(a.allowanceHours) - used)),
-            pct >= 75 ? h(Chip, { k: pct >= 100 ? "err" : pct >= 90 ? "amber" : "gr" }, num(pct, 0), "%") : null)),
-          h("td", null, h(Btn, { sm: true, onClick: function () { setReq(a); } }, "Request hours")));
-      }))),
+          h("td", { style: { whiteSpace: "nowrap" } }, unlimited ? h("span", { className: "cap" }, "\u2014")
+            : h("div", { className: "row", style: { gap: 8, flexWrap: "nowrap", justifyContent: "flex-end" } },
+                h("span", { className: "tnum", style: { minWidth: 42, textAlign: "right" } }, num(Number(a.allowanceHours) - used), " h"),
+                h(Bar, { used: used, pending: pend, total: a.allowanceHours, style: { width: 92 } }),
+                h("span", { style: { minWidth: 54, display: "inline-flex", justifyContent: "flex-end" } },
+                  pct >= 75 ? h(Chip, { k: pct >= 100 ? "err" : pct >= 90 ? "amber" : "gr" }, num(pct, 0), "%") : null))),
+          h("td", { style: { whiteSpace: "nowrap" } }, h(Btn, { sm: true, onClick: function () { setReq(a); } }, "Request hours")));
+      })))),
     req ? h(RequestHoursModal, {
       db: db, user: user, assignment: req, onClose: function () { setReq(null); },
       onSubmit: function (hours, justification) {
@@ -21492,7 +22411,7 @@ function Profile(p) {
         h("span", { className: "avatar", style: { width: 54, height: 54, fontSize: 18, backgroundImage: user.photoUrl ? "url(" + user.photoUrl + ")" : "none", backgroundSize: "cover" } }, user.photoUrl ? "" : initialsOf(user.fullName)),
         h("div", { className: "col", style: { gap: 1 } },
           h("b", { style: { fontSize: 16 } }, user.fullName),
-          user.fullNameHe ? h("span", { className: "cap", dir: "rtl" }, user.fullNameHe) : null,
+          user.fullNameHe ? h("span", { className: "cap he" }, user.fullNameHe) : null,
           h("span", { className: "cap mono" }, user.email),
           h("div", { className: "row", style: { gap: 5, marginTop: 3 } }, h(Chip, { k: "gr" }, roleName(user.role)), h(Chip, { k: "mut" }, user.jobTitle)))),
       h("div", { className: "panel pad col", style: { gap: 3, background: C.wash } },
@@ -21503,6 +22422,16 @@ function Profile(p) {
         ].map(function (r) {
           return h("div", { key: r[0], className: "row" }, h("span", { className: "cap", style: { width: 122 } }, r[0]), h("b", null, r[1]));
         })),
+      p.setViewPref ? h("div", { className: "col", style: { gap: 5 } },
+        h("div", { className: "h3" }, "Layout on this device"),
+        h("div", { className: "cap" }, "Auto follows the width of the window: the phone build below 820 px, the desktop build above it."),
+        h("div", { className: "pillbar" },
+          [["auto", "Auto"], ["mobile", "Always mobile"], ["desktop", "Always desktop"]].map(function (o) {
+            return h("button", {
+              key: o[0], className: "pill" + (p.viewPref === o[0] ? " on" : ""),
+              onClick: function () { p.setViewPref(o[0]); }
+            }, o[1]);
+          }))) : null,
       h("div", { className: "col", style: { gap: 5 } },
         h("div", { className: "h3" }, "Sessions"),
         h("div", { className: "cap" }, "Session lifetime is 12 hours of inactivity. Concurrent sessions are permitted and can be revoked."),
@@ -21528,6 +22457,14 @@ function App() {
   var mws = useState(false), mywork = mws[0], setMyWork = mws[1];
   var tS = useState([]), toasts = tS[0], setToasts = tS[1];
   var online = useState(true), isOnline = online[0], setOnline = online[1];
+  var thS = useState(readTheme), theme = thS[0], setTheme = thS[1];
+  var vpS = useState(readViewPref), viewPref = vpS[0], setViewPrefState = vpS[1];
+  var nwS = useState(isNarrow), narrow = nwS[0], setNarrow = nwS[1];
+  var setViewPref = function (v) { writeViewPref(v); setViewPrefState(v); };
+
+  /* §14.2 — the theme is applied to the document element, so every panel,
+     table and modal follows from the token block in the stylesheet. */
+  useEffect(function () { applyTheme(theme); }, [theme]);
 
   useEffect(function () {
     _toastFn = function (msg, kind, action) {
@@ -21536,10 +22473,17 @@ function App() {
       setTimeout(function () { setToasts(function (l) { return l.filter(function (x) { return x.id !== id; }); }); }, action ? 6000 : 4200);
     };
     var on = function () { setOnline(true); }, off = function () { setOnline(false); };
+    var onResize = function () { setNarrow(isNarrow()); };
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
     window.addEventListener("online", on); window.addEventListener("offline", off);
     setOnline(navigator.onLine !== false);
     var detachWheel = attachWheelToSelects();
-    return function () { window.removeEventListener("online", on); window.removeEventListener("offline", off); detachWheel(); };
+    return function () {
+      window.removeEventListener("online", on); window.removeEventListener("offline", off);
+      window.removeEventListener("resize", onResize); window.removeEventListener("orientationchange", onResize);
+      detachWheel();
+    };
   }, []);
 
   var dismiss = function (id) { setToasts(function (l) { return l.filter(function (x) { return x.id !== id; }); }); };
@@ -21608,9 +22552,22 @@ function App() {
       h(Toasts, { items: toasts, dismiss: dismiss }));
   }
 
+  /* §14.4 — below the breakpoint the phone shell renders instead, unless the
+     person has pinned the desktop layout on this device. */
+  var isMobile = viewPref === "mobile" || (viewPref === "auto" && narrow);
+  if (isMobile) {
+    return h(React.Fragment, null,
+      h(MobileApp, {
+        db: db, user: user, mutate: mutate, theme: theme, setTheme: setTheme, onSignOut: signOut,
+        onForceDesktop: function () { setViewPref("desktop"); toast("Desktop layout pinned on this device. My profile \u2192 Layout switches back.", ""); }
+      }),
+      h(Toasts, { items: toasts, dismiss: dismiss }));
+  }
+
   var approvalCount = openApprovalsFor(db, user).length;
   var overdue = overdueCount(db, user);
   var shown = TABS.filter(function (t) {
+    if (t.k === "management" && !canOpenManagement(user)) return false;
     if (t.k === "tasks" && user.role === "VIEW") return false;
     if (t.k === "expenses" && !can(user, "reportExpenses") && !can(user, "approveExpenses")) return false;
     if (t.k === "time" && !can(user, "reportOwnTime") && !can(user, "viewOthersTime")) return false;
@@ -21629,14 +22586,21 @@ function App() {
     h("div", { className: "topbar" },
       h("div", { className: "brand" },
         h(Mark, null),
-        h("div", null, "GALIL", h("small", null, "WorkDesk · V7")),
+        h("div", null, "GALIL", h("small", null, "WorkDesk · V7.1")),
         h(Chip, { k: "gr", style: { background: "rgba(255,255,255,.1)", color: "#C9DDB4", borderColor: "rgba(255,255,255,.2)" } }, "Standalone")),
       isOnline ? null : h(Chip, { k: "amber" }, "Offline — changes cached locally"),
       h("div", { className: "spacer" }),
+      h("button", {
+        className: "iconbtn", onClick: function () { setTheme(theme === "dark" ? "light" : "dark"); },
+        title: theme === "dark" ? "Switch to the light theme" : "Switch to the dark theme",
+        "aria-label": theme === "dark" ? "Switch to the light theme" : "Switch to the dark theme"
+      }, theme === "dark" ? "\u2600" : "\u263e"),
+      narrow ? h("button", {
+        className: "iconbtn", title: "Switch to the mobile layout",
+        onClick: function () { setViewPref("auto"); }
+      }, "\ud83d\udcf1") : null,
       h("button", { className: "iconbtn", title: "My assignments and allowances", onClick: function () { setMyWork(true); } }, "◱"),
-      can(user, "manageClientsProjects") || can(user, "viewAuditLog") || can(user, "backupRestore") || can(user, "assignTasks")
-        ? h("button", { className: "iconbtn", title: "Lists & data administration", onClick: function () { setAdmin(true); } }, "⚙") : null,
-      h("a", { className: "iconbtn", style: { textDecoration: "none", fontWeight: 700 }, href: "../handbook/index.html", target: "_blank", rel: "noopener", title: "Help — open the WorkDesk Handbook" }, "?"),
+      h("button", { className: "iconbtn", title: "System administration", onClick: function () { setAdmin(true); } }, "⚙"),
       h("button", { className: "who iconbtn", style: { minWidth: 0, padding: "0 8px", gap: 9 }, onClick: function () { setProfile(true); }, title: "My profile" },
         h("span", { className: "avatar", style: user.photoUrl ? { backgroundImage: "url(" + user.photoUrl + ")", backgroundSize: "cover" } : null }, user.photoUrl ? "" : initialsOf(user.fullName)),
         h("span", { className: "nm col", style: { alignItems: "flex-start", gap: 0 } },
@@ -21656,19 +22620,20 @@ function App() {
     tab === "planner"   ? h(PlannerTab, common) : null,
     tab === "tasks"     ? h(TasksTab, Object.assign({ goReport: goReportTask }, common)) : null,
     tab === "expenses"  ? h(ExpensesTab, common) : null,
-    tab === "budgets"   ? h(BudgetsTab, common) : null,
+    tab === "management" ? h(ManagementTab, common) : null,
     tab === "approvals" ? h(ApprovalsTab, common) : null,
     tab === "dashboard" ? h(DashboardTab, common) : null,
     tab === "library"   ? h(LibraryTab, common) : null,
 
     admin ? h(AdminModal, Object.assign({ onClose: function () { setAdmin(false); } }, common)) : null,
-    profile ? h(Profile, { db: db, user: user, onClose: function () { setProfile(false); }, onSignOut: signOut }) : null,
+    profile ? h(Profile, { db: db, user: user, viewPref: viewPref, setViewPref: setViewPref, onClose: function () { setProfile(false); }, onSignOut: signOut }) : null,
     mywork ? h(MyWork, Object.assign({ onClose: function () { setMyWork(false); } }, common)) : null,
     h(Toasts, { items: toasts, dismiss: dismiss }));
 }
 
 /* ---- boot ---- */
 (function () {
+  applyTheme(readTheme());
   var style = document.createElement("style");
   style.textContent = CSS;
   document.head.appendChild(style);

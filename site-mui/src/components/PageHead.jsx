@@ -1,9 +1,10 @@
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
-import { brand } from '../theme';
+import { useBrandColors } from '../lib/ThemeModeContext';
 
 export default function PageHead({ eyebrow, title, lede }) {
+  const brand = useBrandColors();
   return (
     <Box sx={{ py: { xs: '38px', md: '58px' }, borderBottom: `1px solid ${brand.rule}`, bgcolor: brand.surface }}>
       <Container maxWidth="lg">

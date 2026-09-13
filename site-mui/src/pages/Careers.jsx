@@ -10,7 +10,7 @@ import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Chip from '@mui/material/Chip';
 import { useLanguage } from '../lib/LanguageContext';
-import { brand } from '../theme';
+import { useBrandColors } from '../lib/ThemeModeContext';
 import PageHead from '../components/PageHead';
 import FileUploadButton from '../components/FileUploadButton';
 import { useMailtoForm } from '../lib/useMailtoForm';
@@ -117,6 +117,7 @@ const GENERAL_APPLICATION = ['General application — no specific role', 'מוע
 
 export default function Careers() {
   const { t } = useLanguage();
+  const brand = useBrandColors();
 
   const fields = [
     { name: 'name', label: t('Your name', 'שם'), check: 'required' },

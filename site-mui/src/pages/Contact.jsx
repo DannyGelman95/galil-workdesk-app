@@ -8,7 +8,7 @@ import MenuItem from '@mui/material/MenuItem';
 import Button from '@mui/material/Button';
 import Alert from '@mui/material/Alert';
 import { useLanguage } from '../lib/LanguageContext';
-import { brand } from '../theme';
+import { useBrandColors } from '../lib/ThemeModeContext';
 import PageHead from '../components/PageHead';
 import { useMailtoForm } from '../lib/useMailtoForm';
 
@@ -21,6 +21,7 @@ const KIND_OPTIONS = [
 
 export default function Contact() {
   const { t } = useLanguage();
+  const brand = useBrandColors();
 
   const fields = [
     { name: 'name', label: t('Your name', 'שם'), check: 'required' },

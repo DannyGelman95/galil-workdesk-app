@@ -3,7 +3,7 @@ import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { styled } from '@mui/material/styles';
-import { brand } from '../theme';
+import { useBrandColors } from '../lib/ThemeModeContext';
 
 const VisuallyHiddenInput = styled('input')({
   clip: 'rect(0 0 0 0)',
@@ -21,6 +21,7 @@ const VisuallyHiddenInput = styled('input')({
 // own documented pattern: a real <input type="file"> visually hidden behind
 // a normal Button, triggered via a <label>.
 export default function FileUploadButton({ label, accept, fileName, chooseLabel, onChange }) {
+  const brand = useBrandColors();
   return (
     <Box>
       <Typography sx={{ fontSize: 14, fontWeight: 600, mb: '6px' }}>{label}</Typography>
@@ -29,11 +30,11 @@ export default function FileUploadButton({ label, accept, fileName, chooseLabel,
         variant="outlined"
         startIcon={<UploadFileIcon />}
         sx={{
-          bgcolor: '#fff',
+          bgcolor: brand.card,
           borderColor: brand.rule,
           color: brand.forest,
           justifyContent: 'flex-start',
-          '&:hover': { borderColor: brand.forest, bgcolor: '#fff' },
+          '&:hover': { borderColor: brand.forest, bgcolor: brand.card },
         }}
       >
         {fileName || chooseLabel}

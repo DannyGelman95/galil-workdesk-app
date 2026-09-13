@@ -12,10 +12,19 @@ import ListItemButton from '@mui/material/ListItemButton';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
+import { alpha } from '@mui/material/styles';
 import MenuIcon from '@mui/icons-material/Menu';
+import DesktopWindowsOutlinedIcon from '@mui/icons-material/DesktopWindowsOutlined';
+import LightModeOutlinedIcon from '@mui/icons-material/LightModeOutlined';
+import DarkModeOutlinedIcon from '@mui/icons-material/DarkModeOutlined';
 import GalilLogo from './GalilLogo';
 import { useLanguage } from '../lib/LanguageContext';
-import { brand } from '../theme';
+import { useThemeMode, useBrandColors } from '../lib/ThemeModeContext';
+
+/* Where the WorkDesk app is published relative to this site's root — see
+   .github/workflows/deploy-pages.yml, which publishes site-mui at the Pages
+   root and site/app/ alongside it at /app/. */
+const WORKDESK_URL = 'app/';
 
 const NAV = [
   { to: '/', en: 'Home', he: 'בית' },
@@ -26,6 +35,8 @@ const NAV = [
 
 export default function Header() {
   const { lang, setLang, t } = useLanguage();
+  const { mode, toggleMode } = useThemeMode();
+  const brand = useBrandColors();
   const location = useLocation();
   const [open, setOpen] = useState(false);
 
@@ -57,14 +68,17 @@ export default function Header() {
       position="sticky"
       elevation={0}
       sx={{
-        bgcolor: 'rgba(251,252,249,.88)',
+        bgcolor: alpha(brand.paper, 0.88),
         backdropFilter: 'saturate(1.4) blur(10px)',
         borderBottom: `1px solid ${brand.rule}`,
         color: brand.forest,
       }}
     >
       <Container maxWidth="lg">
-        <Toolbar disableGutters sx={{ height: 74, gap: '20px' }}>
+        <Toolbar
+          disableGutters
+          sx={{ minHeight: 74, py: '10px', gap: '14px 20px', flexWrap: 'wrap' }}
+        >
           <Box
             component={RouterLink}
             to="/"
@@ -72,14 +86,47 @@ export default function Header() {
             sx={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none', color: 'inherit', flex: '0 0 auto' }}
           >
             <GalilLogo />
-            <Typography component="b" sx={{ fontSize: 23, fontWeight: 700, letterSpacing: '.06em' }}>
+            <Typography component="b" sx={{ fontSize: 23, fontWeight: 700, letterSpacing: '.06em', whiteSpace: 'nowrap' }}>
               GALIL
             </Typography>
           </Box>
 
-          <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: '26px', ml: 'auto' }}>
+          <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: '26px', ml: 'auto', flexShrink: 0 }}>
             {NAV.map(navLink)}
           </Box>
+
+          <Button
+            component="a"
+            href={WORKDESK_URL}
+            target="_blank"
+            rel="noopener"
+            title={t('Open GALIL WorkDesk', 'פתחו את גליל WorkDesk')}
+            startIcon={<DesktopWindowsOutlinedIcon sx={{ fontSize: 17 }} />}
+            sx={{
+              ml: { xs: 'auto', md: 0 },
+              flexShrink: 0,
+              whiteSpace: 'nowrap',
+              borderRadius: '999px',
+              border: `1.5px solid ${brand.rule}`,
+              color: brand.forest,
+              fontSize: '14.5px',
+              py: '9px',
+              px: '16px',
+              '&:hover': { borderColor: brand.green, bgcolor: brand.green, color: '#12240F' },
+            }}
+          >
+            <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+              {t('Employees Portal', 'פורטל העובדים')}
+            </Box>
+          </Button>
+
+          <IconButton
+            aria-label={mode === 'dark' ? t('Switch to the light theme', 'עברו לערכת נושא בהירה') : t('Switch to the dark theme', 'עברו לערכת נושא כהה')}
+            onClick={toggleMode}
+            sx={{ flexShrink: 0, border: `1px solid ${brand.rule}`, width: 38, height: 38, color: brand.forest }}
+          >
+            {mode === 'dark' ? <LightModeOutlinedIcon sx={{ fontSize: 18 }} /> : <DarkModeOutlinedIcon sx={{ fontSize: 18 }} />}
+          </IconButton>
 
           <ToggleButtonGroup
             value={lang}
@@ -87,11 +134,11 @@ export default function Header() {
             size="small"
             onChange={(_, v) => v && setLang(v)}
             sx={{
-              ml: { xs: 'auto', md: 0 },
+              flexShrink: 0,
               border: `1px solid ${brand.rule}`,
               borderRadius: '999px',
               overflow: 'hidden',
-              bgcolor: '#fff',
+              bgcolor: 'background.paper',
               '& .MuiToggleButton-root': {
                 border: 0,
                 fontSize: 13,
@@ -99,6 +146,7 @@ export default function Header() {
                 color: brand.steel,
                 px: '13px',
                 py: '7px',
+                whiteSpace: 'nowrap',
                 '&.Mui-selected': { bgcolor: brand.green, color: '#fff' },
                 '&.Mui-selected:hover': { bgcolor: brand.greenDeep },
               },
@@ -113,7 +161,7 @@ export default function Header() {
             to="/contact"
             variant="contained"
             disableElevation
-            sx={{ display: { xs: 'none', md: 'inline-flex' }, py: '10px', px: '18px', fontSize: '14.5px' }}
+            sx={{ display: { xs: 'none', md: 'inline-flex' }, flexShrink: 0, whiteSpace: 'nowrap', py: '10px', px: '18px', fontSize: '14.5px' }}
           >
             {t('Start a project', 'התחילו פרויקט')}
           </Button>
@@ -121,7 +169,7 @@ export default function Header() {
           <IconButton
             aria-label="Menu"
             onClick={() => setOpen(true)}
-            sx={{ display: { xs: 'inline-flex', md: 'none' }, color: brand.forest }}
+            sx={{ display: { xs: 'inline-flex', md: 'none' }, flexShrink: 0, color: brand.forest }}
           >
             <MenuIcon />
           </IconButton>

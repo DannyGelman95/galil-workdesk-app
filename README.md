@@ -18,7 +18,7 @@ site/                     The other two products published to GitHub Pages
                            (carried into the deploy as-is, unrelated to the
                            site-mui build).
   app/
-    index.html              The WorkDesk app (V7). Self-contained build: React
+    index.html              The WorkDesk app (V7.1). Self-contained build: React
                            inlined, no network calls. Open it directly in a
                            browser or serve the folder statically.
   handbook/
@@ -79,9 +79,27 @@ On every change the whole database is written to the browser's
 device/browser — but it is **not shared between users or devices**. Each
 visitor effectively gets their own sandboxed copy of the fake company.
 
-Use **⚙ Lists & data administration → Backup & restore** in the app to
+Use **⚙ System administration → Backup & restore** in the app to
 export/import that data as JSON (see `materials/backups/` for samples) if you
-want to move a demo session between browsers.
+want to move a demo session between browsers. People, clients, projects, work
+orders, assignments, expense types and the verification queue live on the
+**Management** tab instead (up to V7 this was the **Budgets** tab); the ⚙
+window now holds only company settings, backup & restore, the audit log and a
+read-only roles & permissions reference.
+
+### What's new in V7.1
+
+- A third hour type, **Blue · Management**, for Team Leads, Project Managers,
+  Operations Managers and the CEO — time spent managing a client's projects
+  and tasks, attributed to a client/project but drawn from neither an
+  allowance nor a budget.
+- Duplicate a time entry to the next day or the next week, and click a work
+  order code anywhere in a table to copy it to the clipboard.
+- Expense evidence attachments can be replaced or removed in place.
+- A light/dark theme switch, applied across the app, the Handbook and the
+  GALIL website — each remembers the choice per device.
+- A dedicated phone build below 820px width, built around a running timer,
+  with its own Time / Plan / Tasks / Expenses / More navigation.
 
 ### Logging in
 
@@ -141,4 +159,4 @@ Microsoft sign-in can be swapped for real services without a rewrite:
    once one exists.
 
 See `docs/GALIL-WorkDesk-Authentication-Setup-Guide.docx` and
-`docs/GALIL-WorkDesk-Functional-Specification-V7.docx` for the fuller spec.
+`docs/GALIL-WorkDesk-Functional-Specification-V7.1.docx` for the fuller spec.

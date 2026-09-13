@@ -4,6 +4,7 @@ import { createTheme } from '@mui/material/styles';
 const brand = {
   paper: '#FBFCF9',
   surface: '#F1F5EC',
+  card: '#FFFFFF',
   forest: '#1F3D24',
   forestDeep: '#14301C',
   green: '#8CC63E',
@@ -13,18 +14,34 @@ const brand = {
   annot: '#17A3B8',
 };
 
-export { brand };
+// Dark-theme counterparts — an explicit choice wins over the device default;
+// the deep-green sections (footer, track record) stay dark in both themes.
+const brandDark = {
+  paper: '#0E1710',
+  surface: '#16211A',
+  card: '#1A261C',
+  forest: '#E4EFE0',
+  forestDeep: '#0A1209',
+  green: '#9FD154',
+  greenDeep: '#B6E072',
+  steel: '#9AAD96',
+  rule: '#2A3A2C',
+  annot: '#49C2D4',
+};
 
-export function getTheme(direction) {
+export { brand, brandDark };
+
+export function getTheme(direction, mode) {
+  const b = mode === 'dark' ? brandDark : brand;
   return createTheme({
     direction,
     palette: {
-      mode: 'light',
-      background: { default: brand.paper, paper: '#FFFFFF' },
-      primary: { main: brand.green, dark: brand.greenDeep, contrastText: '#12240F' },
-      secondary: { main: brand.annot },
-      text: { primary: brand.forest, secondary: brand.steel },
-      divider: brand.rule,
+      mode: mode === 'dark' ? 'dark' : 'light',
+      background: { default: b.paper, paper: b.card },
+      primary: { main: b.green, dark: b.greenDeep, contrastText: mode === 'dark' ? '#0E1B0B' : '#12240F' },
+      secondary: { main: b.annot },
+      text: { primary: b.forest, secondary: b.steel },
+      divider: b.rule,
       error: { main: '#C0392B' },
     },
     shape: { borderRadius: 10 },
@@ -44,7 +61,7 @@ export function getTheme(direction) {
       },
       MuiCssBaseline: {
         styleOverrides: {
-          body: { backgroundColor: brand.paper },
+          body: { backgroundColor: b.paper },
         },
       },
       // Inputs otherwise render transparent, showing whatever section
@@ -53,9 +70,9 @@ export function getTheme(direction) {
       MuiOutlinedInput: {
         styleOverrides: {
           root: {
-            backgroundColor: '#fff',
-            '& .MuiOutlinedInput-notchedOutline': { borderColor: brand.rule },
-            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: brand.forest },
+            backgroundColor: b.card,
+            '& .MuiOutlinedInput-notchedOutline': { borderColor: b.rule },
+            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: b.forest },
           },
         },
       },

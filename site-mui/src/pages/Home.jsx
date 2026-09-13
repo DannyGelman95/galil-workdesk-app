@@ -8,7 +8,7 @@ import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import CheckIcon from '@mui/icons-material/Check';
 import { useLanguage } from '../lib/LanguageContext';
-import { brand } from '../theme';
+import { useBrandColors } from '../lib/ThemeModeContext';
 import AssemblyDiagram from '../components/AssemblyDiagram';
 
 const SERVICES = [
@@ -58,6 +58,7 @@ const INDUSTRIES = [
 
 export default function Home() {
   const { t } = useLanguage();
+  const brand = useBrandColors();
 
   return (
     <>
@@ -91,7 +92,7 @@ export default function Home() {
                   component={RouterLink}
                   to="/services"
                   variant="outlined"
-                  sx={{ borderColor: brand.rule, color: brand.forest, '&:hover': { borderColor: brand.forest, bgcolor: '#fff' } }}
+                  sx={{ borderColor: brand.rule, color: brand.forest, '&:hover': { borderColor: brand.forest, bgcolor: brand.card } }}
                 >
                   {t('See what we produce', 'מה אנחנו מפיקים')}
                 </Button>
