@@ -17477,23 +17477,26 @@ function applyTheme(t) {
 }
 
 /* ================= §14.1 brand tokens ================= */
+/* These read as CSS custom properties, not fixed hex, so every inline style
+   built from C repaints correctly when the theme switches — the light hex
+   values only ever showed up as the :root fallback anyway (§14.1 above). */
 var C = {
-  green:   "#8CC63E",
-  deep:    "#5C8B22",
-  wash:    "#F2F8E9",
-  ink:     "#1B2A18",
-  muted:   "#5B6B57",
-  line:    "#D8E7C4",
-  teal:    "#17A3B8",
-  red:     "#E05C4B",
-  yellow:  "#E3AC35",
-  blue:    "#3B7DD8",
-  amber:   "#F0A32C",
-  sick:    "#9C8CE8",
-  vacation:"#3FA97E",
-  error:   "#C0392B",
+  green:   "var(--green)",
+  deep:    "var(--deep)",
+  wash:    "var(--wash)",
+  ink:     "var(--ink)",
+  muted:   "var(--muted)",
+  line:    "var(--line)",
+  teal:    "var(--teal)",
+  red:     "var(--red)",
+  yellow:  "var(--yellow)",
+  blue:    "var(--blue)",
+  amber:   "var(--amber)",
+  sick:    "var(--sick)",
+  vacation:"var(--vac)",
+  error:   "var(--err)",
   white:   "#FFFFFF",
-  paper:   "#FBFDF7"
+  paper:   "var(--paper)"
 };
 
 /* ================= date & number helpers ================= */
@@ -18341,6 +18344,7 @@ var CSS = [
 "--amberbg:#FEF6E7;--amberline:#F5D89B;--ambertx:#7A5407;",
 "--errbg:#FBEBE9;--errline:#EBC6C1;--tealbg:#E7F6F8;--tealline:#AEE0E7;--tealtx:#0B6675;",
 "--bluebg:#E8F1FC;--blueline:#B7D2F3;--bluetx:#1E548F;",
+"--sickbg:#F1EEFC;--sickline:#D3C7F5;--sicktx:#5A48B8;--vacbg:#E8F7F0;--vacline:#B7E4D0;--vactx:#1F7A57;",
 "--sel:#1B2A18;--selfg:#FFFFFF;--onlight:#14260A;",
 /* the dark chrome bar stays dark in both themes, so text on it is always light */
 "--chrome:#1B2A18;--chrometx:#FFFFFF;--chromedim:#C9DDB4;--chromesoft:#B9CFA2;",
@@ -18358,6 +18362,7 @@ var CSS = [
 "--amberbg:#2E2412;--amberline:#5A4720;--ambertx:#F0C270;",
 "--errbg:#2E1815;--errline:#5C2C26;--tealbg:#12333A;--tealline:#1D5763;--tealtx:#68CEDD;",
 "--bluebg:#14263D;--blueline:#28496F;--bluetx:#9CC5F5;",
+"--sickbg:#241F3D;--sickline:#4A3F73;--sicktx:#C9BFF5;--vacbg:#16291F;--vacline:#2C5540;--vactx:#8DE0BB;",
 "--sel:#9FD154;--selfg:#14260A;--onlight:#14260A;",
 "--chrome:#2B3A22;--chrometx:#FFFFFF;--chromedim:#C9DDB4;--chromesoft:#B9CFA2;",
 "--ovl:rgba(0,0,0,.62);--shadow:rgba(0,0,0,.4);--shadow2:rgba(0,0,0,.7);",
@@ -19713,7 +19718,7 @@ function TimeLogTab(p) {
                   h("span", { className: "tnum" }, il(e.date)),
                   h("span", { className: "cap", style: { marginLeft: 6 } }, DOW[s2d(e.date).getDay()])),
                 h("td", null, userName(db, e.assignee)),
-                h("td", null, e.type === "Work" ? h("span", { className: "cap" }, "Work") : h(Chip, { k: "mut", style: { background: (e.type === "Sick" ? C.sick : C.vacation) + "22", color: e.type === "Sick" ? "#5A48B8" : "#1F7A57", borderColor: (e.type === "Sick" ? C.sick : C.vacation) + "66" } }, e.type)),
+                h("td", null, e.type === "Work" ? h("span", { className: "cap" }, "Work") : h(Chip, { k: "mut", style: { background: e.type === "Sick" ? "var(--sickbg)" : "var(--vacbg)", color: e.type === "Sick" ? "var(--sicktx)" : "var(--vactx)", borderColor: e.type === "Sick" ? "var(--sickline)" : "var(--vacline)" } }, e.type)),
                 h("td", { className: "tnum", style: { whiteSpace: "nowrap" } }, e.start ? e.start + "–" + e.end : "—"),
                 h("td", { className: "hrs" }, hoursChips(e)),
                 h("td", null, e.clientId ? nameOf(db.clients, e.clientId) : e.client ? h("span", { title: "Typed by the employee — not in the master list" }, e.client, " ", h(Chip, { k: "amber" }, "new")) : "—"),
@@ -20747,7 +20752,7 @@ function ExpensesTab(p) {
                 h("td", null, x.etype),
                 h("td", { className: "num" }, x.vkind === "money" ? money(x.amount, x.currency) : num(x.hours) + " h"),
                 h("td", null, x.clientId ? nameOf(db.clients, x.clientId) : "—", x.projectId ? h("div", { className: "cap" }, nameOf(db.projects, x.projectId)) : null),
-                h("td", { className: "mono", style: { fontSize: 12 } }, x.workOrderId ? nameOf(db.workOrders, x.workOrderId, "code") : "—"),
+                h("td", null, h(CopyCell, { value: x.workOrderId ? nameOf(db.workOrders, x.workOrderId, "code") : "" })),
                 h("td", null, (x.attachments || []).length
                   ? h(Btn, { sm: true, kind: "t", title: (x.attachments || []).map(function (a) { return a.name; }).join("\n") + "\n\nOpen the expense to replace or remove attachments.", onClick: function () { set(Object.assign({}, x)); window.scrollTo(0, 0); } }, "\ud83d\udcce ", String(x.attachments.length))
                   : h("span", { className: "cap" }, "\u2014")),
@@ -22334,6 +22339,7 @@ function MobileApp(p) {
       can(user, "approveTime") || can(user, "approveExpenses") ? h(Btn, { style: { minHeight: 48, justifyContent: "flex-start" }, onClick: function () { setSheet(null); setTab("approvals"); } }, "✔  Approvals", approvals ? h(Chip, { k: "amber" }, approvals) : null) : null,
       h(Btn, { style: { minHeight: 48, justifyContent: "flex-start" }, onClick: function () { setSheet("mywork"); } }, "◱  My assignments and allowances"),
       h(Btn, { style: { minHeight: 48, justifyContent: "flex-start" }, onClick: function () { setSheet("profile"); } }, "👤  My profile"),
+      h("a", { className: "btn", style: { minHeight: 48, justifyContent: "flex-start", textDecoration: "none" }, href: "../handbook/index.html", target: "_blank", rel: "noopener" }, "❓  Help — WorkDesk Handbook"),
       h("div", { className: "sep" }),
       h("div", { className: "cap" }, "The Dashboard, Management and System administration are laid out for a larger screen. Switch to the desktop layout to reach them — this phone will keep that choice."),
       h(Btn, { kind: "p", style: { minHeight: 48 }, onClick: function () { p.onForceDesktop(); } }, "🖥  Switch to the desktop layout")) : null,
@@ -22601,9 +22607,10 @@ function App() {
       }, "\ud83d\udcf1") : null,
       h("button", { className: "iconbtn", title: "My assignments and allowances", onClick: function () { setMyWork(true); } }, "◱"),
       h("button", { className: "iconbtn", title: "System administration", onClick: function () { setAdmin(true); } }, "⚙"),
+      h("a", { className: "iconbtn", style: { textDecoration: "none", fontWeight: 700 }, href: "../handbook/index.html", target: "_blank", rel: "noopener", title: "Help — open the WorkDesk Handbook" }, "?"),
       h("button", { className: "who iconbtn", style: { minWidth: 0, padding: "0 8px", gap: 9 }, onClick: function () { setProfile(true); }, title: "My profile" },
         h("span", { className: "avatar", style: user.photoUrl ? { backgroundImage: "url(" + user.photoUrl + ")", backgroundSize: "cover" } : null }, user.photoUrl ? "" : initialsOf(user.fullName)),
-        h("span", { className: "nm col", style: { alignItems: "flex-start", gap: 0 } },
+        h("span", { className: "nm col", style: { alignItems: "center", gap: 0 } },
           h("span", { style: { fontWeight: 600 } }, user.fullName),
           h("span", { className: "rolechip" }, roleName(user.role))))),
 
