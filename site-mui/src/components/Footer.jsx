@@ -60,6 +60,15 @@ export default function Footer() {
                 {t(item.en, item.he)}
               </Box>
             ))}
+            <Box
+              component="a"
+              href="app/"
+              target="_blank"
+              rel="noopener"
+              sx={{ color: '#C6DABE', textDecoration: 'none', whiteSpace: 'nowrap', '&:hover': { color: 'primary.main' } }}
+            >
+              {t('Employees Portal', 'פורטל העובדים')}
+            </Box>
           </Box>
 
           <Box sx={{ display: 'flex', gap: '9px' }}>

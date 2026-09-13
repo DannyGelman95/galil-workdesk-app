@@ -4,6 +4,7 @@ import { CacheProvider } from '@emotion/react';
 import CssBaseline from '@mui/material/CssBaseline';
 import { ThemeProvider } from '@mui/material/styles';
 import { useLanguage } from './lib/LanguageContext';
+import { useThemeMode } from './lib/ThemeModeContext';
 import { cacheLtr, cacheRtl } from './lib/rtlCache';
 import { getTheme } from './theme';
 import Layout from './components/Layout';
@@ -14,7 +15,8 @@ import Contact from './pages/Contact';
 
 export default function App() {
   const { dir } = useLanguage();
-  const theme = useMemo(() => getTheme(dir), [dir]);
+  const { mode } = useThemeMode();
+  const theme = useMemo(() => getTheme(dir, mode), [dir, mode]);
   const cache = dir === 'rtl' ? cacheRtl : cacheLtr;
 
   return (

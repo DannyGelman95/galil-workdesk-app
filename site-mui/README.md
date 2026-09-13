@@ -26,9 +26,11 @@ npm run preview    # serve the production build locally
 
 ```
 src/
-  theme.js                 MUI theme — GALIL brand palette, typography.
+  theme.js                 MUI theme — GALIL brand palette, typography, light/dark.
   lib/
     LanguageContext.jsx     EN/HE state, sets <html lang/dir>, exposes t(en, he).
+    ThemeModeContext.jsx     Light/dark state, persisted per device; useBrandColors()
+                             hands components the palette for the current mode.
     rtlCache.js              Emotion caches (LTR / RTL via stylis-plugin-rtl).
     useMailtoForm.js         Shared validate-then-mailto logic for the
                              Contact and Careers/CV forms (no backend yet,
@@ -43,6 +45,13 @@ src/
 Every string in the UI is passed through `t(english, hebrew)` from
 `useLanguage()`, mirroring the `data-en`/`data-he` attribute pairs used in
 the archived static site's markup.
+
+The header carries an **Employees Portal** button (links to `app/`, where the
+WorkDesk app is published alongside this site — see root README's
+**Deployment** section) and a light/dark theme toggle. Page components read
+colours through `useBrandColors()` rather than importing the `brand` constant
+directly, so they repaint when the theme switches; `theme.js` exports both
+the light (`brand`) and dark (`brandDark`) palettes.
 
 Routing uses React Router's `HashRouter` (`/#/services`, `/#/careers`, …) so
 the built output is plain static files with no server-side rewrite rules —
