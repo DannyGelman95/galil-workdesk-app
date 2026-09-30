@@ -861,7 +861,7 @@ table code{background:transparent; padding:0}
     <div class="ch-head"><span class="ch-num">09</span><h2>Management</h2></div>
     <p class="lede">The day-to-day operational tab — budgets, work orders and the company's master records — behind one <strong>Management</strong> tab in the top bar. Up to V7, budgets and work orders lived on their own tab while people, assignments, clients, projects, expense types and the verification queue lived behind the ⚙ button; V7.1 brings all of it together here. Which of the sections below you see depends on your role.</p>
     <div class="locked-note"></div>
-    <div class="perm" data-perm="viewBudgets,editBudgets,createWorkOrders,assignTasks,manageClientsProjects,manageEmployeesRoles"></div>
+    <div class="perm" data-perm="viewBudgets,editBudgets,createWorkOrders,assignTasks,manageTeams,manageClientsProjects,manageEmployeesRoles"></div>
 
     <div class="note">
       <span class="tag">Who sees what</span>
@@ -936,6 +936,20 @@ table code{background:transparent; padding:0}
       <img src="img/51-admin-people.png" alt="The Management tab's People section listing staff with role dropdowns, team, manager and active status.">
       <figcaption><span class="fno">Fig 9.5</span><span>People. Deactivating keeps the person's history intact; it only stops them signing in.</span></figcaption>
     </figure>
+
+    <h3 id="h-teams">Teams</h3>
+    <p>To the right of <strong>People</strong>. Team Leads, Project Managers, Operations Managers and the CEO set up teams here, add people to them and choose each member's <strong>direct manager</strong> — normally themselves.</p>
+    <ol class="steps">
+      <li>Type a <strong>New team name</strong> and click <strong>+ Create team</strong>. You become its team lead. Operations Managers and the CEO can pick any manager as the <strong>Team lead</strong> instead.</li>
+      <li>In the team's card, choose a person under <strong>Add a person</strong>, set <strong>Their direct manager</strong> (it starts on the team lead) and click <strong>+ Add to team</strong>.</li>
+      <li>Change a member's direct manager at any time from the dropdown in their row, or take them out of the team with <strong>Remove</strong> — their direct manager stays as it was.</li>
+      <li>Rename a team in place. <strong>Delete team</strong> works once the team has no members.</li>
+    </ol>
+    <p>Team Leads and Project Managers see and manage only the teams they lead, and can add anyone who is not already in another team — but not themselves, an Operations Manager or the CEO. Nobody changes their own direct manager; that is set by the person above them. Operations Managers and the CEO manage every team.</p>
+    <div class="note">
+      <span class="tag">Why it matters</span>
+      <p>The <strong>direct manager</strong> receives the person's sick and vacation requests. The <strong>team lead</strong> is first in line for the person's other approval requests, with the direct manager next.</p>
+    </div>
 
     <h3>Pending activation</h3>
     <p>New sign-ups wait here. For each one:</p>
@@ -1365,7 +1379,9 @@ var PERM = {
   libraryWrite:          ["Y","Y","Y","Y","Y","-","Y","-","-"],
   excelExport:           ["O","O","T","P","Y","Y","Y","O","Y"],
   backupRestore:         ["-","-","-","-","Y","-","Y","-","-"],
-  viewAuditLog:          ["-","-","-","-","Y","Y","Y","-","-"]
+  viewAuditLog:          ["-","-","-","-","Y","Y","Y","-","-"],
+  knowledgeBase:         ["Y","Y","Y","Y","Y","Y","Y","-","-"],
+  manageTeams:           ["-","-","Y","Y","Y","-","Y","-","-"]
 };
 var LABEL = {
   reportOwnTime:"Report own time", reportBlueTime:"Report Blue · management hours", viewOthersTime:"View others' time", editOthersTime:"Edit others' time",
@@ -1376,7 +1392,8 @@ var LABEL = {
   manageClientsProjects:"Manage clients & projects", manageEmployeesRoles:"Manage employees & roles",
   dashboardOwn:"Dashboard — own figures", dashboardCompany:"Dashboard — company figures",
   libraryRead:"Library — read", libraryWrite:"Library — write", excelExport:"Excel export",
-  backupRestore:"Backup / restore", viewAuditLog:"View audit log"
+  backupRestore:"Backup / restore", viewAuditLog:"View audit log",
+  knowledgeBase:"Knowledge Base", manageTeams:"Set up teams & managers"
 };
 var SCOPE_WORD = {Y:"", O:"own", T:"team", P:"projects"};
 
