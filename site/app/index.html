@@ -17574,7 +17574,9 @@ var PERM = {
   libraryWrite:               ["Y","Y","Y","Y","Y","-","Y","-","-"],
   excelExport:                ["O","O","T","P","Y","Y","Y","O","Y"],
   backupRestore:              ["-","-","-","-","Y","-","Y","-","-"],
-  viewAuditLog:               ["-","-","-","-","Y","Y","Y","-","-"]
+  viewAuditLog:               ["-","-","-","-","Y","Y","Y","-","-"],
+  /* Employee Knowledge Base (site/kb/) — every employee, not contractors or viewers */
+  knowledgeBase:              ["Y","Y","Y","Y","Y","Y","Y","-","-"]
 };
 var PERM_LABELS = {
   reportOwnTime: "Report own time", reportBlueTime: "Report Blue \u00b7 management hours", viewOthersTime: "View others' time", editOthersTime: "Edit others' time",
@@ -17585,7 +17587,8 @@ var PERM_LABELS = {
   manageClientsProjects: "Manage clients & projects", manageEmployeesRoles: "Manage employees & roles",
   dashboardOwn: "Dashboard — own figures", dashboardCompany: "Dashboard — company figures",
   libraryRead: "Library — read", libraryWrite: "Library — write", excelExport: "Excel export",
-  backupRestore: "Backup / restore", viewAuditLog: "View audit log"
+  backupRestore: "Backup / restore", viewAuditLog: "View audit log",
+  knowledgeBase: "Knowledge Base"
 };
 var ROLE_ORDER = ["EMP","SEN","TL","PM","OPS","FIN","CEO","EXT","VIEW"];
 /* scope letter for a capability: "Y" | "O" | "T" | "P" | "-" */
@@ -22339,6 +22342,7 @@ function MobileApp(p) {
       can(user, "approveTime") || can(user, "approveExpenses") ? h(Btn, { style: { minHeight: 48, justifyContent: "flex-start" }, onClick: function () { setSheet(null); setTab("approvals"); } }, "✔  Approvals", approvals ? h(Chip, { k: "amber" }, approvals) : null) : null,
       h(Btn, { style: { minHeight: 48, justifyContent: "flex-start" }, onClick: function () { setSheet("mywork"); } }, "◱  My assignments and allowances"),
       h(Btn, { style: { minHeight: 48, justifyContent: "flex-start" }, onClick: function () { setSheet("profile"); } }, "👤  My profile"),
+      can(user, "knowledgeBase") ? h("a", { className: "btn", style: { minHeight: 48, justifyContent: "flex-start", textDecoration: "none" }, href: "../kb/index.html", target: "_blank", rel: "noopener" }, "📖  Knowledge Base") : null,
       h("a", { className: "btn", style: { minHeight: 48, justifyContent: "flex-start", textDecoration: "none" }, href: "../handbook/index.html", target: "_blank", rel: "noopener" }, "❓  Help — WorkDesk Handbook"),
       h("div", { className: "sep" }),
       h("div", { className: "cap" }, "The Dashboard, Management and System administration are laid out for a larger screen. Switch to the desktop layout to reach them — this phone will keep that choice."),
@@ -22607,6 +22611,7 @@ function App() {
       }, "\ud83d\udcf1") : null,
       h("button", { className: "iconbtn", title: "My assignments and allowances", onClick: function () { setMyWork(true); } }, "◱"),
       h("button", { className: "iconbtn", title: "System administration", onClick: function () { setAdmin(true); } }, "⚙"),
+      can(user, "knowledgeBase") ? h("a", { className: "iconbtn", style: { textDecoration: "none" }, href: "../kb/index.html", target: "_blank", rel: "noopener", title: "Knowledge Base — onboarding, company rules and training", "aria-label": "Open the Employee Knowledge Base" }, "\ud83d\udcd6") : null,
       h("a", { className: "iconbtn", style: { textDecoration: "none", fontWeight: 700 }, href: "../handbook/index.html", target: "_blank", rel: "noopener", title: "Help — open the WorkDesk Handbook" }, "?"),
       h("button", { className: "who iconbtn", style: { minWidth: 0, padding: "0 8px", gap: 9 }, onClick: function () { setProfile(true); }, title: "My profile" },
         h("span", { className: "avatar", style: user.photoUrl ? { backgroundImage: "url(" + user.photoUrl + ")", backgroundSize: "cover" } : null }, user.photoUrl ? "" : initialsOf(user.fullName)),
