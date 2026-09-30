@@ -44,6 +44,10 @@ site/                     The other two products published to GitHub Pages
   handbook/
     index.html              The WorkDesk Handbook — user guide for the app,
                            also linked from the ? button in the app's top bar.
+  kb/
+    index.html              The Employee Knowledge Base — onboarding, company
+                           rules and training how-to's, opened from the 📖
+                           button in the app's top bar.
 archive/                  Superseded builds, kept for reference.
   GALIL-WorkDesk-v6.html
   galil-workdesk-dev-cdn-build.html
@@ -149,17 +153,41 @@ The sign-in screen itself also shows these credentials.
 The **?** button in the app's top bar, right next to the profile avatar, opens
 the WorkDesk Handbook (`site/handbook/index.html`) in a new tab.
 
+## The Employee Knowledge Base (`site/kb/`)
+
+An internal knowledge base for GALIL employees: **Onboarding** (welcome,
+first-week checklist, accounts and systems), **Company rules** (code of
+conduct, working hours and time reporting, leave, expenses, information
+security, client confidentiality) and **Training & how-to's** (VPN setup,
+MFA, signing in to WorkDesk, logging time, planning the week, expenses,
+tasks, phishing). Static HTML with no build step, searchable, light/dark
+theme, phone-friendly. Articles live in the `ARTICLES` array in
+`site/kb/index.html` — add or edit an entry there to change the content.
+
+**Opening it:** the 📖 button in the WorkDesk top bar (desktop) or
+**More → 📖 Knowledge Base** (phone) opens it in a new tab.
+
+**Who can see it:** every role except **External Contractor** and
+**Viewer** — the `knowledgeBase` capability in the app's permission matrix
+(`PERM` in `site/app/index.html`, also listed under ⚙ → Roles & permissions).
+The button is hidden for EXT and VIEW, and the Knowledge Base page itself
+reads the WorkDesk session from the browser and shows a "No access" screen
+for those roles, or a "Sign in to WorkDesk first" screen when nobody is
+signed in. Like the rest of the standalone build this is a client-side
+check; it should move behind the same server-side auth as the app when
+Microsoft Entra ID sign-in lands (see **Roadmap**).
+
 ## Deployment (GitHub Pages)
 
 A workflow at `.github/workflows/deploy-pages.yml` builds `site-mui` and
 publishes it to GitHub Pages on every push to `main`, with `site/app/` and
-`site/handbook/` carried over unchanged into the same deploy. One manual,
+`site/handbook/` and `site/kb/` carried over unchanged into the same deploy. One manual,
 one-time step is required before it will run successfully: in the repo's
 **Settings → Pages**, set **Source** to **GitHub Actions**. After that, every
 push to `main` that touches `site-mui/` or `site/` redeploys automatically,
 and the workflow can also be run by hand from the **Actions** tab. Once
 deployed, the website is at the Pages root, the app is at `/app/`, and the
-handbook is at `/handbook/`.
+handbook is at `/handbook/`, and the Knowledge Base is at `/kb/`.
 
 ## Roadmap — replacing the fake database
 
