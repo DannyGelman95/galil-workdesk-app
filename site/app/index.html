@@ -17575,6 +17575,8 @@ var PERM = {
   excelExport:                ["O","O","T","P","Y","Y","Y","O","Y"],
   backupRestore:              ["-","-","-","-","Y","-","Y","-","-"],
   viewAuditLog:               ["-","-","-","-","Y","Y","Y","-","-"],
+  /* Teams sub-tab: leads set up their own teams (OPS and CEO manage every team) */
+  manageTeams:                ["-","-","Y","Y","Y","-","Y","-","-"],
   /* Employee Knowledge Base (site/kb/) — every employee, not contractors or viewers */
   knowledgeBase:              ["Y","Y","Y","Y","Y","Y","Y","-","-"]
 };
@@ -17588,7 +17590,7 @@ var PERM_LABELS = {
   dashboardOwn: "Dashboard — own figures", dashboardCompany: "Dashboard — company figures",
   libraryRead: "Library — read", libraryWrite: "Library — write", excelExport: "Excel export",
   backupRestore: "Backup / restore", viewAuditLog: "View audit log",
-  knowledgeBase: "Knowledge Base"
+  knowledgeBase: "Knowledge Base", manageTeams: "Set up teams & managers"
 };
 var ROLE_ORDER = ["EMP","SEN","TL","PM","OPS","FIN","CEO","EXT","VIEW"];
 /* scope letter for a capability: "Y" | "O" | "T" | "P" | "-" */
@@ -17868,6 +17870,10 @@ function AttachmentLinks(p) {
   }));
 }
 
+/* Yellow · Client and Blue · Management both draw on the personal allowance and on
+   the project / work-order budget. Red · Company draws on neither. */
+function allowanceHrs(e) { return (Number(e.yellow) || 0) + (Number(e.blue) || 0); }
+
 /* ================= §8 the entitlement engine ================= */
 /* Returns { status, reason, softFlag, escalate } */
 function entitlementCheck(db, entry) {
@@ -17880,14 +17886,13 @@ function entitlementCheck(db, entry) {
      sends them to the person's manager as a Leave request (the CEO registers directly). */
   if (isLeave(entry.type)) return ok;
 
-  var hrs = Number(entry.yellow) || 0;
+  var hrs = allowanceHrs(entry);
 
-  /* 2 — Red · Company and Blue · Management are never gated.
-     Blue is management time: it is attributed to a client and project so it can be
-     reported on, but it draws on neither a personal allowance nor a project budget.
-     Both still count toward the daily soft and hard limits (checks 8 and 9). */
+  /* 2 — Red · Company is never gated. Blue · Management is gated exactly like
+     Yellow: it draws on the personal allowance and on the project or work-order
+     budget. Red still counts toward the daily soft and hard limits (checks 8 and 9). */
   if (!hrs) {
-    var other = (Number(entry.red) || 0) + (Number(entry.blue) || 0);
+    var other = Number(entry.red) || 0;
     if (!other) return ok;
     var sd0 = db.entries.filter(function (e) {
       return e.assignee === entry.assignee && e.date === entry.date && e.id !== entry.id && e.status === "registered";
@@ -17930,7 +17935,7 @@ function entitlementCheck(db, entry) {
   var sameDay = db.entries.filter(function (e) {
     return e.assignee === entry.assignee && e.date === entry.date && e.id !== entry.id && e.status === "registered";
   }).reduce(function (a, e) { return a + (Number(e.red) || 0) + (Number(e.yellow) || 0) + (Number(e.blue) || 0); }, 0);
-  var total = sameDay + hrs + (Number(entry.red) || 0) + (Number(entry.blue) || 0);
+  var total = sameDay + hrs + (Number(entry.red) || 0);
   if (total > hard) return no("Daily limit exceeded");
   if (total > soft) return { status: "registered", reason: "", softFlag: true, escalate: null };
 
@@ -17943,14 +17948,14 @@ function findAssignment(db, userId, projectId, workOrderId) {
   if (exact) return exact;
   return db.assignments.filter(function (a) { return a.userId === userId && a.projectId === projectId && !a.workOrderId; })[0] || null;
 }
-/* §8.2 — Consumed counts registered Yellow hours only. Pending is never consumed. */
+/* §8.2 — Consumed counts registered Yellow and Blue hours. Pending is never consumed. */
 function consumedOn(db, userId, asg, excludeId) {
   return db.entries.filter(function (e) {
     if (e.status !== "registered" || e.assignee !== userId || e.id === excludeId) return false;
     if (e.projectId !== asg.projectId) return false;
     if (asg.workOrderId) return e.workOrderId === asg.workOrderId;
     return true;
-  }).reduce(function (a, e) { return a + (Number(e.yellow) || 0); }, 0);
+  }).reduce(function (a, e) { return a + allowanceHrs(e); }, 0);
 }
 function pendingOn(db, userId, asg) {
   return db.entries.filter(function (e) {
@@ -17958,7 +17963,7 @@ function pendingOn(db, userId, asg) {
     if (e.projectId !== asg.projectId) return false;
     if (asg.workOrderId) return e.workOrderId === asg.workOrderId;
     return true;
-  }).reduce(function (a, e) { return a + (Number(e.yellow) || 0); }, 0);
+  }).reduce(function (a, e) { return a + allowanceHrs(e); }, 0);
 }
 function budgetFor(db, projectId, workOrderId) {
   if (workOrderId) {
@@ -17982,17 +17987,17 @@ function budgetScopeEntries(db, b, status) {
 function budgetConsumed(db, b, excludeId) {
   return budgetScopeEntries(db, b, "registered")
     .filter(function (e) { return e.id !== excludeId; })
-    .reduce(function (a, e) { return a + (Number(e.yellow) || 0); }, 0);
+    .reduce(function (a, e) { return a + allowanceHrs(e); }, 0);
 }
 function budgetPending(db, b) {
-  return budgetScopeEntries(db, b, "pending").reduce(function (a, e) { return a + (Number(e.yellow) || 0); }, 0);
+  return budgetScopeEntries(db, b, "pending").reduce(function (a, e) { return a + allowanceHrs(e); }, 0);
 }
 /* §12.2 — projected exhaustion from the last 30 days' burn rate */
 function burnProjection(db, b) {
   var cut = new Date(); cut.setDate(cut.getDate() - 30);
   var hrs = budgetScopeEntries(db, b, "registered")
     .filter(function (e) { return s2d(e.date) >= cut; })
-    .reduce(function (a, e) { return a + (Number(e.yellow) || 0); }, 0);
+    .reduce(function (a, e) { return a + allowanceHrs(e); }, 0);
   if (!b.hours) return null;
   var remaining = Number(b.hours) - budgetConsumed(db, b);
   if (remaining <= 0) return "exhausted";
@@ -18486,7 +18491,7 @@ var CSS = [
 
 /* ---- fields ---- */
 ".fld{display:flex;flex-direction:column;gap:3px;min-width:0}",
-".fld>label{font-size:11.5px;font-weight:600;color:var(--muted);letter-spacing:.02em}",
+".fld>label{font-size:11.5px;font-weight:600;color:var(--muted);letter-spacing:.02em;line-height:16px;min-height:16px}",
 ".fld input,.fld select,.fld textarea{min-height:38px;padding:7px 9px;border:1px solid var(--line);border-radius:9px;background-color:var(--surface);font-size:13.5px;width:100%}",
 ".fld textarea{min-height:38px;resize:vertical}",
 ".fld input:focus,.fld select:focus,.fld textarea:focus{border-color:var(--deep);outline:2px solid rgba(92,139,34,.25);outline-offset:0}",
@@ -18695,6 +18700,18 @@ var CSS = [
 ".pill.on{background:var(--sel);color:var(--selfg);border-color:var(--sel)}",
 ".pill .badge{background:var(--amber);color:#fff;border-radius:999px;font-size:10.5px;font-weight:700;padding:0 5px;margin-left:5px}",
 ".hidden{display:none}",
+".filebox{display:flex;align-items:center;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;gap:6px;min-height:38px;padding:4px 6px;border:1px dashed var(--line);border-radius:9px;background:var(--surface);min-width:0}",
+".filebox .fbtn{min-height:28px;padding:4px 11px;border-radius:8px;border:1px solid var(--line);background:var(--wash);color:var(--deep);font:600 12.5px var(--font);cursor:pointer;flex:0 0 auto}",
+".filebox .fbtn:hover{background:var(--green);border-color:var(--green);color:var(--onlight)}",
+".filebox .cap{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}",
+".filebox .att{flex:0 0 auto}",
+".band>.banner{white-space:nowrap;overflow:hidden}",
+".band>.banner>span{overflow:hidden;text-overflow:ellipsis}",
+".fld.bad .filebox{border-color:var(--err);background:var(--errbg)}",
+".band>.banner{min-height:38px}",
+/* toolbars that mix pills, headings or chips with labelled fields line up on the fields */
+".panel.row:has(> div > .fld, > .fld){align-items:flex-end}",
+".panel.row:has(> div > .fld, > .fld) > :not(div:has(> .fld)):not(.fld):not(.grow){min-height:38px;display:flex;align-items:center}",
 /* small popover menu (duplicate an entry, replace an attachment) */
 ".pop{position:absolute;right:0;top:100%;z-index:60;background:var(--surface);border:1px solid var(--line);border-radius:11px;box-shadow:0 14px 34px var(--shadow2);padding:5px;display:flex;flex-direction:column;gap:2px;min-width:190px}",
 ".pop button{background:transparent;border:0;border-radius:8px;padding:8px 10px;text-align:left;font:600 12.5px var(--font);color:var(--ink);cursor:pointer;min-height:36px;white-space:nowrap}",
@@ -19475,7 +19492,7 @@ function EntryForm(p) {
 
   /* §8.4 warning banner for the selected assignment */
   var warn = null;
-  if (!isDayType && f.hourType === "yellow" && f.projectId) {
+  if (!isDayType && (f.hourType === "yellow" || f.hourType === "blue") && f.projectId) {
     var asg = findAssignment(db, f.assignee, f.projectId, f.workOrderId || null);
     if (asg && asg.allowanceHours !== null && asg.allowanceHours !== "" && asg.allowanceHours !== undefined) {
       var used = consumedOn(db, f.assignee, asg, f.id), allow = Number(asg.allowanceHours);
@@ -19537,7 +19554,7 @@ function EntryForm(p) {
               }, h("span", { className: "dot", style: { background: f.hourType === "yellow" ? "#3B2A05" : C.yellow } }), "Yellow"),
               can(viewer, "reportBlueTime") ? h("button", {
                 type: "button", role: "radio", "aria-checked": f.hourType === "blue" ? "true" : "false",
-                className: f.hourType === "blue" ? "on b" : "", title: "Blue · Management — time spent managing a client's projects and tasks. Attributed to the client, but drawn from neither your allowance nor the project budget.",
+                className: f.hourType === "blue" ? "on b" : "", title: "Blue · Management — time spent managing a client's projects and tasks. Like Yellow, drawn from your allowance and the project budget.",
                 onClick: function () { up("hourType", "blue"); }
               }, h("span", { className: "dot", style: { background: f.hourType === "blue" ? "#fff" : C.blue } }), "Blue") : null))
         ]
@@ -19590,16 +19607,16 @@ function leaveDayLabel(f) {
 function LeaveBand(p) {
   var f = p.form, direct = !leaveNeedsApproval(p.viewer);
   var to = direct ? null : routeApproval(p.db, f.assignee, "Leave request");
-  return h("div", { className: "band", style: { alignItems: "flex-start" } },
+  return h("div", { className: "band" },
     f.type === "Sick" ? h(AttachField, {
-      label: "Sick-leave confirmation (PDF or image)", cls: "grow", keepData: true,
-      emptyText: "Attach the confirmation from the clinic or doctor's office.",
+      label: "Sick-leave confirmation — clinic or doctor's office (PDF or image)", cls: "grow", keepData: true,
+      emptyText: "No file attached",
       value: f.attachments || [], onChange: function (v) { p.up("attachments", v); }
     }) : null,
-    h("div", { className: "banner " + (direct ? "gr" : "teal"), style: { flex: "1 1 280px", alignSelf: "flex-end" } },
-      direct ? "\u2713 As CEO, this " + f.type.toLowerCase() + " is registered directly — no request is sent."
-        : h("span", null, "\u2709 This is sent as a leave request to ", h("b", null, userName(p.db, to)),
-            ". The days are pending — and not counted — until they approve.")));
+    h("div", { className: "banner " + (direct ? "gr" : "teal"), style: { flex: "1 1 280px" } },
+      direct ? h("span", null, "\u2713 As CEO, your entry is registered directly — no request is sent.")
+        : h("span", { title: "The days are pending, and not counted, until " + userName(p.db, to) + " approves." },
+            "\u2709 Sent for approval to ", h("b", null, userName(p.db, to)), " — pending until approved.")));
 }
 
 /* ---------- the one path an entry takes into the store (§7.2, §8) ----------
@@ -19864,7 +19881,7 @@ function TimeLogTab(p) {
         h("div", { style: { minWidth: 108 } }, h(Sel, { label: "Entry type", value: flt.type, placeholder: "All", options: ["Work", "Sick", "Vacation"], onChange: function (e) { setFlt(Object.assign({}, flt, { type: e.target.value })); } })),
         h("div", { style: { minWidth: 150 } }, h(Sel, { label: "Project status", value: flt.projectStatus, placeholder: "All", options: PROJECT_STATUSES, onChange: function (e) { setFlt(Object.assign({}, flt, { projectStatus: e.target.value })); } })),
         h("div", { style: { minWidth: 132 } }, h(Sel, { label: "Entry status", value: flt.status, placeholder: "All", options: [{ value: "registered", label: "Registered" }, { value: "pending", label: "Pending" }, { value: "cancelled", label: "Cancelled" }, { value: "locked", label: "Locked" }], onChange: function (e) { setFlt(Object.assign({}, flt, { status: e.target.value })); } })),
-        h(Btn, { sm: true, kind: "t", onClick: function () { setFlt({ employees: [], clientId: "", projectId: "", workOrderId: "", taskId: "", type: "", projectStatus: "", status: "" }); } }, "Clear"))),
+        h(Btn, { kind: "t", onClick: function () { setFlt({ employees: [], clientId: "", projectId: "", workOrderId: "", taskId: "", type: "", projectStatus: "", status: "" }); } }, "Clear"))),
 
     /* ---- list ---- */
     h("div", { className: "panel scroll" },
@@ -20282,23 +20299,24 @@ function PlannerTab(p) {
   }
 
   return h("div", { className: "page" },
-    h("div", { className: "panel pad row", style: { gap: 9 } },
-      h("div", { className: "pillbar" }, ["day", "week", "month"].map(function (v) {
+    h("div", { className: "panel pad row", style: { gap: 9, alignItems: "flex-end" } },
+      h("div", { className: "pillbar", style: { minHeight: 38, alignItems: "center" } }, ["day", "week", "month"].map(function (v) {
         return h("button", { key: v, className: "pill" + (vmode === v ? " on" : ""), onClick: function () { setV(v); setOff(0); } }, v.charAt(0).toUpperCase() + v.slice(1));
       })),
-      h("div", { className: "row", style: { gap: 4 } },
-        h("button", { className: "iconbtn", style: { color: C.muted, minHeight: 36 }, onClick: function () { setOff(off - 1); }, "aria-label": "Previous" }, "‹"),
+      h("div", { className: "row", style: { gap: 4, minHeight: 38 } },
+        h("button", { className: "iconbtn", style: { color: C.muted, minHeight: 38 }, onClick: function () { setOff(off - 1); }, "aria-label": "Previous" }, "‹"),
         h("span", { className: "mono", style: { minWidth: 168, textAlign: "center", fontWeight: 700 } }, il(days[0]), " – ", il(days[days.length - 1])),
-        h("button", { className: "iconbtn", style: { color: C.muted, minHeight: 36 }, onClick: function () { setOff(off + 1); }, "aria-label": "Next" }, "›"),
-        h(Btn, { sm: true, kind: "t", onClick: function () { setOff(0); } }, "This week")),
+        h("button", { className: "iconbtn", style: { color: C.muted, minHeight: 38 }, onClick: function () { setOff(off + 1); }, "aria-label": "Next" }, "›"),
+        h(Btn, { kind: "t", onClick: function () { setOff(0); } }, "This week")),
       pool.length > 1 ? h("div", { style: { minWidth: 176 } }, h(Sel, { label: "Planning for", value: who, options: pool.map(function (u) { return { value: u.id, label: u.fullName }; }), onChange: function (e) { setWho(e.target.value); } })) : null,
       h("div", { className: "grow" }),
+      h("div", { className: "row", style: { gap: 6, minHeight: 38 } },
       h(Chip, { k: "teal" }, "Planned ", num(plannedTotal), " h"),
       h(Chip, { k: "gr" }, "Actual ", num(actualTotal), " h"),
       h(Chip, { k: (actualTotal - plannedTotal) >= 0 ? "gr" : "amber" }, "Variance ", (actualTotal - plannedTotal >= 0 ? "+" : ""), num(actualTotal - plannedTotal), " h"),
-      h(Chip, { k: plannedTotal > capacity ? "amber" : "gr", title: "Contracted " + num(capacity) + " h" }, "Capacity ", num(plannedTotal), "/", num(capacity), " h"),
-      h(Btn, { sm: true, onClick: copyWeek }, "Copy week"),
-      can(user, "excelExport") ? h(Btn, { sm: true, onClick: doExport }, "⬇ Export") : null),
+      h(Chip, { k: plannedTotal > capacity ? "amber" : "gr", title: "Contracted " + num(capacity) + " h" }, "Capacity ", num(plannedTotal), "/", num(capacity), " h")),
+      h(Btn, { onClick: copyWeek }, "Copy week"),
+      can(user, "excelExport") ? h(Btn, { onClick: doExport }, "⬇ Export") : null),
 
     plannedTotal > capacity ? h("div", { className: "banner amber" }, "⚠ ", userName(db, who), " is planned above contracted capacity for this period.") : null,
 
@@ -20472,7 +20490,7 @@ function ApprovalsTab(p) {
             var asg = findAssignment(d, e.assignee, e.projectId, e.workOrderId);
             if (asg && asg.allowanceHours !== null && asg.allowanceHours !== undefined && asg.allowanceHours !== "") {
               var used = consumedOn(d, e.assignee, asg, e.id);
-              var over = (used + (Number(e.yellow) || 0)) - Number(asg.allowanceHours);
+              var over = (used + allowanceHrs(e)) - Number(asg.allowanceHours);
               if (over > 0) asg.allowanceHours = Number(asg.allowanceHours) + over;
             }
           }
@@ -20757,16 +20775,20 @@ function AttachField(p) {
     fr.readAsDataURL(file);
   };
   return h(Field, { label: p.label, err: p.err, cls: p.cls },
-    h("div", { className: "col", style: { gap: 7 } },
+    h("div", { className: "filebox" },
       h("input", {
-        type: "file", accept: "image/*,.pdf", id: base + "-add",
+        type: "file", accept: "image/*,.pdf", id: base + "-add", className: "hidden",
         onChange: function (e) {
           var file = e.target.files && e.target.files[0]; if (!file) return;
           read(file, function (m) { p.onChange(list.concat([m])); }); e.target.value = "";
         }
       }),
+      h("button", {
+        type: "button", className: "fbtn", title: "Attach a PDF or an image",
+        onClick: function () { var el = document.getElementById(base + "-add"); if (el) el.click(); }
+      }, list.length ? "+ Add file" : "Choose file"),
       list.length
-        ? h("div", { className: "row", style: { gap: 6 } }, list.map(function (a, i) {
+        ? list.map(function (a, i) {
             return h("span", { key: i, className: "att" },
               h("span", {
                 className: "nm", title: a.name + (a.size ? " \u00b7 " + Math.round(a.size / 1024) + " KB" : "") + (a.data ? " \u2014 click to open" : ""),
@@ -20792,8 +20814,8 @@ function AttachField(p) {
                   toast("Attachment removed.", "", { label: "Undo", fn: function () { p.onChange(before); } });
                 }
               }, "\u2715"));
-          }))
-        : h("span", { className: "cap" }, p.emptyText || "No evidence attached yet.")));
+          })
+        : h("span", { className: "cap" }, p.emptyText || "No file attached")));
 }
 
 function ExpensesTab(p) {
@@ -21125,7 +21147,7 @@ function ManagementTab(p) {
         h("tbody", null, wos.map(function (w) {
           var pr = byId(db.projects, w.projectId) || {};
           var b = db.budgets.filter(function (x) { return x.workOrderId === w.id; })[0];
-          var used = b ? budgetConsumed(db, b) : db.entries.filter(function (e) { return e.workOrderId === w.id && e.status === "registered"; }).reduce(function (a, e) { return a + (Number(e.yellow) || 0) + (Number(e.blue) || 0); }, 0);
+          var used = b ? budgetConsumed(db, b) : db.entries.filter(function (e) { return e.workOrderId === w.id && e.status === "registered"; }).reduce(function (a, e) { return a + allowanceHrs(e); }, 0);
           return h("tr", { key: w.id },
             h("td", { className: "mono", style: { fontWeight: 700 } }, w.code),
             h("td", null, w.title),
@@ -21357,7 +21379,7 @@ function DashboardTab(p) {
       h("div", { style: { minWidth: 170 } }, h(Sel, { label: "Project", value: flt.projectId, placeholder: "All", options: db.projects.filter(function (x) { return !flt.clientId || x.clientId === flt.clientId; }).map(function (x) { return { value: x.id, label: x.name }; }), onChange: function (e) { setFlt(Object.assign({}, flt, { projectId: e.target.value, workOrderId: "" })); } })),
       h("div", { style: { minWidth: 150 } }, h(Sel, { label: "Work order", value: flt.workOrderId, placeholder: "All", options: db.workOrders.filter(function (w) { return !flt.projectId || w.projectId === flt.projectId; }).map(function (w) { return { value: w.id, label: w.code }; }), onChange: function (e) { setFlt(Object.assign({}, flt, { workOrderId: e.target.value })); } })),
       h("div", { style: { minWidth: 150 } }, h(Sel, { label: "Task", value: flt.taskId, placeholder: "All", options: db.tasks.filter(function (t) { return !flt.projectId || t.projectId === flt.projectId; }).map(function (t) { return { value: t.id, label: t.title }; }), onChange: function (e) { setFlt(Object.assign({}, flt, { taskId: e.target.value })); } })),
-      h(Btn, { sm: true, kind: "t", onClick: function () { setFlt({ employees: [], clientId: "", projectId: "", workOrderId: "", taskId: "" }); } }, "Clear")),
+      h(Btn, { kind: "t", onClick: function () { setFlt({ employees: [], clientId: "", projectId: "", workOrderId: "", taskId: "" }); } }, "Clear")),
 
     h("div", { className: "scroll col", style: { gap: 10 } },
       cockpit ? h("div", { className: "col", style: { gap: 5 } }, h("div", { className: "h3" }, "Manager cockpit"), cockpit) : null,
@@ -21572,6 +21594,7 @@ var MGMT_SECTIONS = [
   { k: "budgets",      label: "Budgets",                  show: function (u) { return can(u, "viewBudgets"); } },
   { k: "wos",          label: "Work orders",              show: function (u) { return can(u, "viewBudgets") || can(u, "createWorkOrders") || can(u, "manageClientsProjects"); } },
   { k: "people",       label: "People",                   show: function (u) { return can(u, "assignTasks") || can(u, "manageClientsProjects") || can(u, "manageEmployeesRoles"); } },
+  { k: "teams",        label: "Teams",                    show: function (u) { return can(u, "manageTeams"); } },
   { k: "activation",   label: "Pending activation",       show: function (u) { return can(u, "manageEmployeesRoles"); } },
   { k: "assignments",  label: "Assignments & allowances", show: function (u) { return can(u, "assignTasks") || can(u, "manageClientsProjects"); } },
   { k: "clients",      label: "Clients",                  show: function (u) { return can(u, "assignTasks") || can(u, "manageClientsProjects") || can(u, "viewBudgets"); } },
@@ -21587,11 +21610,137 @@ function mgmtBadge(db, user, k) {
   return 0;
 }
 
+/* ---------- Management → Teams ----------
+   A manager sets up their own teams, adds people to them and sets each member's
+   direct manager (normally themselves). Team Leads and Project Managers manage the
+   teams they lead and can add anyone who is not already in another team;
+   Operations and the CEO manage every team. The direct manager is who leave
+   requests go to, and the team lead is first in line for other approvals. */
+var MANAGER_ROLES = ["TL", "PM", "OPS", "CEO"];
+function managesAllTeams(user) { return user.role === "OPS" || user.role === "CEO"; }
+function canManageTeam(user, t) { return managesAllTeams(user) || (t && t.leadUserId === user.id); }
+function TeamsPanel(p) {
+  var db = p.db, user = p.user, all = managesAllTeams(user);
+  var ns = useState({ name: "", lead: user.id }), nt = ns[0], setNt = ns[1];
+  var as = useState({}), adding = as[0], setAdding = as[1];
+  var managers = db.users.filter(function (u) { return u.isActive && MANAGER_ROLES.indexOf(u.role) >= 0; })
+    .map(function (u) { return { value: u.id, label: u.fullName + " \u00b7 " + roleName(u.role) }; });
+  var teams = db.teams.filter(function (t) { return canManageTeam(user, t); });
+  var mine = teams.map(function (t) { return t.id; });
+
+  function createTeam() {
+    var name = nt.name.trim();
+    if (!name) { toast("Give the team a name.", "error"); return; }
+    if (db.teams.some(function (t) { return t.name.toLowerCase() === name.toLowerCase(); })) { toast("A team with that name already exists.", "error"); return; }
+    var lead = all ? (nt.lead || user.id) : user.id;
+    p.mutate(function (d) {
+      var t = { id: uid("team"), name: name, leadUserId: lead };
+      d.teams.push(t);
+      audit(d, user.id, "Team created: " + name, "teams", t.id, null, t);
+    });
+    setNt({ name: "", lead: user.id });
+    toast("Team " + name + " created.", "ok");
+  }
+  function updateTeam(t, k, v) {
+    p.mutate(function (d) {
+      var x = byId(d.teams, t.id); if (!x) return;
+      var before = Object.assign({}, x); x[k] = v;
+      audit(d, user.id, "Team edited: " + x.name, "teams", x.id, before, x);
+    });
+  }
+  function deleteTeam(t) {
+    var members = db.users.filter(function (u) { return u.teamId === t.id; });
+    if (members.length) { toast("Move or remove the " + members.length + " member" + (members.length === 1 ? "" : "s") + " first.", "error"); return; }
+    p.mutate(function (d) { d.teams = d.teams.filter(function (x) { return x.id !== t.id; }); audit(d, user.id, "Team deleted: " + t.name, "teams", t.id, t, null); });
+    toast("Team deleted.", "");
+  }
+  function addMember(t) {
+    var a = adding[t.id] || {};
+    if (!a.userId) { toast("Pick a person to add.", "error"); return; }
+    var mgr = a.managerId || t.leadUserId || user.id;
+    if (mgr === a.userId) { toast("A person cannot be their own manager.", "error"); return; }
+    p.mutate(function (d) {
+      var u = byId(d.users, a.userId); if (!u) return;
+      var before = { teamId: u.teamId, managerId: u.managerId };
+      u.teamId = t.id; u.managerId = mgr;
+      audit(d, user.id, "Added " + u.fullName + " to team " + t.name + ", manager " + userName(d, mgr), "users", u.id, before, { teamId: u.teamId, managerId: u.managerId });
+    });
+    var n = Object.assign({}, adding); delete n[t.id]; setAdding(n);
+    toast(userName(db, a.userId) + " added to " + t.name + ".", "ok");
+  }
+  function setManager(u, mgr) {
+    if (mgr === u.id) { toast("A person cannot be their own manager.", "error"); return; }
+    p.mutate(function (d) {
+      var x = byId(d.users, u.id); if (!x) return;
+      var b = x.managerId; x.managerId = mgr || null;
+      audit(d, user.id, "Manager of " + x.fullName + ": " + (b ? userName(d, b) : "none") + " \u2192 " + (mgr ? userName(d, mgr) : "none"), "users", x.id, null, null);
+    });
+  }
+  function removeMember(u, t) {
+    p.mutate(function (d) {
+      var x = byId(d.users, u.id); if (!x) return;
+      x.teamId = null;
+      audit(d, user.id, "Removed " + x.fullName + " from team " + t.name, "users", x.id, null, null);
+    });
+    toast(u.fullName + " removed from " + t.name + ". Their direct manager is unchanged.", "");
+  }
+
+  return h("div", { className: "col", style: { gap: 12 } },
+    h("div", { className: "cap" }, all
+      ? "Set up teams, add people to them and choose each member's direct manager. The direct manager receives the person's sick and vacation requests; the team lead is first in line for their other approvals."
+      : "Set up your own teams, add people to them and choose each member's direct manager — usually you. The direct manager receives the person's sick and vacation requests."),
+    h("div", { className: "band" },
+      h(Inp, { label: "New team name", value: nt.name, placeholder: "e.g. Documentation — North", onChange: function (e) { setNt(Object.assign({}, nt, { name: e.target.value })); } }),
+      all ? h(Sel, { label: "Team lead", value: nt.lead, options: managers, onChange: function (e) { setNt(Object.assign({}, nt, { lead: e.target.value })); } }) : null,
+      h("div", { className: "fld", style: { flex: "0 0 auto" } }, h("label", null, " "), h(Btn, { kind: "p", onClick: createTeam }, "+ Create team"))),
+    teams.length === 0 ? h("div", { className: "empty panel" }, "You don't lead a team yet. Create one above.") : null,
+    teams.map(function (t) {
+      var members = db.users.filter(function (u) { return u.teamId === t.id; });
+      var candidates = db.users.filter(function (u) {
+        if (!u.isActive || u.teamId === t.id || u.role === "VIEW" || u.id === t.leadUserId) return false;
+        if (all) return true;
+        /* a lead builds their team from people below them who are not in someone else's team */
+        if (u.id === user.id || u.role === "OPS" || u.role === "CEO") return false;
+        return !u.teamId || mine.indexOf(u.teamId) >= 0;
+      });
+      var a = adding[t.id] || {};
+      return h("div", { key: t.id, className: "panel pad col", style: { gap: 10 } },
+        h("div", { className: "band" },
+          h(Inp, { label: "Team name", value: t.name, onChange: function (e) { updateTeam(t, "name", e.target.value); } }),
+          all ? h(Sel, { label: "Team lead", value: t.leadUserId || "", placeholder: "— none —", options: managers, onChange: function (e) { updateTeam(t, "leadUserId", e.target.value || null); } })
+              : h(Field, { label: "Team lead" }, h("input", { readOnly: true, tabIndex: -1, value: userName(db, t.leadUserId), style: { backgroundColor: "var(--wash)" } })),
+          h(Field, { label: "Members", cls: "narrow" }, h("input", { readOnly: true, tabIndex: -1, value: String(members.length), style: { backgroundColor: "var(--wash)" } })),
+          h("div", { className: "fld", style: { flex: "0 0 auto" } }, h("label", null, " "), h(Btn, { kind: "d", onClick: function () { deleteTeam(t); } }, "Delete team"))),
+        members.length ? h("div", { style: { overflowX: "auto" } }, h("table", { className: "tbl", style: { tableLayout: "fixed", minWidth: 640 } },
+          h("thead", null, h("tr", null, [["Member", "34%"], ["Role", "20%"], ["Direct manager", "32%"], ["", "14%"]].map(function (c, i) { return h("th", { key: i, style: { width: c[1] } }, c[0]); }))),
+          h("tbody", null, members.map(function (u) {
+            /* nobody sets their own manager or removes themselves — that is for the person above them */
+            var self = u.id === user.id && !all, mid = { verticalAlign: "middle" };
+            return h("tr", { key: u.id },
+              h("td", { style: mid }, h("b", null, u.fullName), h("div", { className: "cap" }, u.jobTitle || u.email)),
+              h("td", { style: mid }, h(Chip, { k: "gr" }, roleName(u.role))),
+              h("td", { style: mid }, self ? h("span", null, u.managerId ? userName(db, u.managerId) : "—", h("span", { className: "cap" }, " · set by your manager"))
+                : h("select", { className: "minisel", value: u.managerId || "", "aria-label": "Direct manager of " + u.fullName, onChange: function (e) { setManager(u, e.target.value); } },
+                h("option", { value: "" }, "— none —"),
+                managers.filter(function (m) { return m.value !== u.id; }).map(function (m) { return h("option", { key: m.value, value: m.value }, m.label); }))),
+              h("td", { style: { textAlign: "right", verticalAlign: "middle" } }, self ? null : h(Btn, { sm: true, kind: "t", onClick: function () { removeMember(u, t); } }, "Remove")));
+          })))) : h("div", { className: "cap" }, "No members yet."),
+        h("div", { className: "band" },
+          h(Sel, { label: "Add a person", value: a.userId || "", placeholder: candidates.length ? "Select…" : "— nobody available —", options: candidates.map(function (u) { return { value: u.id, label: u.fullName + (u.teamId ? " (in " + nameOf(db.teams, u.teamId) + ")" : "") }; }),
+            onChange: function (e) { var n = Object.assign({}, adding); n[t.id] = Object.assign({}, a, { userId: e.target.value }); setAdding(n); } }),
+          h(Sel, { label: "Their direct manager", value: a.managerId || t.leadUserId || user.id, options: managers.filter(function (m) { return m.value !== a.userId; }),
+            onChange: function (e) { var n = Object.assign({}, adding); n[t.id] = Object.assign({}, a, { managerId: e.target.value }); setAdding(n); } }),
+          h("div", { className: "fld", style: { flex: "0 0 auto" } }, h("label", null, " "), h(Btn, { kind: "p", onClick: function () { addMember(t); } }, "+ Add to team"))));
+    }));
+}
+
 /* Renders one Management section. Used by the Management tab. */
 function MgmtPanel(p) {
   var db = p.db, user = p.user, section = p.section;
   var isAdmin = can(user, "manageEmployeesRoles");
   var canLists = can(user, "manageClientsProjects");
+
+  if (section === "teams") return h(TeamsPanel, { db: db, user: user, mutate: p.mutate });
 
   if (section === "people") return h(ListEditor, {
     db: db, user: user, mutate: p.mutate, kind: "users", canEdit: false,
@@ -22815,7 +22964,7 @@ function App() {
       }, "\ud83d\udcf1") : null,
       h("button", { className: "iconbtn", title: "My assignments and allowances", onClick: function () { setMyWork(true); } }, "◱"),
       h("button", { className: "iconbtn", title: "System administration", onClick: function () { setAdmin(true); } }, "⚙"),
-      can(user, "knowledgeBase") ? h("a", { className: "iconbtn", style: { textDecoration: "none" }, href: "../kb/index.html", target: "_blank", rel: "noopener", title: "Knowledge Base — onboarding, company rules and training", "aria-label": "Open the Employee Knowledge Base" }, "\ud83d\udcd6") : null,
+      can(user, "knowledgeBase") ? h("a", { className: "iconbtn", style: { textDecoration: "none" }, href: "../kb/index.html", target: "_blank", rel: "noopener", title: "Knowledge Base — onboarding, company rules and training", "aria-label": "Open the Employee Knowledge Base" }, h(KbIcon)) : null,
       h("a", { className: "iconbtn", style: { textDecoration: "none", fontWeight: 700 }, href: "../handbook/index.html", target: "_blank", rel: "noopener", title: "Help — open the WorkDesk Handbook" }, "?"),
       h("button", { className: "who iconbtn", style: { minWidth: 0, padding: "0 8px", gap: 9 }, onClick: function () { setProfile(true); }, title: "My profile" },
         h("span", { className: "avatar", style: user.photoUrl ? { backgroundImage: "url(" + user.photoUrl + ")", backgroundSize: "cover" } : null }, user.photoUrl ? "" : initialsOf(user.fullName)),
@@ -22845,6 +22994,13 @@ function App() {
     profile ? h(Profile, { db: db, user: user, viewPref: viewPref, setViewPref: setViewPref, onClose: function () { setProfile(false); }, onSignOut: signOut }) : null,
     mywork ? h(MyWork, Object.assign({ onClose: function () { setMyWork(false); } }, common)) : null,
     h(Toasts, { items: toasts, dismiss: dismiss }));
+}
+
+/* open-book line icon, drawn in currentColor like the other top-bar glyphs */
+function KbIcon() {
+  return h("svg", { width: 18, height: 18, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.9, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" },
+    h("path", { d: "M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z" }),
+    h("path", { d: "M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z" }));
 }
 
 /* ---- boot ---- */

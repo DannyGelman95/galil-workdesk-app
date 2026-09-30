@@ -46,8 +46,8 @@ site/                     The other two products published to GitHub Pages
                            also linked from the ? button in the app's top bar.
   kb/
     index.html              The Employee Knowledge Base — onboarding, company
-                           rules and training how-to's, opened from the 📖
-                           button in the app's top bar.
+                           rules and training how-to's, opened from the
+                           book button in the app's top bar.
 archive/                  Superseded builds, kept for reference.
   GALIL-WorkDesk-v6.html
   galil-workdesk-dev-cdn-build.html
@@ -115,8 +115,8 @@ read-only roles & permissions reference.
 
 - A third hour type, **Blue · Management**, for Team Leads, Project Managers,
   Operations Managers and the CEO — time spent managing a client's projects
-  and tasks, attributed to a client/project but drawn from neither an
-  allowance nor a budget.
+  and tasks. Blue works just like Yellow: attributed to a client/project and
+  drawn from the personal allowance and the project or work-order budget.
 - Duplicate a time entry to the next day or the next week, and click a work
   order code anywhere in a table to copy it to the clipboard.
 - Expense evidence attachments can be replaced or removed in place.
@@ -124,6 +124,15 @@ read-only roles & permissions reference.
   GALIL website — each remembers the choice per device.
 - A dedicated phone build below 820px width, built around a running timer,
   with its own Time / Plan / Tasks / Expenses / More navigation.
+
+### Teams
+
+**Management → Teams** (to the right of People) lets Team Leads, Project
+Managers, Operations Managers and the CEO create teams, add people to them and
+set each member's direct manager — normally themselves. Leads manage only the
+teams they lead; Operations and the CEO manage every team. The direct manager
+receives the person's sick and vacation requests. Governed by the
+`manageTeams` capability; see `TeamsPanel` in `site/app/index.html`.
 
 ### Sick and vacation requests
 
@@ -176,7 +185,7 @@ tasks, phishing). Static HTML with no build step, searchable, light/dark
 theme, phone-friendly. Articles live in the `ARTICLES` array in
 `site/kb/index.html` — add or edit an entry there to change the content.
 
-**Opening it:** the 📖 button in the WorkDesk top bar (desktop) or
+**Opening it:** the book button in the WorkDesk top bar (desktop) or
 **More → 📖 Knowledge Base** (phone) opens it in a new tab.
 
 **Who can see it:** every role except **External Contractor** and
