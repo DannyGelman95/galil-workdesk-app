@@ -125,6 +125,18 @@ read-only roles & permissions reference.
 - A dedicated phone build below 820px width, built around a running timer,
   with its own Time / Plan / Tasks / Expenses / More navigation.
 
+### Sick and vacation requests
+
+Sick and Vacation are entered in the Time Log (desktop form or phone sheet)
+with a **From** and **To** date; every working day (Sun–Thu) in the range
+becomes one day entry. Unless the person recording it is the **CEO**, the
+whole range is sent as a single **Leave request** to the employee's direct
+manager (falling back to the usual approval chain), and the days stay
+Pending — out of every total — until the manager approves or declines them
+together. Sick requests can carry a **sick-leave confirmation** (PDF or image,
+up to 2 MB) that the approver opens from the request card. See `commitLeave`
+in `site/app/index.html`.
+
 ### Logging in
 
 Sign-in enforces the `@galiltc.co.il` domain and offers two paths — a real

@@ -14,7 +14,7 @@ document.documentElement.setAttribute("data-theme",v);}catch(e){}})();
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'%3E%3Cpath d='M78 34H42a10 10 0 00-10 10v152a10 10 0 0010 10h36' fill='none' stroke='%231F3D24' stroke-width='18' stroke-linecap='round'/%3E%3Cpath d='M162 34h36a10 10 0 0110 10v152a10 10 0 01-10 10h-36' fill='none' stroke='%231F3D24' stroke-width='18' stroke-linecap='round'/%3E%3Cpath d='M148 92A44 44 0 10152 148V122H122' fill='none' stroke='%238CC63E' stroke-width='20' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Noto+Sans+Mono:wght@400;500;600&display=swap">
 <style>
 :root{
   --paper:#FBFDF7; --surface:#FFFFFF; --wash:#F2F8E9; --sunk:#EFF4E6;
@@ -28,9 +28,9 @@ document.documentElement.setAttribute("data-theme",v);}catch(e){}})();
   --chrome-bg:#1B2A18; --chrome-fg:#EAF3E0; --chrome-fg-soft:#C4D9AE;
   --row-alt:#F2F8E9;
   --shadow:0 1px 2px rgba(27,42,24,.05), 0 8px 24px -16px rgba(27,42,24,.28);
-  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
-  --serif:"Source Serif 4",Georgia,"Times New Roman",serif;
-  --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  --sans:"Noto Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --serif:"Noto Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"Noto Sans Mono",ui-monospace,"SF Mono",Menlo,monospace;
   color-scheme:light;
 }
 @media (prefers-color-scheme:dark){
@@ -361,7 +361,7 @@ table code{background:transparent; padding:0}
       <dt><span class="swatch" style="background:var(--blue)"></span> Blue · Management</dt>
       <dd>New in V7.1. Time spent managing a client's projects and tasks — attributed to a client and project so it can be reported and seen, but drawn from <strong>neither</strong> a personal allowance nor a project budget, and never blocked. Only Team Leads, Project Managers, Operations Managers and the CEO can report it; the option does not appear for anyone else.</dd>
     </dl>
-    <p>Sick and Vacation are day types rather than hour types. They record one day each and always register directly.</p>
+    <p>Sick and Vacation are day types rather than hour types. You choose a start and an end date, and every working day (Sunday to Thursday) in between is recorded as one day. Unless you are the CEO, they are sent to your manager as a <em>Leave request</em> and count only once approved.</p>
 
     <h3>The words WorkDesk uses</h3>
     <div class="tw"><table>
@@ -608,7 +608,7 @@ table code{background:transparent; padding:0}
     <h3>Reporting time</h3>
     <ol class="steps">
       <li>Set the <strong>Date</strong>, or click <strong>Today</strong>. Future dates are refused — plan those in the Week Planner instead.</li>
-      <li>Choose the <strong>Type</strong>: <em>Work</em>, <em>Sick</em> or <em>Vacation</em>. Sick and Vacation record one day and hide the time fields.</li>
+      <li>Choose the <strong>Type</strong>: <em>Work</em>, <em>Sick</em> or <em>Vacation</em>. Sick and Vacation hide the time fields — see <a href="#h-leave">Sick and vacation days</a> below.</li>
       <li>Set <strong>Start</strong> and <strong>End</strong> from the hour and minute dropdowns. <strong>Hours</strong> fills itself, rounded to the nearest half hour.</li>
       <li>Pick the <strong>Hour type</strong> — <span class="swatch" style="background:var(--red)"></span> Red · Company, <span class="swatch" style="background:var(--yellow)"></span> Yellow · Client, or — if you manage clients' projects and tasks — <span class="swatch" style="background:var(--blue)"></span> Blue · Management.</li>
       <li>For Yellow or Blue, choose <strong>Client</strong>, <strong>Project</strong>, and <strong>Work order</strong> if the project is work-order tracked. Optionally pick a <strong>Task</strong> and set the <strong>Project status</strong>.</li>
@@ -626,6 +626,17 @@ table code{background:transparent; padding:0}
       <p>Each of Client, Project and Work order has a <strong>Type it</strong> toggle for something not yet on the master list. Typing a name is allowed, but the entry then goes to approval as an <em>Unlisted item</em>, and on approval the name becomes a real master-list record.</p>
     </div>
 
+    <h3 id="h-leave">Sick and vacation days</h3>
+    <ol class="steps">
+      <li>Set the <strong>Type</strong> to <em>Sick</em> or <em>Vacation</em>.</li>
+      <li>Set <strong>From</strong> and <strong>To</strong>. <strong>Days</strong> counts the working days (Sunday to Thursday) in the range — Fridays and Saturdays are skipped. Future dates are allowed, so vacation can be requested ahead of time. One request covers up to 60 working days.</li>
+      <li>For <em>Sick</em>, use <strong>Sick-leave confirmation</strong> to attach the confirmation from the clinic or doctor's office — a PDF or an image, up to 2 MB. You can replace or remove it before sending.</li>
+      <li>Add a <strong>Description</strong> and click <strong>Send request</strong>.</li>
+    </ol>
+    <p>The form shows who the request goes to: <strong>your direct manager</strong>, or — if you have none — the usual approval chain. Every day in the range is saved as <strong>Pending</strong> and stays out of the totals until your manager approves or declines the whole request at once. A decline cancels every day in it, and the reason is shown on each.</p>
+    <p>The <strong>CEO</strong> is the only role whose sick and vacation days register directly, without a request — for their own leave or anyone else's.</p>
+    <p>An attached confirmation appears as a 📎 button on each day in the Time Log and on the request card in Approvals; click it to open the document.</p>
+
     <h3>What the form refuses to save</h3>
     <ul>
       <li>End time not later than start time.</li>
@@ -634,7 +645,8 @@ table code{background:transparent; padding:0}
       <li>No work order on a project that is tracked by work order.</li>
       <li>An overlap with another entry you already reported that day — the message names the clashing times.</li>
       <li>An identical entry (same date, same start and end, same description).</li>
-      <li>A future date.</li>
+      <li>A future date (Work entries only — Sick and Vacation can be in the future).</li>
+      <li>Sick or Vacation on a day already recorded as leave, or a range with no working days.</li>
       <li>A date inside a month that has been closed for payroll.</li>
     </ul>
 
@@ -643,7 +655,7 @@ table code{background:transparent; padding:0}
     <div class="tw"><table>
       <thead><tr><th class="num" style="width:44px">#</th><th style="width:210px">Check</th><th>Outcome</th></tr></thead>
       <tbody>
-        <tr><td class="num">1</td><td>Sick or Vacation</td><td>Registers directly.</td></tr>
+        <tr><td class="num">1</td><td>Sick or Vacation</td><td>Pending — <em>Leave request</em>, routed to your direct manager. Registers directly only when the CEO records it.</td></tr>
         <tr><td class="num">2</td><td>Red · Company or Blue · Management</td><td>Registers directly — neither is ever gated by an assignment, allowance or budget. Both still count toward the daily soft and hard limits below.</td></tr>
         <tr><td class="num">3</td><td>Unlisted client, project or work order</td><td>Pending — <em>Unlisted item</em>.</td></tr>
         <tr><td class="num">4</td><td>Assigned to that project or work order?</td><td>Pending — <em>Not assigned</em>.</td></tr>
@@ -1005,6 +1017,7 @@ table code{background:transparent; padding:0}
 
     <h3>How a request is routed</h3>
     <p>For most reasons, WorkDesk tries in order: <strong>your team's lead → your direct manager → a Project Manager → the Operations Manager → the CEO</strong>, skipping anyone who is inactive, cannot approve time, or is the requester.</p>
+    <p>For a <strong>Leave request</strong> (Sick or Vacation) it tries <strong>your direct manager first</strong>, then falls back to the order above.</p>
     <p>For <strong>Budget exceeded</strong> it skips the team entirely and goes <strong>Project Manager → Operations Manager → CEO</strong>, because the decision belongs to whoever owns the budget.</p>
 
     <h3>The four actions</h3>
@@ -1258,7 +1271,7 @@ table code{background:transparent; padding:0}
         <tr><td><strong>Task priority</strong></td><td>Low · Normal · High · Critical</td></tr>
         <tr><td><strong>Work-order status</strong></td><td>Active · On hold · Closed</td></tr>
         <tr><td><strong>Reimbursement</strong></td><td>Submitted · Approved · Paid · Rejected</td></tr>
-        <tr><td><strong>Request types</strong></td><td>Time entry · Allowance increase · New list item · Expense · Account activation · Role change · Retroactive edit</td></tr>
+        <tr><td><strong>Request types</strong></td><td>Time entry · Leave request · Allowance increase · New list item · Expense · Account activation · Role change · Retroactive edit</td></tr>
         <tr><td><strong>Pricing bases</strong></td><td>Money · Hours · Pages · Words · Custom</td></tr>
       </tbody>
     </table></div>
@@ -1283,7 +1296,7 @@ table code{background:transparent; padding:0}
     <h3>Reserved for a later version</h3>
     <ul>
       <li><strong>Hebrew and right-to-left layout</strong> — the language toggle on the sign-in card acknowledges the request and stays in English. V8.</li>
-      <li><strong>Annual Sick and Vacation balances</strong> — those entry types register directly today; no balance is checked yet.</li>
+      <li><strong>Annual Sick and Vacation balances</strong> — leave is approved by your manager today; no annual balance is checked yet.</li>
     </ul>
 
     <h3>Demonstration accounts</h3>

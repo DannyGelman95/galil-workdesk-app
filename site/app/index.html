@@ -17810,6 +17810,64 @@ function nameOf(arr, id, field) { var o = byId(arr, id); return o ? o[field || "
 function userName(db, id) { var u = byId(db.users, id); return u ? u.fullName : "—"; }
 function initialsOf(s) { return String(s || "").split(/\s+/).map(function (w) { return w[0]; }).join("").slice(0, 2).toUpperCase(); }
 
+/* ================= Sick / Vacation leave =================
+   A leave can span a date range. Each working day (Sun–Thu) in the range becomes
+   one day-type entry; all of them share a leaveGroup id and are decided together
+   through a single "Leave request" routed to the person's manager. Only the CEO
+   registers leave directly, without a request. */
+function isLeave(type) { return type === "Sick" || type === "Vacation"; }
+function leaveNeedsApproval(user) { return !user || user.role !== "CEO"; }
+var MAX_LEAVE_DAYS = 60;
+function leaveDates(from, to) {
+  var out = [];
+  if (!from) return out;
+  var d = s2d(from), end = s2d(to && to >= from ? to : from);
+  for (var guard = 0; d <= end && guard < 400; guard++) {
+    if (d.getDay() !== 5 && d.getDay() !== 6) out.push(d2s(d));  /* Fri/Sat weekend */
+    d.setDate(d.getDate() + 1);
+  }
+  return out;
+}
+/* ids of the entries an approval request covers (leave requests cover several) */
+function requestEntryIds(a) { return a.entityIds && a.entityIds.length ? a.entityIds : [a.entityId]; }
+/* take an entry out of any open request; a request left with no entries is dropped */
+function detachFromRequests(d, entryId) {
+  d.approvals = d.approvals.filter(function (a) {
+    if (a.status !== "pending" || a.entityTable !== "entries") return true;
+    var ids = requestEntryIds(a);
+    if (ids.indexOf(entryId) < 0) return true;
+    ids = ids.filter(function (x) { return x !== entryId; });
+    if (!ids.length) return false;
+    a.entityIds = ids; a.entityId = ids[0];
+    if (a.payloadAfter) a.payloadAfter.days = ids.length;
+    return true;
+  });
+}
+/* supporting documents are kept inline (data URL) so the approver can open them */
+var MAX_DOC_BYTES = 2 * 1024 * 1024;
+function openAttachment(a) {
+  if (!a || !a.data) { toast("Only the file name was kept for this attachment.", ""); return; }
+  try {
+    var parts = a.data.split(","), mime = (parts[0].match(/data:([^;]+)/) || [])[1] || a.type || "application/octet-stream";
+    var bin = atob(parts[1]), buf = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    var url = URL.createObjectURL(new Blob([buf], { type: mime }));
+    var w = window.open(url, "_blank", "noopener");
+    if (!w) { var link = document.createElement("a"); link.href = url; link.download = a.name || "document"; link.click(); }
+    setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+  } catch (e) { toast("This attachment could not be opened.", "error"); }
+}
+function AttachmentLinks(p) {
+  var list = (p.value || []).filter(function (a) { return a && a.name; });
+  if (!list.length) return null;
+  return h("span", { className: "row", style: { gap: 5, display: "inline-flex", flexWrap: "wrap" } }, list.map(function (a, i) {
+    return h("button", {
+      key: i, type: "button", className: "btn sm t", title: "Open " + a.name,
+      onClick: function (ev) { ev.stopPropagation(); openAttachment(a); }
+    }, "\ud83d\udcce ", a.name);
+  }));
+}
+
 /* ================= §8 the entitlement engine ================= */
 /* Returns { status, reason, softFlag, escalate } */
 function entitlementCheck(db, entry) {
@@ -17818,8 +17876,9 @@ function entitlementCheck(db, entry) {
   var ok = { status: "registered", reason: "", softFlag: false, escalate: null };
   var no = function (reason, esc) { return { status: "pending", reason: reason, softFlag: false, escalate: esc || null }; };
 
-  /* 1 — Sick / Vacation register directly (annual balance check reserved, §15.2) */
-  if (entry.type === "Sick" || entry.type === "Vacation") return ok;
+  /* 1 — Sick / Vacation never reach this check: they go through commitLeave, which
+     sends them to the person's manager as a Leave request (the CEO registers directly). */
+  if (isLeave(entry.type)) return ok;
 
   var hrs = Number(entry.yellow) || 0;
 
@@ -17955,6 +18014,11 @@ function routeApproval(db, requesterId, reason) {
   };
   if (reason === "Budget exceeded") {
     return pick(firstOf(db, "PM")) || pick(firstOf(db, "OPS")) || pick(firstOf(db, "CEO")) || firstOf(db, "CEO");
+  }
+  /* Sick and Vacation go to the person's direct manager before the team lead */
+  if (reason === "Leave request") {
+    var boss = pick(u.managerId);
+    if (boss) return boss;
   }
   var team = u.teamId ? byId(db.teams, u.teamId) : null;
   var lead = team ? pick(team.leadUserId) : null;
@@ -19245,7 +19309,8 @@ function blankEntry(userId) {
     hourType: "yellow", projectStatus: "", description: "", notes: "",
     status: "registered", statusReason: "", submittedAt: null,
     approvedBy: null, approvedAt: null, decisionNote: "", softFlag: false,
-    freeClient: false, freeProject: false, freeWO: false
+    freeClient: false, freeProject: false, freeWO: false,
+    dateTo: "", attachments: [], leaveGroup: null
   };
 }
 function toForm(e) {
@@ -19256,6 +19321,7 @@ function toForm(e) {
   f.freeWO = !!(!e.workOrderId && e.workOrder);
   f.clientId = e.clientId || ""; f.projectId = e.projectId || "";
   f.workOrderId = e.workOrderId || ""; f.taskId = e.taskId || "";
+  f.dateTo = e.date; f.attachments = e.attachments || [];
   return f;
 }
 
@@ -19318,6 +19384,25 @@ function validateEntry(db, f, viewer) {
     })[0];
     if (dup) e.description = "An identical entry already exists for this date.";
   }
+  if (isLeave(f.type)) {
+    if (!f.date) e.date = "Choose the first day.";
+    else {
+      var to = f.id ? f.date : (f.dateTo || f.date);
+      if (to < f.date) e.dateTo = "The end date cannot be before the start date.";
+      else {
+        var days = leaveDates(f.date, to);
+        if (!days.length) e.dateTo = "The range has no working days (Sunday to Thursday).";
+        else if (days.length > MAX_LEAVE_DAYS) e.dateTo = "A single request can cover up to " + MAX_LEAVE_DAYS + " working days.";
+        var taken = db.entries.filter(function (x) {
+          return x.assignee === f.assignee && x.id !== f.id && isLeave(x.type) && x.status !== "cancelled" && days.indexOf(x.date) >= 0;
+        })[0];
+        if (taken) e.date = il(taken.date) + " is already recorded as " + taken.type + (taken.status === "pending" ? " (in approval)" : "") + ".";
+        var closed = days.filter(function (dd) { return isMonthClosed(db, dd); })[0];
+        if (closed && !f.retro) e.date = "That month is closed for payroll. Editing needs a retroactive-edit request.";
+      }
+    }
+    return e;
+  }
   if (f.date > todayStr()) e.date = "Time cannot be reported for a future date. Use the Week Planner instead.";
   if (isMonthClosed(db, f.date) && !f.retro) e.date = "That month is closed for payroll. Editing needs a retroactive-edit request.";
   return e;
@@ -19369,6 +19454,8 @@ function EntryForm(p) {
     if (k === "workOrderId") n.taskId = "";
     if (k === "type" && v !== "Work") { n.hourType = "yellow"; }
     if (n.hourType === "blue" && !can(viewer, "reportBlueTime")) n.hourType = "yellow";
+    if ((k === "date" || k === "type") && (!n.dateTo || n.dateTo < n.date)) n.dateTo = n.date;
+    if (k === "date" || k === "dateTo") { var ce = Object.assign({}, errs); delete ce.date; delete ce.dateTo; errs = ce; }
     set(n);
     var ne = Object.assign({}, errs); delete ne[k];
     if (k === "start" || k === "end") { delete ne.start; delete ne.end; }
@@ -19415,14 +19502,16 @@ function EntryForm(p) {
       assignable.length > 1
         ? h(Sel, { label: "Assignee", cls: "person", value: f.assignee, options: assignable.map(function (u) { return { value: u.id, label: u.fullName }; }), onChange: function (e) { up("assignee", e.target.value); } })
         : null,
-      h(Field, { label: "Date", err: errs.date, req: true, cls: "date" },
-        h("input", { type: "date", value: f.date, max: todayStr(), onChange: function (e) { up("date", e.target.value); } })),
+      h(Field, { label: isDayType && !f.id ? "From" : "Date", err: errs.date, req: true, cls: "date" },
+        h("input", { type: "date", value: f.date, max: isDayType ? null : todayStr(), onChange: function (e) { up("date", e.target.value); } })),
       h("div", { className: "fld", style: { flex: "0 0 74px" } },
         h("label", null, " "),
         h("button", { className: "btn sm", style: { minHeight: 38 }, onClick: function () { up("date", todayStr()); } }, "Today")),
+      isDayType && !f.id ? h(Field, { label: "To", err: errs.dateTo, req: true, cls: "date" },
+        h("input", { type: "date", value: f.dateTo || f.date, min: f.date, onChange: function (e) { up("dateTo", e.target.value); } })) : null,
       h(Sel, { label: "Type", cls: "narrow", value: f.type, options: ["Work", "Sick", "Vacation"], onChange: function (e) { up("type", e.target.value); } }),
 
-      isDayType ? h(Field, { label: "Days", cls: "narrow" }, h("input", { className: "ro", readOnly: true, value: "1 day" }))
+      isDayType ? h(Field, { label: "Days", cls: "narrow" }, h("input", { className: "ro", readOnly: true, tabIndex: -1, value: leaveDayLabel(f) }))
         : [
           h(Field, { key: "st", label: "Start", err: errs.start, cls: "timefld" },
             h("div", { className: "row", style: { gap: 4, flexWrap: "nowrap" } },
@@ -19453,7 +19542,7 @@ function EntryForm(p) {
               }, h("span", { className: "dot", style: { background: f.hourType === "blue" ? "#fff" : C.blue } }), "Blue") : null))
         ]
     ),
-    isDayType || f.hourType === "red" && false ? null : null,
+    isDayType ? h(LeaveBand, { db: db, viewer: viewer, form: f, up: up }) : null,
     isDayType ? null : h("div", { className: "band" },
       h(ListOrFree, {
         label: "Client", req: f.hourType !== "red", cls: "grow", err: errs.client,
@@ -19489,13 +19578,35 @@ function EntryForm(p) {
         h("label", null, " "),
         h("div", { className: "row", style: { gap: 6 } },
           p.onCancel ? h(Btn, { onClick: p.onCancel }, "Cancel") : null,
-          h(Btn, { kind: "p", onClick: save }, p.saveLabel || (f.id ? "Save changes" : "Add entry"))))));
+          h(Btn, { kind: "p", onClick: save }, p.saveLabel || (isDayType && leaveNeedsApproval(viewer) ? "Send request" : f.id ? "Save changes" : "Add entry"))))));
+}
+
+/* Sick / Vacation: working days in the chosen range */
+function leaveDayLabel(f) {
+  var n = f.id ? 1 : leaveDates(f.date, f.dateTo || f.date).length;
+  return n + " day" + (n === 1 ? "" : "s");
+}
+/* who a leave request will go to, and the sick-leave confirmation upload */
+function LeaveBand(p) {
+  var f = p.form, direct = !leaveNeedsApproval(p.viewer);
+  var to = direct ? null : routeApproval(p.db, f.assignee, "Leave request");
+  return h("div", { className: "band", style: { alignItems: "flex-start" } },
+    f.type === "Sick" ? h(AttachField, {
+      label: "Sick-leave confirmation (PDF or image)", cls: "grow", keepData: true,
+      emptyText: "Attach the confirmation from the clinic or doctor's office.",
+      value: f.attachments || [], onChange: function (v) { p.up("attachments", v); }
+    }) : null,
+    h("div", { className: "banner " + (direct ? "gr" : "teal"), style: { flex: "1 1 280px", alignSelf: "flex-end" } },
+      direct ? "\u2713 As CEO, this " + f.type.toLowerCase() + " is registered directly — no request is sent."
+        : h("span", null, "\u2709 This is sent as a leave request to ", h("b", null, userName(p.db, to)),
+            ". The days are pending — and not counted — until they approve.")));
 }
 
 /* ---------- the one path an entry takes into the store (§7.2, §8) ----------
    Desktop Time Log, the duplicate action and the mobile timer all go through
    this, so the entitlement engine and approval routing can never diverge. */
 function commitEntry(mutate, user, form, after) {
+  if (isLeave(form.type)) { commitLeave(mutate, user, form, after); return; }
   mutate(function (d) {
     var e = formToEntry(d, form);
     var verdict = entitlementCheck(d, e);
@@ -19526,6 +19637,56 @@ function commitEntry(mutate, user, form, after) {
     else if (e.softFlag) toast("Entry registered and flagged: a long day.", "");
     else toast("Entry registered.", "ok");
     if (after) after(e);
+  });
+}
+
+/* ---------- Sick / Vacation: one request for the whole range ----------
+   Anyone but the CEO sends the leave to the person's manager as a Leave request;
+   the days stay Pending (and out of the totals) until the manager decides. */
+function commitLeave(mutate, user, form, after) {
+  var direct = !leaveNeedsApproval(user);
+  mutate(function (d) {
+    var dates = form.id ? [form.date] : leaveDates(form.date, form.dateTo || form.date);
+    var group = form.leaveGroup || uid("lv");
+    var docs = form.type === "Sick" ? (form.attachments || []) : [];
+    var made = [];
+    dates.forEach(function (dt) {
+      var e = formToEntry(d, Object.assign({}, form, { date: dt }));
+      if (!form.id) e.id = uid("e");
+      e.leaveGroup = group; e.attachments = docs;
+      if (direct) {
+        e.status = "registered"; e.statusReason = ""; e.submittedAt = null;
+        e.approvedBy = user.id; e.approvedAt = nowISO(); e.decisionNote = "";
+      } else {
+        e.status = "pending"; e.statusReason = "Leave request"; e.submittedAt = nowISO();
+        e.approvedBy = null; e.approvedAt = null; e.decisionNote = "";
+      }
+      var i = form.id ? d.entries.findIndex(function (x) { return x.id === form.id; }) : -1;
+      if (i >= 0) {
+        var before = d.entries[i];
+        detachFromRequests(d, e.id);
+        d.entries[i] = e;
+        audit(d, user.id, "Leave edited", "entries", e.id, before, e);
+      } else {
+        d.entries.unshift(e);
+        audit(d, user.id, "Leave recorded", "entries", e.id, null, e);
+      }
+      made.push(e);
+    });
+    var to = null;
+    if (!direct && made.length) {
+      var ids = made.map(function (x) { return x.id; });
+      var ar = raiseApproval(d, "Leave request", "entries", ids[0], form.assignee, "Leave request");
+      ar.entityIds = ids;
+      ar.payloadAfter = { leaveType: form.type, from: dates[0], to: dates[dates.length - 1], days: ids.length, attachments: docs };
+      to = userName(d, ar.assignedTo);
+    }
+    return { days: made.length, direct: direct, to: to, type: form.type };
+  }, function (r) {
+    var what = r.type + " \u2014 " + r.days + " day" + (r.days === 1 ? "" : "s");
+    if (r.direct) toast(what + " registered.", "ok");
+    else toast(what + " sent to " + r.to + " for approval. It counts once approved.", "");
+    if (after) after(r);
   });
 }
 
@@ -19598,7 +19759,7 @@ function TimeLogTab(p) {
     var snapshot = JSON.parse(JSON.stringify(e));
     p.mutate(function (d) {
       d.entries = d.entries.filter(function (x) { return x.id !== e.id; });
-      d.approvals = d.approvals.filter(function (a) { return !(a.entityTable === "entries" && a.entityId === e.id && a.status === "pending"); });
+      detachFromRequests(d, e.id);
       audit(d, user.id, "Entry deleted", "entries", e.id, snapshot, null);
     });
     toast("Entry deleted.", "", { label: "Undo", fn: function () { p.mutate(function (d) { d.entries.unshift(snapshot); audit(d, user.id, "Entry delete undone", "entries", snapshot.id, null, snapshot); }); } });
@@ -19731,6 +19892,7 @@ function TimeLogTab(p) {
                 h("td", null, h("span", { onClick: function () { cycleProjectStatus(e); }, style: { cursor: editable ? "pointer" : "default" }, title: editable ? "Click to change" : "" }, psChip(e.projectStatus) || h("span", { className: "cap" }, "—"))),
                 h("td", null, h("div", { className: "row", style: { gap: 6 } }, statusBadge(e), h("span", null, e.description)),
                   e.notes ? h("div", { className: "cap" }, e.notes) : null,
+                  (e.attachments || []).length ? h(AttachmentLinks, { value: e.attachments }) : null,
                   e.status === "pending" && e.statusReason ? h("div", { className: "cap", style: { color: C.amber, fontWeight: 600 } }, "Reason: ", e.statusReason) : null,
                   e.status === "cancelled" && e.decisionNote ? h("div", { className: "cap", style: { color: C.error, fontWeight: 600 } }, "Declined: ", e.decisionNote) : null),
                 h("td", { style: { whiteSpace: "nowrap" } },
@@ -20253,7 +20415,7 @@ function PlanEditor(p) {
    §9 — Module: Approvals
    ===================================================================== */
 
-var REQ_TYPES = ["Time entry", "Allowance increase", "New list item", "Expense", "Account activation", "Role change", "Retroactive edit"];
+var REQ_TYPES = ["Time entry", "Leave request", "Allowance increase", "New list item", "Expense", "Account activation", "Role change", "Retroactive edit"];
 
 function ApprovalsTab(p) {
   var db = p.db, user = p.user;
@@ -20285,8 +20447,8 @@ function ApprovalsTab(p) {
     p.mutate(function (d) {
       var req = byId(d.approvals, a.id); if (!req) return;
       req.status = "approved"; req.decidedBy = user.id; req.decidedAt = nowISO(); req.decisionNote = opts.note || "";
-      if (req.entityTable === "entries") {
-        var e = byId(d.entries, req.entityId);
+      if (req.entityTable === "entries") requestEntryIds(req).forEach(function (eid) {
+        var e = byId(d.entries, eid);
         if (e) {
           /* an unlisted item becomes a real master-list record on approval */
           if (req.reason === "Unlisted item") {
@@ -20316,7 +20478,7 @@ function ApprovalsTab(p) {
           }
           e.status = "registered"; e.statusReason = ""; e.approvedBy = user.id; e.approvedAt = nowISO();
         }
-      }
+      });
       if (req.entityTable === "expenses") {
         var x = byId(d.expenses, req.entityId); if (x) x.status = "Approved";
       }
@@ -20337,7 +20499,7 @@ function ApprovalsTab(p) {
     p.mutate(function (d) {
       var req = byId(d.approvals, a.id); if (!req) return;
       req.status = "declined"; req.decidedBy = user.id; req.decidedAt = nowISO(); req.decisionNote = note;
-      if (req.entityTable === "entries") { var e = byId(d.entries, req.entityId); if (e) { e.status = "cancelled"; e.decisionNote = note; e.approvedBy = user.id; e.approvedAt = nowISO(); } }
+      if (req.entityTable === "entries") requestEntryIds(req).forEach(function (eid) { var e = byId(d.entries, eid); if (e) { e.status = "cancelled"; e.decisionNote = note; e.approvedBy = user.id; e.approvedAt = nowISO(); } });
       if (req.entityTable === "expenses") { var x = byId(d.expenses, req.entityId); if (x) x.status = "Rejected"; }
       if (req.entityTable === "users") { var u = byId(d.users, req.entityId); if (u) { u.pendingActivation = false; u.isActive = false; } }
       audit(d, user.id, "Declined: " + req.type + " — " + note, req.entityTable, req.entityId, null, null);
@@ -20390,6 +20552,8 @@ function ApprovalsTab(p) {
 
   function Card(pp) {
     var a = pp.a, e = entryOf(a), x = expenseOf(a);
+    var lv = a.type === "Leave request" ? (a.payloadAfter || {}) : null;
+    if (lv) e = null;  /* a leave has no hours, client or budget to show */
     var pickable = a.status === "pending" && a.reason !== "Budget exceeded";
     var bud = e ? budgetFor(db, e.projectId, e.workOrderId) : null;
     var asg = e ? findAssignment(db, e.assignee, e.projectId, e.workOrderId) : null;
@@ -20401,12 +20565,15 @@ function ApprovalsTab(p) {
           h("div", { className: "row", style: { gap: 6 } },
             h("b", null, userName(db, a.requesterId)),
             h(Chip, { k: "teal" }, a.type),
-            h(Chip, { k: a.reason === "Budget exceeded" ? "err" : "amber" }, a.reason),
+            a.reason !== a.type ? h(Chip, { k: a.reason === "Budget exceeded" ? "err" : "amber" }, a.reason) : null,
             a.status !== "pending" ? h(Chip, { k: a.status === "approved" ? "gr" : "err" }, a.status) : null),
           h("div", { className: "cap" }, "Raised ", new Date(a.createdAt).toLocaleString("en-GB"), " · routed to ", userName(db, a.assignedTo))),
         e ? h("div", { className: "col", style: { alignItems: "flex-end" } },
           h("b", { className: "mono", style: { fontSize: 17 } }, num((Number(e.red) || 0) + (Number(e.yellow) || 0) + (Number(e.blue) || 0)), " h"),
           h("span", { className: "cap mono" }, il(e.date), e.start ? " · " + e.start + "–" + e.end : "")) : null,
+        lv ? h("div", { className: "col", style: { alignItems: "flex-end" } },
+          h("b", { className: "mono", style: { fontSize: 17 } }, num(lv.days || requestEntryIds(a).length), " d"),
+          h("span", { className: "cap mono" }, il(lv.from), lv.to && lv.to !== lv.from ? " \u2192 " + il(lv.to) : "")) : null,
         x ? h("div", { className: "col", style: { alignItems: "flex-end" } },
           h("b", { className: "mono", style: { fontSize: 17 } }, money(x.amount, x.currency)),
           h("span", { className: "cap mono" }, il(x.date))) : null),
@@ -20419,6 +20586,18 @@ function ApprovalsTab(p) {
         e.taskId ? h(Chip, { k: "gr" }, nameOf(db.tasks, e.taskId, "title")) : null) : null,
       e ? h("div", { style: { fontSize: 13.5 } }, e.description) : null,
       x ? h("div", { style: { fontSize: 13.5 } }, x.etype, " — ", x.description) : null,
+      lv ? (function () {
+        var first = byId(db.entries, requestEntryIds(a)[0]) || {};
+        var docs = lv.attachments || [], n = lv.days || requestEntryIds(a).length;
+        return h("div", { className: "col", style: { gap: 6 } },
+          h("div", { className: "row", style: { gap: 6, fontSize: 13 } },
+            h(Chip, { k: "mut", style: { background: lv.leaveType === "Sick" ? "var(--sickbg)" : "var(--vacbg)", color: lv.leaveType === "Sick" ? "var(--sicktx)" : "var(--vactx)", borderColor: lv.leaveType === "Sick" ? "var(--sickline)" : "var(--vacline)" } }, lv.leaveType),
+            h("span", { className: "cap" }, num(n), " working day", n === 1 ? "" : "s", " · ", il(lv.from), lv.to && lv.to !== lv.from ? " to " + il(lv.to) : "")),
+          first.description ? h("div", { style: { fontSize: 13.5 } }, first.description) : null,
+          lv.leaveType === "Sick" ? h("div", { className: "row", style: { gap: 7 } },
+            h("span", { className: "cap" }, "Supporting document"),
+            docs.length ? h(AttachmentLinks, { value: docs }) : h(Chip, { k: "amber" }, "none attached")) : null);
+      })() : null,
       a.type === "Account activation" ? h("div", { className: "col", style: { gap: 4 } },
         h("div", { style: { fontSize: 13.5 } }, a.reason),
         h("div", { className: "row", style: { gap: 7 } },
@@ -20452,7 +20631,7 @@ function ApprovalsTab(p) {
             setRaiseAllow({ a: a });
           } else approve(a);
         } }, "Approve"),
-        e ? h(Btn, { sm: true, onClick: function () { setEditing({ a: a, form: toForm(e) }); } }, "Edit & approve") : null,
+        e && !lv ? h(Btn, { sm: true, onClick: function () { setEditing({ a: a, form: toForm(e) }); } }, "Edit & approve") : null,
         h(Btn, { sm: true, kind: "d", onClick: function () { setDeclining(a); } }, "Decline"),
         h(Btn, { sm: true, kind: "t", onClick: function () { setAsking(a); } }, "Request information"))
         : h("div", { className: "cap" }, a.status === "approved" ? "Approved" : "Declined", " by ", userName(db, a.decidedBy), " on ", new Date(a.decidedAt).toLocaleString("en-GB"), a.decisionNote ? " — " + a.decisionNote : ""));
@@ -20565,25 +20744,41 @@ function AttachField(p) {
   if (!idRef.current) idRef.current = uid("att");
   var base = idRef.current, list = p.value || [];
   var meta = function (file) { return { name: file.name, size: file.size, type: file.type || "" }; };
+  /* keepData: also keep the file itself (as a data URL) so it can be opened later */
+  var read = function (file, cb) {
+    if (!p.keepData) { cb(meta(file)); return; }
+    if (!/^image\//.test(file.type || "") && !/\.pdf$/i.test(file.name) && file.type !== "application/pdf") {
+      toast("Attach a PDF or an image.", "error"); return;
+    }
+    if (file.size > MAX_DOC_BYTES) { toast("That file is larger than 2 MB. Attach a smaller scan or photo.", "error"); return; }
+    var fr = new FileReader();
+    fr.onload = function () { cb(Object.assign(meta(file), { data: String(fr.result || "") })); };
+    fr.onerror = function () { toast("That file could not be read.", "error"); };
+    fr.readAsDataURL(file);
+  };
   return h(Field, { label: p.label, err: p.err, cls: p.cls },
     h("div", { className: "col", style: { gap: 7 } },
       h("input", {
         type: "file", accept: "image/*,.pdf", id: base + "-add",
         onChange: function (e) {
           var file = e.target.files && e.target.files[0]; if (!file) return;
-          p.onChange(list.concat([meta(file)])); e.target.value = "";
+          read(file, function (m) { p.onChange(list.concat([m])); }); e.target.value = "";
         }
       }),
       list.length
         ? h("div", { className: "row", style: { gap: 6 } }, list.map(function (a, i) {
             return h("span", { key: i, className: "att" },
-              h("span", { className: "nm", title: a.name + (a.size ? " \u00b7 " + Math.round(a.size / 1024) + " KB" : "") }, "\ud83d\udcce ", a.name),
+              h("span", {
+                className: "nm", title: a.name + (a.size ? " \u00b7 " + Math.round(a.size / 1024) + " KB" : "") + (a.data ? " \u2014 click to open" : ""),
+                style: a.data ? { cursor: "pointer", textDecoration: "underline" } : null,
+                onClick: a.data ? function () { openAttachment(a); } : null
+              }, "\ud83d\udcce ", a.name),
               h("input", {
                 type: "file", accept: "image/*,.pdf", id: base + "-r" + i, className: "hidden",
                 onChange: function (e) {
                   var file = e.target.files && e.target.files[0]; if (!file) return;
-                  var n = list.slice(); n[i] = meta(file); p.onChange(n); e.target.value = "";
-                  toast("Attachment replaced.", "ok");
+                  read(file, function (m) { var n = list.slice(); n[i] = m; p.onChange(n); toast("Attachment replaced.", "ok"); });
+                  e.target.value = "";
                 }
               }),
               h("button", {
@@ -20598,7 +20793,7 @@ function AttachField(p) {
                 }
               }, "\u2715"));
           }))
-        : h("span", { className: "cap" }, "No evidence attached yet.")));
+        : h("span", { className: "cap" }, p.emptyText || "No evidence attached yet.")));
 }
 
 function ExpensesTab(p) {
@@ -21827,6 +22022,8 @@ function MobileEntrySheet(p) {
     if (k === "workOrderId") n.taskId = "";
     if (k === "type" && v !== "Work") n.hourType = "yellow";
     if (n.hourType === "blue" && !can(user, "reportBlueTime")) n.hourType = "yellow";
+    if ((k === "date" || k === "type") && (!n.dateTo || n.dateTo < n.date)) n.dateTo = n.date;
+    if (k === "date" || k === "dateTo") { var ce = Object.assign({}, errs); delete ce.date; delete ce.dateTo; errs = ce; }
     set(n);
     var ne = Object.assign({}, errs); delete ne[k];
     if (k === "clientId") delete ne.client;
@@ -21849,12 +22046,18 @@ function MobileEntrySheet(p) {
   return h(Sheet, {
     title: f.id ? "Edit entry" : "Report time", onClose: p.onClose,
     footer: [h(Btn, { key: "c", onClick: p.onClose, style: { flex: 1 } }, "Cancel"),
-             h(Btn, { key: "s", kind: "p", onClick: save, style: { flex: 2 } }, f.id ? "Save changes" : "Save entry")]
+             h(Btn, { key: "s", kind: "p", onClick: save, style: { flex: 2 } }, day && leaveNeedsApproval(user) ? "Send request" : f.id ? "Save changes" : "Save entry")]
   },
-    h(Field, { label: "Date", err: errs.date, req: true },
-      h("input", { type: "date", value: f.date, max: todayStr(), onChange: function (e) { up("date", e.target.value); } })),
     h(Sel, { label: "Type", value: f.type, options: ["Work", "Sick", "Vacation"], onChange: function (e) { up("type", e.target.value); } }),
-    day ? h(Field, { label: "Days" }, h("input", { className: "ro", readOnly: true, value: "1 day" }))
+    day && !f.id
+      ? h("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9 } },
+          h(Field, { label: "From", err: errs.date, req: true },
+            h("input", { type: "date", value: f.date, onChange: function (e) { up("date", e.target.value); } })),
+          h(Field, { label: "To", err: errs.dateTo, req: true },
+            h("input", { type: "date", value: f.dateTo || f.date, min: f.date, onChange: function (e) { up("dateTo", e.target.value); } })))
+      : h(Field, { label: "Date", err: errs.date, req: true },
+          h("input", { type: "date", value: f.date, max: day ? null : todayStr(), onChange: function (e) { up("date", e.target.value); } })),
+    day ? h(Field, { label: "Days" }, h("input", { className: "ro", readOnly: true, value: leaveDayLabel(f) }))
       : h("div", { className: "col", style: { gap: 6 } },
           h("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9 } },
             h(Field, { key: "s", label: "Start", err: errs.start },
@@ -21882,7 +22085,8 @@ function MobileEntrySheet(p) {
     day ? null : h(Sel, { label: "Work order", err: errs.workOrder, value: f.workOrderId, placeholder: opts.workOrders.length ? "Select…" : "— none on this project —", options: opts.workOrders, disabled: !f.projectId, onChange: function (e) { up("workOrderId", e.target.value); } }),
     day ? null : h(Sel, { label: "Task", value: f.taskId, placeholder: opts.tasks.length ? "— none —" : "— no assigned task —", options: opts.tasks, onChange: function (e) { up("taskId", e.target.value); } }),
     h(Inp, { label: "Description", req: true, err: errs.description, value: f.description, placeholder: f.type === "Work" ? "What did you work on?" : "Optional note", onChange: function (e) { up("description", e.target.value); } }),
-    h(Inp, { label: "Notes", value: f.notes, placeholder: "Optional", onChange: function (e) { up("notes", e.target.value); } }));
+    h(Inp, { label: "Notes", value: f.notes, placeholder: "Optional", onChange: function (e) { up("notes", e.target.value); } }),
+    day ? h(LeaveBand, { db: db, viewer: user, form: f, up: up }) : null);
 }
 
 /* ---------- Time: the timer, then this month's entries ---------- */
@@ -22276,7 +22480,7 @@ function MobileApp(p) {
     var snapshot = JSON.parse(JSON.stringify(e));
     p.mutate(function (d) {
       d.entries = d.entries.filter(function (x) { return x.id !== e.id; });
-      d.approvals = d.approvals.filter(function (a) { return !(a.entityTable === "entries" && a.entityId === e.id && a.status === "pending"); });
+      detachFromRequests(d, e.id);
       audit(d, user.id, "Entry deleted", "entries", e.id, snapshot, null);
     });
     toast("Entry deleted.", "", { label: "Undo", fn: function () { p.mutate(function (d) { d.entries.unshift(snapshot); }); } });
