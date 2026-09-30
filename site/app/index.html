@@ -17868,6 +17868,10 @@ function AttachmentLinks(p) {
   }));
 }
 
+/* Yellow · Client and Blue · Management both draw on the personal allowance and on
+   the project / work-order budget. Red · Company draws on neither. */
+function allowanceHrs(e) { return (Number(e.yellow) || 0) + (Number(e.blue) || 0); }
+
 /* ================= §8 the entitlement engine ================= */
 /* Returns { status, reason, softFlag, escalate } */
 function entitlementCheck(db, entry) {
@@ -17880,14 +17884,13 @@ function entitlementCheck(db, entry) {
      sends them to the person's manager as a Leave request (the CEO registers directly). */
   if (isLeave(entry.type)) return ok;
 
-  var hrs = Number(entry.yellow) || 0;
+  var hrs = allowanceHrs(entry);
 
-  /* 2 — Red · Company and Blue · Management are never gated.
-     Blue is management time: it is attributed to a client and project so it can be
-     reported on, but it draws on neither a personal allowance nor a project budget.
-     Both still count toward the daily soft and hard limits (checks 8 and 9). */
+  /* 2 — Red · Company is never gated. Blue · Management is gated exactly like
+     Yellow: it draws on the personal allowance and on the project or work-order
+     budget. Red still counts toward the daily soft and hard limits (checks 8 and 9). */
   if (!hrs) {
-    var other = (Number(entry.red) || 0) + (Number(entry.blue) || 0);
+    var other = Number(entry.red) || 0;
     if (!other) return ok;
     var sd0 = db.entries.filter(function (e) {
       return e.assignee === entry.assignee && e.date === entry.date && e.id !== entry.id && e.status === "registered";
@@ -17930,7 +17933,7 @@ function entitlementCheck(db, entry) {
   var sameDay = db.entries.filter(function (e) {
     return e.assignee === entry.assignee && e.date === entry.date && e.id !== entry.id && e.status === "registered";
   }).reduce(function (a, e) { return a + (Number(e.red) || 0) + (Number(e.yellow) || 0) + (Number(e.blue) || 0); }, 0);
-  var total = sameDay + hrs + (Number(entry.red) || 0) + (Number(entry.blue) || 0);
+  var total = sameDay + hrs + (Number(entry.red) || 0);
   if (total > hard) return no("Daily limit exceeded");
   if (total > soft) return { status: "registered", reason: "", softFlag: true, escalate: null };
 
@@ -17943,14 +17946,14 @@ function findAssignment(db, userId, projectId, workOrderId) {
   if (exact) return exact;
   return db.assignments.filter(function (a) { return a.userId === userId && a.projectId === projectId && !a.workOrderId; })[0] || null;
 }
-/* §8.2 — Consumed counts registered Yellow hours only. Pending is never consumed. */
+/* §8.2 — Consumed counts registered Yellow and Blue hours. Pending is never consumed. */
 function consumedOn(db, userId, asg, excludeId) {
   return db.entries.filter(function (e) {
     if (e.status !== "registered" || e.assignee !== userId || e.id === excludeId) return false;
     if (e.projectId !== asg.projectId) return false;
     if (asg.workOrderId) return e.workOrderId === asg.workOrderId;
     return true;
-  }).reduce(function (a, e) { return a + (Number(e.yellow) || 0); }, 0);
+  }).reduce(function (a, e) { return a + allowanceHrs(e); }, 0);
 }
 function pendingOn(db, userId, asg) {
   return db.entries.filter(function (e) {
@@ -17958,7 +17961,7 @@ function pendingOn(db, userId, asg) {
     if (e.projectId !== asg.projectId) return false;
     if (asg.workOrderId) return e.workOrderId === asg.workOrderId;
     return true;
-  }).reduce(function (a, e) { return a + (Number(e.yellow) || 0); }, 0);
+  }).reduce(function (a, e) { return a + allowanceHrs(e); }, 0);
 }
 function budgetFor(db, projectId, workOrderId) {
   if (workOrderId) {
@@ -17982,17 +17985,17 @@ function budgetScopeEntries(db, b, status) {
 function budgetConsumed(db, b, excludeId) {
   return budgetScopeEntries(db, b, "registered")
     .filter(function (e) { return e.id !== excludeId; })
-    .reduce(function (a, e) { return a + (Number(e.yellow) || 0); }, 0);
+    .reduce(function (a, e) { return a + allowanceHrs(e); }, 0);
 }
 function budgetPending(db, b) {
-  return budgetScopeEntries(db, b, "pending").reduce(function (a, e) { return a + (Number(e.yellow) || 0); }, 0);
+  return budgetScopeEntries(db, b, "pending").reduce(function (a, e) { return a + allowanceHrs(e); }, 0);
 }
 /* §12.2 — projected exhaustion from the last 30 days' burn rate */
 function burnProjection(db, b) {
   var cut = new Date(); cut.setDate(cut.getDate() - 30);
   var hrs = budgetScopeEntries(db, b, "registered")
     .filter(function (e) { return s2d(e.date) >= cut; })
-    .reduce(function (a, e) { return a + (Number(e.yellow) || 0); }, 0);
+    .reduce(function (a, e) { return a + allowanceHrs(e); }, 0);
   if (!b.hours) return null;
   var remaining = Number(b.hours) - budgetConsumed(db, b);
   if (remaining <= 0) return "exhausted";
@@ -19475,7 +19478,7 @@ function EntryForm(p) {
 
   /* §8.4 warning banner for the selected assignment */
   var warn = null;
-  if (!isDayType && f.hourType === "yellow" && f.projectId) {
+  if (!isDayType && (f.hourType === "yellow" || f.hourType === "blue") && f.projectId) {
     var asg = findAssignment(db, f.assignee, f.projectId, f.workOrderId || null);
     if (asg && asg.allowanceHours !== null && asg.allowanceHours !== "" && asg.allowanceHours !== undefined) {
       var used = consumedOn(db, f.assignee, asg, f.id), allow = Number(asg.allowanceHours);
@@ -19537,7 +19540,7 @@ function EntryForm(p) {
               }, h("span", { className: "dot", style: { background: f.hourType === "yellow" ? "#3B2A05" : C.yellow } }), "Yellow"),
               can(viewer, "reportBlueTime") ? h("button", {
                 type: "button", role: "radio", "aria-checked": f.hourType === "blue" ? "true" : "false",
-                className: f.hourType === "blue" ? "on b" : "", title: "Blue · Management — time spent managing a client's projects and tasks. Attributed to the client, but drawn from neither your allowance nor the project budget.",
+                className: f.hourType === "blue" ? "on b" : "", title: "Blue · Management — time spent managing a client's projects and tasks. Like Yellow, drawn from your allowance and the project budget.",
                 onClick: function () { up("hourType", "blue"); }
               }, h("span", { className: "dot", style: { background: f.hourType === "blue" ? "#fff" : C.blue } }), "Blue") : null))
         ]
@@ -20472,7 +20475,7 @@ function ApprovalsTab(p) {
             var asg = findAssignment(d, e.assignee, e.projectId, e.workOrderId);
             if (asg && asg.allowanceHours !== null && asg.allowanceHours !== undefined && asg.allowanceHours !== "") {
               var used = consumedOn(d, e.assignee, asg, e.id);
-              var over = (used + (Number(e.yellow) || 0)) - Number(asg.allowanceHours);
+              var over = (used + allowanceHrs(e)) - Number(asg.allowanceHours);
               if (over > 0) asg.allowanceHours = Number(asg.allowanceHours) + over;
             }
           }
@@ -21125,7 +21128,7 @@ function ManagementTab(p) {
         h("tbody", null, wos.map(function (w) {
           var pr = byId(db.projects, w.projectId) || {};
           var b = db.budgets.filter(function (x) { return x.workOrderId === w.id; })[0];
-          var used = b ? budgetConsumed(db, b) : db.entries.filter(function (e) { return e.workOrderId === w.id && e.status === "registered"; }).reduce(function (a, e) { return a + (Number(e.yellow) || 0) + (Number(e.blue) || 0); }, 0);
+          var used = b ? budgetConsumed(db, b) : db.entries.filter(function (e) { return e.workOrderId === w.id && e.status === "registered"; }).reduce(function (a, e) { return a + allowanceHrs(e); }, 0);
           return h("tr", { key: w.id },
             h("td", { className: "mono", style: { fontWeight: 700 } }, w.code),
             h("td", null, w.title),

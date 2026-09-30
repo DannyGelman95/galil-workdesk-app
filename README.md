@@ -115,8 +115,8 @@ read-only roles & permissions reference.
 
 - A third hour type, **Blue · Management**, for Team Leads, Project Managers,
   Operations Managers and the CEO — time spent managing a client's projects
-  and tasks, attributed to a client/project but drawn from neither an
-  allowance nor a budget.
+  and tasks. Blue works just like Yellow: attributed to a client/project and
+  drawn from the personal allowance and the project or work-order budget.
 - Duplicate a time entry to the next day or the next week, and click a work
   order code anywhere in a table to copy it to the clipboard.
 - Expense evidence attachments can be replaced or removed in place.
