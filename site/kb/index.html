@@ -17,7 +17,7 @@ document.documentElement.setAttribute("data-theme",v);}catch(e){}})();
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'%3E%3Cpath d='M78 34H42a10 10 0 00-10 10v152a10 10 0 0010 10h36' fill='none' stroke='%231F3D24' stroke-width='18' stroke-linecap='round'/%3E%3Cpath d='M162 34h36a10 10 0 0110 10v152a10 10 0 01-10 10h-36' fill='none' stroke='%231F3D24' stroke-width='18' stroke-linecap='round'/%3E%3Cpath d='M148 92A44 44 0 10152 148V122H122' fill='none' stroke='%238CC63E' stroke-width='20' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Noto+Sans+Mono:wght@400;500;600&display=swap">
 <style>
 :root{
   --paper:#FBFDF7; --surface:#FFFFFF; --wash:#F2F8E9; --sunk:#EFF4E6;
@@ -28,9 +28,9 @@ document.documentElement.setAttribute("data-theme",v);}catch(e){}})();
   --note-bg:#EAF2FC; --note-fg:#1F4E8C; --warn-bg:#FDF3E1; --warn-fg:#7A4E07;
   --chrome-bg:#1B2A18; --chrome-fg:#EAF3E0; --chrome-fg-soft:#C4D9AE;
   --shadow:0 1px 2px rgba(27,42,24,.05), 0 8px 24px -16px rgba(27,42,24,.28);
-  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
-  --serif:"Source Serif 4",Georgia,"Times New Roman",serif;
-  --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  --sans:"Noto Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --serif:"Noto Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"Noto Sans Mono",ui-monospace,"SF Mono",Menlo,monospace;
   color-scheme:light;
 }
 @media (prefers-color-scheme:dark){
@@ -364,16 +364,17 @@ var ARTICLES = [
 { id: "leave", cat: "rules", title: "Vacation, sick leave & holidays", updated: "30 Sep 2026",
   summary: "How to request vacation, report sick days and plan around holidays.",
   body:
+  '<p class="lede">Sick and vacation days are requested in WorkDesk and approved by your manager. See <a href="#/workdesk-leave">Requesting sick and vacation days in WorkDesk</a> for the steps.</p>' +
   '<h2>Vacation</h2>' +
   '<ol class="steps">' +
-  '<li>Agree the dates with your Team Lead, at least <strong>two weeks</strong> in advance for anything longer than two days.</li>' +
-  '<li>Mark the days as vacation in the WorkDesk Week Planner.</li>' +
-  '<li>Set an out-of-office reply in Outlook and hand over any urgent work.</li>' +
+  '<li>Agree the dates with your manager, at least <strong>two weeks</strong> in advance for anything longer than two days.</li>' +
+  '<li>Send a <strong>Vacation</strong> request in WorkDesk for the whole range. Your manager approves or declines it.</li>' +
+  '<li>Once approved, set an out-of-office reply in Outlook and hand over any urgent work.</li>' +
   '</ol>' +
   '<h2>Sick leave</h2>' +
-  '<ul><li>Tell your Team Lead as early as possible on the day.</li>' +
-  '<li>Log the day as sick leave in WorkDesk.</li>' +
-  '<li>Send a medical certificate to Operations for absences longer than the period required by law.</li></ul>' +
+  '<ul><li>Tell your manager as early as possible on the day.</li>' +
+  '<li>Send a <strong>Sick</strong> request in WorkDesk covering the days you are off.</li>' +
+  '<li>Attach the sick-leave confirmation from the clinic or doctor\'s office to the request (PDF or photo).</li></ul>' +
   '<h2>Public holidays</h2>' +
   '<p>The office is closed on Israeli public holidays. Operations publishes the holiday calendar for the year in Teams each January, including half-days on holiday eves.</p>'
 },
@@ -487,14 +488,28 @@ var ARTICLES = [
   '<div class="callout note"><b>Out of allowance?</b> Use <strong>Request hours</strong> — your Team Lead or Project Manager will approve or decline it.</div>'
 },
 { id: "workdesk-plan", cat: "training", title: "Planning your week in WorkDesk", updated: "30 Sep 2026",
-  summary: "Use the Week Planner to plan hours, vacation and sick days.",
+  summary: "Use the Week Planner to plan next week's hours.",
   body:
   '<ol class="steps">' +
   '<li>Open the <strong>Week Planner</strong> tab and move to next week with the arrows.</li>' +
   '<li>For each day, add planned hours against your assigned work orders.</li>' +
-  '<li>Mark vacation or sick days so your Team Lead can see your availability.</li>' +
+  '<li>Planning to be away? Request the days as vacation in the Time Log — see <a href="#/workdesk-leave">Requesting sick and vacation days</a>.</li>' +
   '<li>Plans save automatically. Finish next week\'s plan by Thursday.</li>' +
   '</ol>'
+},
+{ id: "workdesk-leave", cat: "training", title: "Requesting sick and vacation days in WorkDesk", updated: "30 Sep 2026",
+  summary: "Send a sick or vacation request for a date range, with a supporting document.",
+  body:
+  '<p class="lede">Sick and vacation days go to your manager as a request. They count once your manager approves them.</p>' +
+  '<ol class="steps">' +
+  '<li>Open the <strong>Time Log</strong> tab and set <strong>Type</strong> to <em>Sick</em> or <em>Vacation</em>.</li>' +
+  '<li>Choose the <strong>From</strong> and <strong>To</strong> dates. <strong>Days</strong> shows the working days (Sunday to Thursday) in the range.</li>' +
+  '<li>For sick leave, click the file button under <strong>Sick-leave confirmation</strong> and attach the confirmation from the clinic or doctor\'s office — a PDF or an image, up to 2 MB.</li>' +
+  '<li>Add a short description and click <strong>Send request</strong>.</li>' +
+  '</ol>' +
+  '<p>The form shows who the request goes to — your direct manager. Until they decide, the days show as <strong>Pending</strong> and are not counted. If they decline, you\'ll see their reason on each day.</p>' +
+  '<p>On the phone layout, the same fields are in the <strong>Report time</strong> sheet.</p>' +
+  '<div class="callout note"><b>Note:</b> Only the CEO records sick and vacation days without a request.</div>'
 },
 { id: "workdesk-expenses", cat: "training", title: "Reporting expenses in WorkDesk", updated: "30 Sep 2026",
   summary: "Submit a claim with evidence and follow it through approval.",
