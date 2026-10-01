@@ -17439,7 +17439,7 @@ var Recharts = (function () {
 </script>
 <script>"use strict";
 /* =====================================================================
-   GALIL WorkDesk — V7.1
+   GALIL WorkDesk — V7.2
    Functional & Technical Specification, Version 7.1 (13 Sep 2026)
    Standalone build (Spec §3.3): single self-contained HTML, no server,
    data local under the frozen storage key `galil-workdesk-v1` (§3.2).
@@ -17607,7 +17607,7 @@ function emptyDB() {
     users: [], teams: [], clients: [], projects: [], workOrders: [], budgets: [],
     tasks: [], taskAssignees: [], assignments: [], entries: [], planned: [],
     expenses: [], attachments: [], library: [], approvals: [], audit: [],
-    expenseTypes: [], settings: {}
+    expenseTypes: [], teamRequests: [], settings: {}
   };
 }
 function readRaw() {
@@ -17648,8 +17648,12 @@ function seed() {
   var T = function (n) { var d = new Date(); d.setDate(d.getDate() + n); return d2s(d); };
 
   db.teams = [
-    { id: "team-doc", name: "Documentation", leadUserId: "u-tl" },
-    { id: "team-trn", name: "Training",      leadUserId: "u-pm" }
+    { id: "team-doc", name: "Documentation", leadUserId: "u-tl", department: "Technical Writing", color: "#5C8B22", code: "DOC",
+      description: "Operator and maintenance manuals, help systems and API references for our defence and aerospace clients.",
+      contact: "docs@galiltc.co.il", location: "Haifa office", clientIds: ["c-iai", "c-elb"] },
+    { id: "team-trn", name: "Training",      leadUserId: "u-pm", department: "Training & Instructional Design", color: "#3B7DD8", code: "TRN",
+      description: "Courseware, instructor guides and e-learning modules, from needs analysis to delivery.",
+      contact: "training@galiltc.co.il", location: "Haifa office", clientIds: ["c-iai"] }
   ];
   db.users = [
     mkUser("u-ceo", "Dana Galil",    "דנה גליל", "CEO", "Founder & CEO",          "Management",  null,       null,    true),
@@ -17908,7 +17912,7 @@ function entitlementCheck(db, entry) {
   if (!entry.projectId) return no("Unlisted item");
 
   /* 4 — assigned to that project or work order? */
-  var asg = findAssignment(db, entry.assignee, entry.projectId, entry.workOrderId);
+  var asg = findAssignment(db, entry.assignee, entry.projectId, entry.workOrderId, entry.date);
   if (!asg) return no("Not assigned");
 
   /* 5 — task selected but not assigned to the user */
@@ -17942,11 +17946,14 @@ function entitlementCheck(db, entry) {
   /* 10 — otherwise register */
   return ok;
 }
-function findAssignment(db, userId, projectId, workOrderId) {
+function findAssignment(db, userId, projectId, workOrderId, onDate) {
   if (!projectId) return null;
-  var exact = db.assignments.filter(function (a) { return a.userId === userId && a.projectId === projectId && a.workOrderId === workOrderId; })[0];
+  /* an assignment made by a team loan only counts between its from and until dates */
+  var day = onDate || todayStr();
+  var live = function (a) { return (!a.from || a.from <= day) && (!a.until || a.until >= day); };
+  var exact = db.assignments.filter(function (a) { return a.userId === userId && a.projectId === projectId && a.workOrderId === workOrderId && live(a); })[0];
   if (exact) return exact;
-  return db.assignments.filter(function (a) { return a.userId === userId && a.projectId === projectId && !a.workOrderId; })[0] || null;
+  return db.assignments.filter(function (a) { return a.userId === userId && a.projectId === projectId && !a.workOrderId && live(a); })[0] || null;
 }
 /* §8.2 — Consumed counts registered Yellow and Blue hours. Pending is never consumed. */
 function consumedOn(db, userId, asg, excludeId) {
@@ -18530,6 +18537,7 @@ var CSS = [
 ".seg button.on.r{background:var(--red)}",
 ".seg button.on.y{background:var(--yellow);color:#3B2A05}",
 ".seg button.on.b{background:var(--blue);color:#fff}",
+".seg button.on.g{background:var(--sel);color:var(--selfg)}",
 
 /* ---- click-to-select chips (assignees, dependencies, filters) ---- */
 ".picker{display:flex;flex-wrap:wrap;gap:6px;padding:8px;border:1px solid var(--line);border-radius:11px;background:var(--surface);max-height:170px;overflow:auto;align-content:flex-start}",
@@ -18705,6 +18713,16 @@ var CSS = [
 ".filebox .fbtn:hover{background:var(--green);border-color:var(--green);color:var(--onlight)}",
 ".filebox .cap{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}",
 ".filebox .att{flex:0 0 auto}",
+".teamgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}",
+".teamcard{background:var(--surface);border:1px solid var(--line);border-top:5px solid var(--green);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px;min-height:250px}",
+".teamdot{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:13px;flex:0 0 auto}",
+".teamname{font-size:15.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
+".teamdesc{margin:0;font-size:13px;color:var(--ink);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}",
+".availgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}",
+".availcard{border:1px dashed var(--line);border-radius:11px;padding:9px;display:flex;flex-direction:column;gap:6px;background:var(--wash)}",
+".avatar.temp{background:transparent!important;border:2px dashed var(--teal);color:var(--teal)}",
+".swatchbtn{width:28px;height:28px;border-radius:50%;border:2px solid var(--surface);box-shadow:0 0 0 1px var(--line);cursor:pointer}",
+".swatchbtn.on{box-shadow:0 0 0 2px var(--ink)}",
 ".band>.banner{white-space:nowrap;overflow:hidden}",
 ".band>.banner>span{overflow:hidden;text-overflow:ellipsis}",
 ".fld.bad .filebox{border-color:var(--err);background:var(--errbg)}",
@@ -20433,7 +20451,7 @@ function PlanEditor(p) {
    §9 — Module: Approvals
    ===================================================================== */
 
-var REQ_TYPES = ["Time entry", "Leave request", "Allowance increase", "New list item", "Expense", "Account activation", "Role change", "Retroactive edit"];
+var REQ_TYPES = ["Time entry", "Leave request", "Team loan", "Team transfer", "Allowance increase", "New list item", "Expense", "Account activation", "Role change", "Retroactive edit"];
 
 function ApprovalsTab(p) {
   var db = p.db, user = p.user;
@@ -20504,6 +20522,7 @@ function ApprovalsTab(p) {
         var u = byId(d.users, req.entityId);
         if (u) { u.isActive = true; u.pendingActivation = false; if (opts.role) u.role = opts.role; u.requestedRole = null; }
       }
+      if (req.entityTable === "teamRequests") applyTeamRequest(d, req, user);
       if (req.entityTable === "allowance") {
         var asg2 = byId(d.assignments, req.entityId);
         if (asg2) asg2.allowanceHours = (Number(asg2.allowanceHours) || 0) + Number(req.payloadAfter && req.payloadAfter.hours || 0);
@@ -20520,6 +20539,7 @@ function ApprovalsTab(p) {
       if (req.entityTable === "entries") requestEntryIds(req).forEach(function (eid) { var e = byId(d.entries, eid); if (e) { e.status = "cancelled"; e.decisionNote = note; e.approvedBy = user.id; e.approvedAt = nowISO(); } });
       if (req.entityTable === "expenses") { var x = byId(d.expenses, req.entityId); if (x) x.status = "Rejected"; }
       if (req.entityTable === "users") { var u = byId(d.users, req.entityId); if (u) { u.pendingActivation = false; u.isActive = false; } }
+      if (req.entityTable === "teamRequests") { var tr = byId(d.teamRequests || [], req.entityId); if (tr) { tr.status = "declined"; tr.decidedAt = nowISO(); tr.decisionNote = note; } }
       audit(d, user.id, "Declined: " + req.type + " — " + note, req.entityTable, req.entityId, null, null);
     });
     toast("Declined. The requester keeps the record with your reason.", "");
@@ -20571,6 +20591,7 @@ function ApprovalsTab(p) {
   function Card(pp) {
     var a = pp.a, e = entryOf(a), x = expenseOf(a);
     var lv = a.type === "Leave request" ? (a.payloadAfter || {}) : null;
+    var tq = a.entityTable === "teamRequests" ? byId(db.teamRequests || [], a.entityId) : null;
     if (lv) e = null;  /* a leave has no hours, client or budget to show */
     var pickable = a.status === "pending" && a.reason !== "Budget exceeded";
     var bud = e ? budgetFor(db, e.projectId, e.workOrderId) : null;
@@ -20604,6 +20625,15 @@ function ApprovalsTab(p) {
         e.taskId ? h(Chip, { k: "gr" }, nameOf(db.tasks, e.taskId, "title")) : null) : null,
       e ? h("div", { style: { fontSize: 13.5 } }, e.description) : null,
       x ? h("div", { style: { fontSize: 13.5 } }, x.etype, " — ", x.description) : null,
+      tq ? h("div", { className: "col", style: { gap: 5, fontSize: 13.5 } },
+        h("div", null, h("b", null, userName(db, tq.userId)), " (", nameOf(db.teams, tq.fromTeamId) || "no team", ") \u2192 ", h("b", null, nameOf(db.teams, tq.toTeamId)),
+          tq.kind === "loan" ? " — temporary" : " — permanent transfer"),
+        tq.kind === "loan" ? h("div", { className: "row", style: { gap: 6 } },
+          h(Chip, { k: "gr" }, nameOf(db.clients, tq.clientId)), h(Chip, { k: "gr" }, nameOf(db.projects, tq.projectId)),
+          tq.taskId ? h(Chip, { k: "gr" }, nameOf(db.tasks, tq.taskId, "title")) : null,
+          h("span", { className: "cap mono" }, il(tq.start), " – ", il(tq.end)),
+          h("span", { className: "cap" }, tq.hours != null ? num(tq.hours) + " h allowance" : "no hour limit")) : null,
+        tq.note ? h("div", { className: "cap" }, "\u201c", tq.note, "\u201d") : null) : null,
       lv ? (function () {
         var first = byId(db.entries, requestEntryIds(a)[0]) || {};
         var docs = lv.attachments || [], n = lv.days || requestEntryIds(a).length;
@@ -21591,16 +21621,16 @@ function ListEditor(pp) {
 
 /* ---------- the Management sections ---------- */
 var MGMT_SECTIONS = [
-  { k: "budgets",      label: "Budgets",                  show: function (u) { return can(u, "viewBudgets"); } },
-  { k: "wos",          label: "Work orders",              show: function (u) { return can(u, "viewBudgets") || can(u, "createWorkOrders") || can(u, "manageClientsProjects"); } },
   { k: "people",       label: "People",                   show: function (u) { return can(u, "assignTasks") || can(u, "manageClientsProjects") || can(u, "manageEmployeesRoles"); } },
   { k: "teams",        label: "Teams",                    show: function (u) { return can(u, "manageTeams"); } },
-  { k: "activation",   label: "Pending activation",       show: function (u) { return can(u, "manageEmployeesRoles"); } },
-  { k: "assignments",  label: "Assignments & allowances", show: function (u) { return can(u, "assignTasks") || can(u, "manageClientsProjects"); } },
   { k: "clients",      label: "Clients",                  show: function (u) { return can(u, "assignTasks") || can(u, "manageClientsProjects") || can(u, "viewBudgets"); } },
   { k: "projects",     label: "Projects",                 show: function (u) { return can(u, "assignTasks") || can(u, "manageClientsProjects") || can(u, "viewBudgets"); } },
-  { k: "expenseTypes", label: "Expense types",            show: function (u) { return can(u, "manageClientsProjects") || can(u, "manageEmployeesRoles") || can(u, "approveExpenses"); } },
-  { k: "verify",       label: "Verification queue",       show: function (u) { return can(u, "manageClientsProjects"); } }
+  { k: "wos",          label: "Work Orders",              show: function (u) { return can(u, "viewBudgets") || can(u, "createWorkOrders") || can(u, "manageClientsProjects"); } },
+  { k: "budgets",      label: "Budgets",                  show: function (u) { return can(u, "viewBudgets"); } },
+  { k: "assignments",  label: "Assignments & Allowances", show: function (u) { return can(u, "assignTasks") || can(u, "manageClientsProjects"); } },
+  { k: "expenseTypes", label: "Expense Types",            show: function (u) { return can(u, "manageClientsProjects") || can(u, "manageEmployeesRoles") || can(u, "approveExpenses"); } },
+  { k: "verify",       label: "Verification Queue",       show: function (u) { return can(u, "manageClientsProjects"); } },
+  { k: "activation",   label: "Pending Activation",       show: function (u) { return can(u, "manageEmployeesRoles"); } }
 ];
 function mgmtSectionsFor(user) { return MGMT_SECTIONS.filter(function (s) { return s.show(user); }); }
 function canOpenManagement(user) { return mgmtSectionsFor(user).length > 0; }
@@ -21610,70 +21640,263 @@ function mgmtBadge(db, user, k) {
   return 0;
 }
 
-/* ---------- Management → Teams ----------
-   A manager sets up their own teams, adds people to them and sets each member's
-   direct manager (normally themselves). Team Leads and Project Managers manage the
-   teams they lead and can add anyone who is not already in another team;
-   Operations and the CEO manage every team. The direct manager is who leave
-   requests go to, and the team lead is first in line for other approvals. */
+/* an approved Team loan / Team transfer takes effect here */
+function applyTeamRequest(d, req, actor) {
+  var r = byId(d.teamRequests || [], req.entityId); if (!r) return;
+  var u = byId(d.users, r.userId), to = byId(d.teams, r.toTeamId);
+  r.status = "approved"; r.decidedAt = nowISO();
+  if (!u || !to) return;
+  if (r.kind === "transfer") {
+    var before = { teamId: u.teamId, managerId: u.managerId };
+    u.teamId = to.id;
+    if (to.leadUserId && to.leadUserId !== u.id) u.managerId = to.leadUserId;
+    audit(d, actor.id, "Transferred " + u.fullName + " to team " + to.name, "users", u.id, before, { teamId: u.teamId, managerId: u.managerId });
+    return;
+  }
+  /* a loan: the person keeps their team and manager, and is assigned to the work */
+  if (r.projectId && !d.assignments.some(function (x) { return x.userId === u.id && x.projectId === r.projectId && !x.workOrderId; })) {
+    var tk = r.taskId ? byId(d.tasks, r.taskId) : null;
+    d.assignments.push({ id: uid("a"), userId: u.id, projectId: r.projectId, workOrderId: tk && tk.workOrderId ? tk.workOrderId : null,
+      allowanceHours: r.hours == null ? null : Number(r.hours), grantedBy: actor.id, grantedAt: nowISO(), from: r.start, until: r.end, viaLoan: r.id });
+  }
+  if (r.taskId && !d.taskAssignees.some(function (x) { return x.taskId === r.taskId && x.userId === u.id; })) {
+    d.taskAssignees.push({ id: uid("ta"), taskId: r.taskId, userId: u.id, allowanceHours: r.hours == null ? null : Number(r.hours) });
+  }
+  audit(d, actor.id, "Loaned " + u.fullName + " to team " + to.name + " until " + r.end, "users", u.id, null, null);
+}
+
+/* ---------- Management → Teams (V7.2) ----------
+   Teams are shown as cards. A manager can:
+   · create and customise a team — name, description and department are required;
+     colour, short code, contact, location and main clients are optional;
+   · place available people (no team, or no direct manager) into a team — the team
+     lead becomes their direct manager unless another is chosen;
+   · ask another team's lead / manager / the CEO to lend one of their people for a
+     client's project or task for a period (Team loan), or to move a person over for
+     good (Team transfer). Both go through Approvals.
+   Team Leads and Project Managers manage the teams they lead; Operations and the
+   CEO manage every team. The direct manager receives leave requests; the team lead
+   is first in line for other approvals. */
 var MANAGER_ROLES = ["TL", "PM", "OPS", "CEO"];
+var TEAM_DEPARTMENTS = [
+  "Technical Writing", "Documentation", "Training & Instructional Design", "e-Learning Development",
+  "Localization & Translation", "Editing & Proofreading", "Illustration & Graphics",
+  "Information Architecture", "Content Strategy", "API & Developer Documentation",
+  "Quality Assurance", "Project Management", "Operations", "Finance & Administration",
+  "Sales & Business Development", "IT & Tools"
+];
+var TEAM_COLORS = ["#5C8B22", "#3B7DD8", "#17A3B8", "#9C8CE8", "#E3AC35", "#E05C4B", "#D2689C", "#3FA97E", "#7A8794"];
 function managesAllTeams(user) { return user.role === "OPS" || user.role === "CEO"; }
 function canManageTeam(user, t) { return managesAllTeams(user) || (t && t.leadUserId === user.id); }
+function teamRequests(db) { return db.teamRequests || []; }
+/* approved loans that are running today */
+function activeLoans(db, teamId) {
+  var today = todayStr();
+  return teamRequests(db).filter(function (r) {
+    return r.kind === "loan" && r.status === "approved" && (!teamId || r.toTeamId === teamId) && r.start <= today && r.end >= today;
+  });
+}
+/* who can decide a request about this person: their team lead, their manager, the CEO */
+function teamRequestApprovers(db, person, requesterId) {
+  var team = person && person.teamId ? byId(db.teams, person.teamId) : null;
+  var ids = [team && team.leadUserId, person && person.managerId, firstOf(db, "CEO")];
+  var seen = {};
+  return ids.filter(function (id) {
+    if (!id || id === requesterId || (person && id === person.id) || seen[id]) return false;
+    var u = byId(db.users, id); if (!u || !u.isActive) return false;
+    seen[id] = true; return true;
+  });
+}
+function blankTeam(user) {
+  return { id: null, name: "", description: "", department: "", deptOther: "", leadUserId: user.id, color: TEAM_COLORS[0], code: "", contact: "", location: "", clientIds: [] };
+}
+
+function TeamEditor(p) {
+  var db = p.db, user = p.user, all = managesAllTeams(user);
+  var init = Object.assign(blankTeam(user), p.value || {});
+  if (init.department && TEAM_DEPARTMENTS.indexOf(init.department) < 0) { init.deptOther = init.department; init.department = "__other"; }
+  var s = useState(init), f = s[0], set = s[1];
+  var es = useState({}), errs = es[0], setErrs = es[1];
+  var up = function (k, v) { var n = Object.assign({}, f); n[k] = v; set(n); var e = Object.assign({}, errs); delete e[k]; setErrs(e); };
+  function save() {
+    var e = {};
+    var name = String(f.name || "").trim(), dept = f.department === "__other" ? String(f.deptOther || "").trim() : f.department;
+    if (!name) e.name = "Give the team a name.";
+    else if (db.teams.some(function (t) { return t.id !== f.id && t.name.toLowerCase() === name.toLowerCase(); })) e.name = "A team with that name already exists.";
+    if (!String(f.description || "").trim()) e.description = "Describe what the team does.";
+    if (!dept) e.department = f.department === "__other" ? "Type the department." : "Choose a department.";
+    setErrs(e); if (Object.keys(e).length) return;
+    p.onSave({
+      id: f.id, name: name, description: f.description.trim(), department: dept,
+      leadUserId: all ? (f.leadUserId || null) : (f.id ? f.leadUserId : user.id),
+      color: f.color || TEAM_COLORS[0], code: String(f.code || "").trim().toUpperCase().slice(0, 6),
+      contact: String(f.contact || "").trim(), location: String(f.location || "").trim(), clientIds: f.clientIds || []
+    });
+  }
+  var managers = db.users.filter(function (u) { return u.isActive && MANAGER_ROLES.indexOf(u.role) >= 0; })
+    .map(function (u) { return { value: u.id, label: u.fullName + " · " + roleName(u.role) }; });
+  return h(Modal, {
+    title: f.id ? "Edit team" : "New team", size: "md", onClose: p.onClose,
+    footer: [h(Btn, { key: "c", onClick: p.onClose }, "Cancel"), h(Btn, { key: "s", kind: "p", onClick: save }, f.id ? "Save team" : "Create team")]
+  },
+    h("div", { className: "col", style: { gap: 10 } },
+      h("div", { className: "grid2" },
+        h(Inp, { label: "Name", req: true, value: f.name, err: errs.name, placeholder: "e.g. Documentation — North", onChange: function (e) { up("name", e.target.value); } }),
+        h(Inp, { label: "Short code (optional)", value: f.code, placeholder: "e.g. DOC-N", onChange: function (e) { up("code", e.target.value); } })),
+      h(Txt, { label: "Description", req: true, rows: 3, value: f.description, err: errs.description, placeholder: "What the team does and for whom.", onChange: function (e) { up("description", e.target.value); } }),
+      h("div", { className: "grid2" },
+        h(Sel, { label: "Department", req: true, value: f.department, err: errs.department, placeholder: "Select…",
+          options: TEAM_DEPARTMENTS.map(function (d) { return { value: d, label: d }; }).concat([{ value: "__other", label: "Other — type it" }]),
+          onChange: function (e) { up("department", e.target.value); } }),
+        f.department === "__other"
+          ? h(Inp, { label: "Department name", req: true, value: f.deptOther, err: errs.department, placeholder: "Type the department", onChange: function (e) { up("deptOther", e.target.value); } })
+          : all ? h(Sel, { label: "Team lead", value: f.leadUserId || "", placeholder: "— none —", options: managers, onChange: function (e) { up("leadUserId", e.target.value); } })
+          : h(Field, { label: "Team lead" }, h("input", { readOnly: true, tabIndex: -1, value: userName(db, f.leadUserId || user.id), style: { backgroundColor: "var(--wash)" } }))),
+      f.department === "__other" && all ? h(Sel, { label: "Team lead", value: f.leadUserId || "", placeholder: "— none —", options: managers, onChange: function (e) { up("leadUserId", e.target.value); } }) : null,
+      h(Field, { label: "Colour (optional)" },
+        h("div", { className: "row", style: { gap: 6, minHeight: 38 } }, TEAM_COLORS.map(function (c) {
+          return h("button", { key: c, type: "button", className: "swatchbtn" + (f.color === c ? " on" : ""), style: { background: c }, "aria-label": "Colour " + c, "aria-pressed": f.color === c ? "true" : "false", onClick: function () { up("color", c); } });
+        }))),
+      h("div", { className: "grid2" },
+        h(Inp, { label: "Team email or channel (optional)", value: f.contact, placeholder: "docs-north@galiltc.co.il", onChange: function (e) { up("contact", e.target.value); } }),
+        h(Inp, { label: "Location (optional)", value: f.location, placeholder: "e.g. Haifa office", onChange: function (e) { up("location", e.target.value); } })),
+      h(Picker, {
+        label: "Main clients (optional)", value: f.clientIds || [],
+        hint: "The clients this team usually works for. Loan requests offer these clients first.",
+        options: db.clients.map(function (c) { return { value: c.id, label: c.name }; }),
+        onChange: function (v) { up("clientIds", v); }
+      })));
+}
+
+/* ask for a person from another team — for a while (loan) or for good (transfer) */
+function TeamRequestModal(p) {
+  var db = p.db, user = p.user;
+  var myTeams = db.teams.filter(function (t) { return canManageTeam(user, t); });
+  var s = useState(Object.assign({ kind: "loan", userId: "", toTeamId: p.toTeamId || (myTeams[0] || {}).id || "", clientId: "", projectId: "", taskId: "", start: todayStr(), end: "", hours: "", note: "", approverId: "" }, p.value || {}));
+  var f = s[0], set = s[1];
+  var es = useState({}), errs = es[0], setErrs = es[1];
+  var up = function (k, v) {
+    var n = Object.assign({}, f); n[k] = v;
+    if (k === "clientId") { n.projectId = ""; n.taskId = ""; }
+    if (k === "projectId") n.taskId = "";
+    if (k === "userId") n.approverId = "";
+    set(n); var e = Object.assign({}, errs); delete e[k]; setErrs(e);
+  };
+  var toTeam = byId(db.teams, f.toTeamId);
+  var people = db.users.filter(function (u) { return u.isActive && u.teamId && u.teamId !== f.toTeamId && u.id !== user.id && u.role !== "VIEW" && (!p.fromTeamId || u.teamId === p.fromTeamId); });
+  var person = byId(db.users, f.userId);
+  var approvers = person ? teamRequestApprovers(db, person, user.id) : [];
+  var approverId = f.approverId || approvers[0] || "";
+  var teamClients = toTeam && toTeam.clientIds ? toTeam.clientIds : [];
+  var clients = db.clients.slice().sort(function (a, b) { return (teamClients.indexOf(b.id) >= 0) - (teamClients.indexOf(a.id) >= 0); });
+  var projects = db.projects.filter(function (x) { return x.clientId === f.clientId; });
+  var tasks = db.tasks.filter(function (t) { return t.projectId === f.projectId && ["Done", "Cancelled"].indexOf(t.status) < 0; });
+
+  function send() {
+    var e = {};
+    if (!f.toTeamId) e.toTeamId = "Choose your team.";
+    if (!f.userId) e.userId = "Choose a person.";
+    if (f.kind === "loan") {
+      if (!f.clientId) e.clientId = "Choose the client.";
+      if (!f.projectId) e.projectId = "Choose the project.";
+      if (!f.start) e.start = "Choose the first day.";
+      if (!f.end) e.end = "Choose the last day.";
+      else if (f.end < f.start) e.end = "The end cannot be before the start.";
+    }
+    if (!approverId) e.userId = "Nobody can decide this request — the person has no team lead, manager or CEO above them.";
+    if (f.userId && teamRequests(db).some(function (r) { return r.status === "pending" && r.userId === f.userId && r.toTeamId === f.toTeamId; }))
+      e.userId = "A request for this person to join this team is already waiting for a decision.";
+    setErrs(e); if (Object.keys(e).length) return;
+    p.onSend(Object.assign({}, f, { approverId: approverId, fromTeamId: person.teamId, hours: f.hours === "" ? null : Number(f.hours) }));
+  }
+
+  return h(Modal, {
+    title: "Request a team member", size: "md", onClose: p.onClose,
+    footer: [h(Btn, { key: "c", onClick: p.onClose }, "Cancel"), h(Btn, { key: "s", kind: "p", onClick: send }, "Send request")]
+  },
+    h("div", { className: "col", style: { gap: 10 } },
+      h(Field, { label: "What are you asking for?" },
+        h("div", { className: "seg", role: "radiogroup", style: { width: "100%" } },
+          [["loan", "Temporary — for a client's project or task"], ["transfer", "Permanent transfer"]].map(function (o) {
+            return h("button", { key: o[0], type: "button", role: "radio", "aria-checked": f.kind === o[0] ? "true" : "false", className: f.kind === o[0] ? "on g" : "", style: { flex: 1, justifyContent: "center" }, onClick: function () { up("kind", o[0]); } }, o[1]);
+          }))),
+      h("div", { className: "grid2" },
+        h(Sel, { label: "Person", req: true, value: f.userId, err: errs.userId, placeholder: people.length ? "Select…" : "— nobody in other teams —",
+          options: people.map(function (u) { return { value: u.id, label: u.fullName + " — " + nameOf(db.teams, u.teamId) + " (" + roleName(u.role) + ")" }; }),
+          onChange: function (e) { up("userId", e.target.value); } }),
+        h(Sel, { label: f.kind === "loan" ? "To join your team" : "To move to your team", req: true, value: f.toTeamId, err: errs.toTeamId, options: myTeams.map(function (t) { return { value: t.id, label: t.name }; }), onChange: function (e) { up("toTeamId", e.target.value); } })),
+      f.kind === "loan" ? h("div", { className: "grid3" },
+        h(Sel, { label: "Client", req: true, value: f.clientId, err: errs.clientId, placeholder: "Select…", options: clients.map(function (c) { return { value: c.id, label: c.name + (teamClients.indexOf(c.id) >= 0 ? " ★" : "") }; }), onChange: function (e) { up("clientId", e.target.value); } }),
+        h(Sel, { label: "Project", req: true, value: f.projectId, err: errs.projectId, disabled: !f.clientId, placeholder: projects.length ? "Select…" : "— choose a client —", options: projects.map(function (x) { return { value: x.id, label: x.name }; }), onChange: function (e) { up("projectId", e.target.value); } }),
+        h(Sel, { label: "Task (optional)", value: f.taskId, disabled: !f.projectId, placeholder: tasks.length ? "— whole project —" : "— no open tasks —", options: tasks.map(function (t) { return { value: t.id, label: t.title }; }), onChange: function (e) { up("taskId", e.target.value); } })) : null,
+      f.kind === "loan" ? h("div", { className: "grid3" },
+        h(Inp, { label: "From", req: true, type: "date", value: f.start, err: errs.start, onChange: function (e) { up("start", e.target.value); } }),
+        h(Inp, { label: "To", req: true, type: "date", value: f.end, err: errs.end, onChange: function (e) { up("end", e.target.value); } }),
+        h(Inp, { label: "Hour allowance (optional)", type: "number", step: "0.5", value: f.hours, placeholder: "blank = unlimited", onChange: function (e) { up("hours", e.target.value); } })) : null,
+      h(Txt, { label: "Reason (optional)", rows: 2, value: f.note, placeholder: f.kind === "loan" ? "Why you need them and what they will do." : "Why the move makes sense.", onChange: function (e) { up("note", e.target.value); } }),
+      h(Sel, { label: "Send the request to", value: approverId, placeholder: !person ? "— choose a person first —" : approvers.length ? undefined : "— nobody available —", disabled: !person,
+        options: approvers.map(function (id) {
+          var u = byId(db.users, id), t = person && person.teamId ? byId(db.teams, person.teamId) : null;
+          var why = t && t.leadUserId === id ? "their team lead" : person && person.managerId === id ? "their manager" : "CEO";
+          return { value: id, label: u.fullName + " — " + why };
+        }), onChange: function (e) { up("approverId", e.target.value); } }),
+      h("div", { className: "banner teal" }, f.kind === "loan"
+        ? "✉ On approval the person joins your team for these dates, is assigned to the project (and task) with the allowance you set, and keeps their own team and manager."
+        : "✉ On approval the person moves to your team and your team lead becomes their direct manager.")));
+}
+
 function TeamsPanel(p) {
   var db = p.db, user = p.user, all = managesAllTeams(user);
-  var ns = useState({ name: "", lead: user.id }), nt = ns[0], setNt = ns[1];
-  var as = useState({}), adding = as[0], setAdding = as[1];
+  var es = useState(null), editing = es[0], setEditing = es[1];
+  var rs = useState(null), requesting = rs[0], setRequesting = rs[1];
+  var ms = useState(null), managing = ms[0], setManaging = ms[1];
   var managers = db.users.filter(function (u) { return u.isActive && MANAGER_ROLES.indexOf(u.role) >= 0; })
-    .map(function (u) { return { value: u.id, label: u.fullName + " \u00b7 " + roleName(u.role) }; });
-  var teams = db.teams.filter(function (t) { return canManageTeam(user, t); });
-  var mine = teams.map(function (t) { return t.id; });
+    .map(function (u) { return { value: u.id, label: u.fullName + " · " + roleName(u.role) }; });
+  var mine = db.teams.filter(function (t) { return canManageTeam(user, t); });
+  /* people without a team and/or without a direct manager */
+  var available = db.users.filter(function (u) {
+    if (!u.isActive || u.pendingActivation || u.role === "VIEW" || u.role === "CEO" || u.id === user.id) return false;
+    return !u.teamId || !u.managerId;
+  });
 
-  function createTeam() {
-    var name = nt.name.trim();
-    if (!name) { toast("Give the team a name.", "error"); return; }
-    if (db.teams.some(function (t) { return t.name.toLowerCase() === name.toLowerCase(); })) { toast("A team with that name already exists.", "error"); return; }
-    var lead = all ? (nt.lead || user.id) : user.id;
+  function saveTeam(f) {
     p.mutate(function (d) {
-      var t = { id: uid("team"), name: name, leadUserId: lead };
-      d.teams.push(t);
-      audit(d, user.id, "Team created: " + name, "teams", t.id, null, t);
+      if (f.id) {
+        var x = byId(d.teams, f.id); if (!x) return;
+        var before = Object.assign({}, x); Object.assign(x, f);
+        audit(d, user.id, "Team edited: " + x.name, "teams", x.id, before, x);
+      } else {
+        var t = Object.assign({}, f, { id: uid("team") });
+        d.teams.push(t);
+        audit(d, user.id, "Team created: " + t.name, "teams", t.id, null, t);
+      }
     });
-    setNt({ name: "", lead: user.id });
-    toast("Team " + name + " created.", "ok");
-  }
-  function updateTeam(t, k, v) {
-    p.mutate(function (d) {
-      var x = byId(d.teams, t.id); if (!x) return;
-      var before = Object.assign({}, x); x[k] = v;
-      audit(d, user.id, "Team edited: " + x.name, "teams", x.id, before, x);
-    });
+    setEditing(null);
+    toast(f.id ? "Team saved." : "Team " + f.name + " created.", "ok");
   }
   function deleteTeam(t) {
-    var members = db.users.filter(function (u) { return u.teamId === t.id; });
-    if (members.length) { toast("Move or remove the " + members.length + " member" + (members.length === 1 ? "" : "s") + " first.", "error"); return; }
+    var n = db.users.filter(function (u) { return u.teamId === t.id; }).length;
+    if (n) { toast("Move or remove the " + n + " member" + (n === 1 ? "" : "s") + " first.", "error"); return; }
     p.mutate(function (d) { d.teams = d.teams.filter(function (x) { return x.id !== t.id; }); audit(d, user.id, "Team deleted: " + t.name, "teams", t.id, t, null); });
-    toast("Team deleted.", "");
+    setManaging(null); toast("Team deleted.", "");
   }
-  function addMember(t) {
-    var a = adding[t.id] || {};
-    if (!a.userId) { toast("Pick a person to add.", "error"); return; }
-    var mgr = a.managerId || t.leadUserId || user.id;
-    if (mgr === a.userId) { toast("A person cannot be their own manager.", "error"); return; }
+  function placePerson(u, t, mgr) {
+    var m = mgr || t.leadUserId || user.id;
+    if (m === u.id) m = u.managerId || null;
     p.mutate(function (d) {
-      var u = byId(d.users, a.userId); if (!u) return;
-      var before = { teamId: u.teamId, managerId: u.managerId };
-      u.teamId = t.id; u.managerId = mgr;
-      audit(d, user.id, "Added " + u.fullName + " to team " + t.name + ", manager " + userName(d, mgr), "users", u.id, before, { teamId: u.teamId, managerId: u.managerId });
+      var x = byId(d.users, u.id); if (!x) return;
+      var before = { teamId: x.teamId, managerId: x.managerId };
+      x.teamId = t.id; x.managerId = m;
+      audit(d, user.id, "Placed " + x.fullName + " in team " + t.name + (m ? ", manager " + userName(d, m) : ""), "users", x.id, before, { teamId: x.teamId, managerId: x.managerId });
     });
-    var n = Object.assign({}, adding); delete n[t.id]; setAdding(n);
-    toast(userName(db, a.userId) + " added to " + t.name + ".", "ok");
+    toast(u.fullName + " joined " + t.name + (m ? " — direct manager " + userName(db, m) : "") + ".", "ok");
   }
   function setManager(u, mgr) {
     if (mgr === u.id) { toast("A person cannot be their own manager.", "error"); return; }
     p.mutate(function (d) {
       var x = byId(d.users, u.id); if (!x) return;
       var b = x.managerId; x.managerId = mgr || null;
-      audit(d, user.id, "Manager of " + x.fullName + ": " + (b ? userName(d, b) : "none") + " \u2192 " + (mgr ? userName(d, mgr) : "none"), "users", x.id, null, null);
+      audit(d, user.id, "Manager of " + x.fullName + ": " + (b ? userName(d, b) : "none") + " → " + (mgr ? userName(d, mgr) : "none"), "users", x.id, null, null);
     });
   }
   function removeMember(u, t) {
@@ -21684,54 +21907,168 @@ function TeamsPanel(p) {
     });
     toast(u.fullName + " removed from " + t.name + ". Their direct manager is unchanged.", "");
   }
+  function sendRequest(f) {
+    p.mutate(function (d) {
+      d.teamRequests = d.teamRequests || [];
+      var r = {
+        id: uid("tr"), kind: f.kind, userId: f.userId, fromTeamId: f.fromTeamId, toTeamId: f.toTeamId,
+        clientId: f.kind === "loan" ? f.clientId : null, projectId: f.kind === "loan" ? f.projectId : null, taskId: f.kind === "loan" ? (f.taskId || null) : null,
+        start: f.kind === "loan" ? f.start : null, end: f.kind === "loan" ? f.end : null, hours: f.kind === "loan" ? f.hours : null,
+        note: f.note || "", requesterId: user.id, approverId: f.approverId, status: "pending", createdAt: nowISO(), decidedAt: null
+      };
+      d.teamRequests.unshift(r);
+      var person = byId(d.users, f.userId);
+      var ar = {
+        id: uid("ar"), type: f.kind === "loan" ? "Team loan" : "Team transfer", entityTable: "teamRequests", entityId: r.id,
+        requesterId: user.id, assignedTo: f.approverId, status: "pending",
+        reason: (person ? person.fullName : "") + " → " + nameOf(d.teams, f.toTeamId),
+        payloadBefore: null, payloadAfter: null, decidedBy: null, decidedAt: null, decisionNote: "", thread: [], createdAt: nowISO()
+      };
+      d.approvals.unshift(ar);
+      audit(d, user.id, "Approval raised: " + ar.type + " (" + ar.reason + ")", "approval_requests", ar.id, null, null);
+    });
+    setRequesting(null);
+    toast("Request sent to " + userName(db, f.approverId) + ".", "ok");
+  }
 
+  var myRequests = teamRequests(db).filter(function (r) {
+    return r.requesterId === user.id || r.approverId === user.id || mine.some(function (t) { return t.id === r.toTeamId || t.id === r.fromTeamId; });
+  }).slice(0, 12);
+
+  function TeamCard(t) {
+    var members = db.users.filter(function (u) { return u.teamId === t.id; });
+    var loans = activeLoans(db, t.id);
+    var mineT = canManageTeam(user, t);
+    var color = t.color || TEAM_COLORS[0];
+    return h("div", { key: t.id, className: "teamcard", style: { borderTopColor: color } },
+      h("div", { className: "row", style: { gap: 8, alignItems: "flex-start", flexWrap: "nowrap" } },
+        h("span", { className: "teamdot", style: { background: color } }, initialsOf(t.name)),
+        h("div", { className: "grow col", style: { gap: 2, minWidth: 0 } },
+          h("b", { className: "teamname" }, t.name),
+          h("div", { className: "row", style: { gap: 5 } },
+            t.department ? h(Chip, { k: "gr" }, t.department) : h(Chip, { k: "amber" }, "No department"),
+            t.code ? h(Chip, { k: "mut" }, t.code) : null))),
+      h("p", { className: "teamdesc" }, t.description || h("span", { className: "cap" }, "No description yet.")),
+      h("div", { className: "cap" }, "Lead ", h("b", null, t.leadUserId ? userName(db, t.leadUserId) : "—"),
+        t.location ? " · " + t.location : "", t.contact ? " · " + t.contact : ""),
+      (t.clientIds || []).length ? h("div", { className: "row", style: { gap: 4 } }, t.clientIds.map(function (c) { return h(Chip, { key: c, k: "teal" }, nameOf(db.clients, c)); })) : null,
+      h("div", { className: "row", style: { gap: 4, marginTop: "auto" } },
+        members.slice(0, 9).map(function (u) { return h("span", { key: u.id, className: "avatar", style: { width: 26, height: 26, fontSize: 10 }, title: u.fullName + " · " + roleName(u.role) }, initialsOf(u.fullName)); }),
+        members.length > 9 ? h("span", { className: "cap" }, "+", members.length - 9) : null,
+        loans.map(function (r) { return h("span", { key: r.id, className: "avatar temp", style: { width: 26, height: 26, fontSize: 10 }, title: userName(db, r.userId) + " — temporary until " + il(r.end) }, initialsOf(userName(db, r.userId))); }),
+        h("span", { className: "cap", style: { marginLeft: 4 } }, members.length, " member", members.length === 1 ? "" : "s", loans.length ? " + " + loans.length + " temporary" : "")),
+      h("div", { className: "row", style: { gap: 6 } },
+        mineT ? h(Btn, { sm: true, kind: "p", onClick: function () { setManaging(t.id); } }, "Manage") : null,
+        mineT ? h(Btn, { sm: true, onClick: function () { setEditing(t); } }, "Edit details") : null,
+        !mineT && mine.length && members.length ? h(Btn, { sm: true, onClick: function () { setRequesting({ fromTeamId: t.id }); } }, "Request a member") : null));
+  }
+
+  var mt = managing ? byId(db.teams, managing) : null;
   return h("div", { className: "col", style: { gap: 12 } },
-    h("div", { className: "cap" }, all
-      ? "Set up teams, add people to them and choose each member's direct manager. The direct manager receives the person's sick and vacation requests; the team lead is first in line for their other approvals."
-      : "Set up your own teams, add people to them and choose each member's direct manager — usually you. The direct manager receives the person's sick and vacation requests."),
+    h("div", { className: "row", style: { gap: 9 } },
+      h("div", { className: "cap grow", style: { minWidth: 260 } }, all
+        ? "Every team in the company. Open a team to place people and set their direct managers, or ask for someone from another team."
+        : "Your teams and the rest of the company's. Place available people in your teams, or ask another team for someone — for a while or for good."),
+      mine.length ? h(Btn, { onClick: function () { setRequesting({}); } }, "Request a team member") : null,
+      h(Btn, { kind: "p", onClick: function () { setEditing(blankTeam(user)); } }, "+ New team")),
+
+    available.length ? h("div", { className: "panel pad col", style: { gap: 8 } },
+      h("div", { className: "row", style: { gap: 8 } }, h("b", null, "Available people"), h(Chip, { k: "amber" }, available.length),
+        h("span", { className: "cap" }, "No team or no direct manager yet. Placing someone in a team makes its lead their direct manager.")),
+      h("div", { className: "availgrid" }, available.map(function (u) {
+        /* leads place people below them; Operations and the CEO place anyone */
+        var placeable = all || (u.id !== user.id && u.role !== "OPS" && u.role !== "CEO" && (!u.teamId || canManageTeam(user, byId(db.teams, u.teamId))));
+        var choices = placeable ? mine.filter(function (t) { return t.id !== u.teamId || !u.managerId; }) : [];
+        return h("div", { key: u.id, className: "availcard" },
+          h("div", { className: "row", style: { gap: 7, flexWrap: "nowrap" } },
+            h("span", { className: "avatar", style: { width: 28, height: 28, fontSize: 10 } }, initialsOf(u.fullName)),
+            h("div", { className: "col grow", style: { gap: 0, minWidth: 0 } }, h("b", { style: { fontSize: 13 } }, u.fullName), h("span", { className: "cap" }, roleName(u.role), u.jobTitle ? " · " + u.jobTitle : ""))),
+          h("div", { className: "row", style: { gap: 4 } },
+            !u.teamId ? h(Chip, { k: "amber" }, "no team") : h(Chip, { k: "gr" }, nameOf(db.teams, u.teamId)),
+            !u.managerId ? h(Chip, { k: "amber" }, "no manager") : h(Chip, { k: "gr" }, "manager ", userName(db, u.managerId))),
+          choices.length ? h("select", { className: "minisel", value: "", "aria-label": "Place " + u.fullName + " in a team", onChange: function (e) { var t = byId(db.teams, e.target.value); if (t) placePerson(u, t); } },
+            h("option", { value: "" }, "Place in team…"),
+            choices.map(function (t) { return h("option", { key: t.id, value: t.id }, t.name + (t.leadUserId ? " — lead " + userName(db, t.leadUserId) : "")); }))
+            : h("span", { className: "cap" }, "Placed by Operations or the CEO."));
+      }))) : null,
+
+    db.teams.length === 0 ? h("div", { className: "empty panel" }, "No teams yet. Create the first one with + New team.") : null,
+    h("div", { className: "teamgrid" }, db.teams.slice().sort(function (a, b) { return canManageTeam(user, b) - canManageTeam(user, a); }).map(TeamCard)),
+
+    myRequests.length ? h("div", { className: "panel pad col", style: { gap: 6 } },
+      h("b", null, "Team requests"),
+      h("div", { style: { overflowX: "auto" } }, h("table", { className: "tbl" },
+        h("thead", null, h("tr", null, ["Type", "Person", "From → to", "For", "Asked by", "Decided by", "Status"].map(function (c) { return h("th", { key: c }, c); }))),
+        h("tbody", null, myRequests.map(function (r) {
+          return h("tr", { key: r.id },
+            h("td", null, r.kind === "loan" ? "Temporary" : "Transfer"),
+            h("td", null, userName(db, r.userId)),
+            h("td", null, nameOf(db.teams, r.fromTeamId) || "—", " → ", nameOf(db.teams, r.toTeamId) || "—"),
+            h("td", null, r.kind === "loan" ? h("span", null, nameOf(db.projects, r.projectId), r.taskId ? " · " + nameOf(db.tasks, r.taskId, "title") : "", h("div", { className: "cap mono" }, il(r.start), " – ", il(r.end))) : "—"),
+            h("td", null, userName(db, r.requesterId)),
+            h("td", null, userName(db, r.approverId)),
+            h("td", null, h(Chip, { k: r.status === "approved" ? "gr" : r.status === "declined" ? "err" : "amber" }, r.status)));
+        }))))) : null,
+
+    editing ? h(TeamEditor, { db: db, user: user, value: editing.id ? editing : null, onClose: function () { setEditing(null); }, onSave: saveTeam }) : null,
+    requesting ? h(TeamRequestModal, { db: db, user: user, fromTeamId: requesting.fromTeamId, toTeamId: requesting.toTeamId, onClose: function () { setRequesting(null); }, onSend: sendRequest }) : null,
+    mt ? h(Modal, {
+      title: mt.name, size: "lg", onClose: function () { setManaging(null); },
+      footer: [h(Btn, { key: "d", kind: "d", onClick: function () { deleteTeam(mt); } }, "Delete team"), h("div", { key: "g", className: "grow" }),
+               h(Btn, { key: "e", onClick: function () { setEditing(mt); } }, "Edit details"), h(Btn, { key: "c", kind: "p", onClick: function () { setManaging(null); } }, "Done")]
+    }, h(TeamManage, { db: db, user: user, team: mt, managers: managers, available: available, placePerson: placePerson, setManager: setManager, removeMember: removeMember, onRequest: function () { setManaging(null); setRequesting({ toTeamId: mt.id }); } })) : null);
+}
+
+/* the members of one team, with the people who can be added to it */
+function TeamManage(p) {
+  var db = p.db, user = p.user, t = p.team, all = managesAllTeams(user);
+  var as = useState({ userId: "", managerId: "" }), a = as[0], setA = as[1];
+  var members = db.users.filter(function (u) { return u.teamId === t.id; });
+  var loans = activeLoans(db, t.id);
+  /* available people first; leads can also re-place people from their other teams; OPS / CEO anyone */
+  var candidates = db.users.filter(function (u) {
+    if (!u.isActive || u.pendingActivation || u.teamId === t.id || u.role === "VIEW" || u.id === t.leadUserId) return false;
+    if (all) return true;
+    if (u.id === user.id || u.role === "OPS" || u.role === "CEO") return false;
+    return !u.teamId || canManageTeam(user, byId(db.teams, u.teamId));
+  });
+  var mid = { verticalAlign: "middle" };
+  return h("div", { className: "col", style: { gap: 12 } },
+    h("div", { className: "row", style: { gap: 6 } },
+      h(Chip, { k: "gr" }, t.department || "No department"),
+      h("span", { className: "cap" }, "Lead ", h("b", null, t.leadUserId ? userName(db, t.leadUserId) : "—")),
+      h("div", { className: "grow" }),
+      h(Btn, { sm: true, onClick: p.onRequest }, "Request someone from another team")),
+    members.length ? h("div", { style: { overflowX: "auto" } }, h("table", { className: "tbl", style: { tableLayout: "fixed", minWidth: 640 } },
+      h("thead", null, h("tr", null, [["Member", "34%"], ["Role", "20%"], ["Direct manager", "32%"], ["", "14%"]].map(function (c, i) { return h("th", { key: i, style: { width: c[1] } }, c[0]); }))),
+      h("tbody", null, members.map(function (u) {
+        var self = u.id === user.id && !all;
+        return h("tr", { key: u.id },
+          h("td", { style: mid }, h("b", null, u.fullName), h("div", { className: "cap" }, u.jobTitle || u.email)),
+          h("td", { style: mid }, h(Chip, { k: "gr" }, roleName(u.role))),
+          h("td", { style: mid }, self ? h("span", null, u.managerId ? userName(db, u.managerId) : "—", h("span", { className: "cap" }, " · set by your manager"))
+            : h("select", { className: "minisel", value: u.managerId || "", "aria-label": "Direct manager of " + u.fullName, onChange: function (e) { p.setManager(u, e.target.value); } },
+              h("option", { value: "" }, "— none —"),
+              p.managers.filter(function (m) { return m.value !== u.id; }).map(function (m) { return h("option", { key: m.value, value: m.value }, m.label); }))),
+          h("td", { style: { textAlign: "right", verticalAlign: "middle" } }, self ? null : h(Btn, { sm: true, kind: "t", onClick: function () { p.removeMember(u, t); } }, "Remove")));
+      })))) : h("div", { className: "cap" }, "No members yet."),
+    loans.length ? h("div", { className: "col", style: { gap: 4 } },
+      h("b", null, "Temporary members"),
+      loans.map(function (r) {
+        return h("div", { key: r.id, className: "cap" }, h("b", null, userName(db, r.userId)), " from ", nameOf(db.teams, r.fromTeamId), " · ", nameOf(db.projects, r.projectId),
+          r.taskId ? " · " + nameOf(db.tasks, r.taskId, "title") : "", " · until ", il(r.end));
+      })) : null,
     h("div", { className: "band" },
-      h(Inp, { label: "New team name", value: nt.name, placeholder: "e.g. Documentation — North", onChange: function (e) { setNt(Object.assign({}, nt, { name: e.target.value })); } }),
-      all ? h(Sel, { label: "Team lead", value: nt.lead, options: managers, onChange: function (e) { setNt(Object.assign({}, nt, { lead: e.target.value })); } }) : null,
-      h("div", { className: "fld", style: { flex: "0 0 auto" } }, h("label", null, " "), h(Btn, { kind: "p", onClick: createTeam }, "+ Create team"))),
-    teams.length === 0 ? h("div", { className: "empty panel" }, "You don't lead a team yet. Create one above.") : null,
-    teams.map(function (t) {
-      var members = db.users.filter(function (u) { return u.teamId === t.id; });
-      var candidates = db.users.filter(function (u) {
-        if (!u.isActive || u.teamId === t.id || u.role === "VIEW" || u.id === t.leadUserId) return false;
-        if (all) return true;
-        /* a lead builds their team from people below them who are not in someone else's team */
-        if (u.id === user.id || u.role === "OPS" || u.role === "CEO") return false;
-        return !u.teamId || mine.indexOf(u.teamId) >= 0;
-      });
-      var a = adding[t.id] || {};
-      return h("div", { key: t.id, className: "panel pad col", style: { gap: 10 } },
-        h("div", { className: "band" },
-          h(Inp, { label: "Team name", value: t.name, onChange: function (e) { updateTeam(t, "name", e.target.value); } }),
-          all ? h(Sel, { label: "Team lead", value: t.leadUserId || "", placeholder: "— none —", options: managers, onChange: function (e) { updateTeam(t, "leadUserId", e.target.value || null); } })
-              : h(Field, { label: "Team lead" }, h("input", { readOnly: true, tabIndex: -1, value: userName(db, t.leadUserId), style: { backgroundColor: "var(--wash)" } })),
-          h(Field, { label: "Members", cls: "narrow" }, h("input", { readOnly: true, tabIndex: -1, value: String(members.length), style: { backgroundColor: "var(--wash)" } })),
-          h("div", { className: "fld", style: { flex: "0 0 auto" } }, h("label", null, " "), h(Btn, { kind: "d", onClick: function () { deleteTeam(t); } }, "Delete team"))),
-        members.length ? h("div", { style: { overflowX: "auto" } }, h("table", { className: "tbl", style: { tableLayout: "fixed", minWidth: 640 } },
-          h("thead", null, h("tr", null, [["Member", "34%"], ["Role", "20%"], ["Direct manager", "32%"], ["", "14%"]].map(function (c, i) { return h("th", { key: i, style: { width: c[1] } }, c[0]); }))),
-          h("tbody", null, members.map(function (u) {
-            /* nobody sets their own manager or removes themselves — that is for the person above them */
-            var self = u.id === user.id && !all, mid = { verticalAlign: "middle" };
-            return h("tr", { key: u.id },
-              h("td", { style: mid }, h("b", null, u.fullName), h("div", { className: "cap" }, u.jobTitle || u.email)),
-              h("td", { style: mid }, h(Chip, { k: "gr" }, roleName(u.role))),
-              h("td", { style: mid }, self ? h("span", null, u.managerId ? userName(db, u.managerId) : "—", h("span", { className: "cap" }, " · set by your manager"))
-                : h("select", { className: "minisel", value: u.managerId || "", "aria-label": "Direct manager of " + u.fullName, onChange: function (e) { setManager(u, e.target.value); } },
-                h("option", { value: "" }, "— none —"),
-                managers.filter(function (m) { return m.value !== u.id; }).map(function (m) { return h("option", { key: m.value, value: m.value }, m.label); }))),
-              h("td", { style: { textAlign: "right", verticalAlign: "middle" } }, self ? null : h(Btn, { sm: true, kind: "t", onClick: function () { removeMember(u, t); } }, "Remove")));
-          })))) : h("div", { className: "cap" }, "No members yet."),
-        h("div", { className: "band" },
-          h(Sel, { label: "Add a person", value: a.userId || "", placeholder: candidates.length ? "Select…" : "— nobody available —", options: candidates.map(function (u) { return { value: u.id, label: u.fullName + (u.teamId ? " (in " + nameOf(db.teams, u.teamId) + ")" : "") }; }),
-            onChange: function (e) { var n = Object.assign({}, adding); n[t.id] = Object.assign({}, a, { userId: e.target.value }); setAdding(n); } }),
-          h(Sel, { label: "Their direct manager", value: a.managerId || t.leadUserId || user.id, options: managers.filter(function (m) { return m.value !== a.userId; }),
-            onChange: function (e) { var n = Object.assign({}, adding); n[t.id] = Object.assign({}, a, { managerId: e.target.value }); setAdding(n); } }),
-          h("div", { className: "fld", style: { flex: "0 0 auto" } }, h("label", null, " "), h(Btn, { kind: "p", onClick: function () { addMember(t); } }, "+ Add to team"))));
-    }));
+      h(Sel, { label: "Add a person", value: a.userId, placeholder: candidates.length ? "Select…" : "— nobody available —",
+        options: candidates.map(function (u) { return { value: u.id, label: u.fullName + (u.teamId ? " (in " + nameOf(db.teams, u.teamId) + ")" : " (no team)") + (u.managerId ? "" : " — no manager") }; }),
+        onChange: function (e) { setA(Object.assign({}, a, { userId: e.target.value })); } }),
+      h(Sel, { label: "Their direct manager", value: a.managerId || t.leadUserId || user.id, options: p.managers.filter(function (m) { return m.value !== a.userId; }),
+        onChange: function (e) { setA(Object.assign({}, a, { managerId: e.target.value })); } }),
+      h("div", { className: "fld", style: { flex: "0 0 auto" } }, h("label", null, " "), h(Btn, { kind: "p", onClick: function () {
+        var u = byId(db.users, a.userId); if (!u) { toast("Pick a person to add.", "error"); return; }
+        p.placePerson(u, t, a.managerId || t.leadUserId || user.id); setA({ userId: "", managerId: "" });
+      } }, "+ Add to team"))),
+    all ? null : h("div", { className: "cap" }, "People in a team you don't lead can't be added here — use Request someone from another team."));
 }
 
 /* Renders one Management section. Used by the Management tab. */
@@ -21832,7 +22169,8 @@ function MgmtPanel(p) {
           var pct = unlimited ? 0 : (used / (Number(a.allowanceHours) || 1)) * 100;
           return h("tr", { key: a.id },
             h("td", { style: { whiteSpace: "nowrap" } }, userName(db, a.userId)),
-            h("td", { style: { whiteSpace: "nowrap" } }, nameOf(db.projects, a.projectId)),
+            h("td", { style: { whiteSpace: "nowrap" } }, nameOf(db.projects, a.projectId),
+              a.until ? h("div", { className: "cap" }, "team loan \u00b7 ", il(a.from), " \u2013 ", il(a.until)) : null),
             h("td", null, h(CopyCell, { value: a.workOrderId ? nameOf(db.workOrders, a.workOrderId, "code") : "" })),
             h("td", { className: "num" }, h("input", {
               type: "number", defaultValue: unlimited ? "" : a.allowanceHours, placeholder: "∞", className: "miniinp", style: { width: 78 },
@@ -22663,7 +23001,7 @@ function MobileApp(p) {
       h(Mark, { style: { width: 26, height: 22 } }),
       h("div", { className: "grow", style: { lineHeight: 1.1 } },
         h("b", { style: { letterSpacing: ".14em", fontSize: 13 } }, "GALIL"),
-        h("div", { style: { fontSize: 10, color: "var(--chromesoft)" } }, "WorkDesk · V7.1")),
+        h("div", { style: { fontSize: 10, color: "var(--chromesoft)" } }, "WorkDesk · V7.2")),
       h("button", {
         className: "iconbtn", onClick: function () { p.setTheme(p.theme === "dark" ? "light" : "dark"); },
         "aria-label": p.theme === "dark" ? "Switch to the light theme" : "Switch to the dark theme"
@@ -22949,7 +23287,7 @@ function App() {
     h("div", { className: "topbar" },
       h("div", { className: "brand" },
         h(Mark, null),
-        h("div", null, "GALIL", h("small", null, "WorkDesk · V7.1")),
+        h("div", null, "GALIL", h("small", null, "WorkDesk · V7.2")),
         h(Chip, { k: "gr", style: { background: "rgba(255,255,255,.1)", color: "#C9DDB4", borderColor: "rgba(255,255,255,.2)" } }, "Standalone")),
       isOnline ? null : h(Chip, { k: "amber" }, "Offline — changes cached locally"),
       h("div", { className: "spacer" }),

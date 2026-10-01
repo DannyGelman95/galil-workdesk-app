@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GALIL WorkDesk Handbook</title>
-<meta name="description" content="Every function in GALIL WorkDesk V7.1 — what it does, how to do it, and which roles are allowed to.">
+<meta name="description" content="Every function in GALIL WorkDesk V7.2 — what it does, how to do it, and which roles are allowed to.">
 <script>
 /* set the theme before the first paint, to avoid a light/dark flash */
 (function(){try{var v=localStorage.getItem("galil-handbook-theme");
@@ -312,11 +312,11 @@ table code{background:transparent; padding:0}
         <div><b>GALIL</b><small>Technical Writing · Training · Implementation</small></div>
       </div>
       <h1 style="margin-top:22px">WorkDesk Handbook</h1>
-      <p class="standfirst">Every function in GALIL WorkDesk V7.1 — what it does, how to do it, and which roles are allowed to. Pick your role in the bar below and the handbook marks what applies to you.</p>
+      <p class="standfirst">Every function in GALIL WorkDesk V7.2 — what it does, how to do it, and which roles are allowed to. Pick your role in the bar below and the handbook marks what applies to you.</p>
     </div>
     <div class="stamp">
       <span>Application <b>GALIL WorkDesk</b></span>
-      <span>Build <b>V7.1 · standalone</b></span>
+      <span>Build <b>V7.2 · standalone</b></span>
       <span>Handbook revised <b>13/09/2026</b></span>
       <span>Interface language <b>English (Hebrew in V8)</b></span>
     </div>
@@ -344,11 +344,11 @@ table code{background:transparent; padding:0}
     <div class="ch-head"><span class="ch-num">01</span><h2>What WorkDesk is</h2></div>
     <p class="lede">WorkDesk is GALIL's internal desk for reported time, planned weeks, tasks, expenses, budgets and approvals. One person's day goes in at the top; the company's utilisation, budget burn and payroll record come out at the bottom.</p>
 
-    <p>Open it in a browser — it is a single page, and V7.1 runs standalone with no server behind it. Everything you enter is stored in your own browser under the key <code>galil-workdesk-v1</code>, and your signed-in session under <code>galil-workdesk-session</code>.</p>
+    <p>Open it in a browser — it is a single page, and V7.2 runs standalone with no server behind it. Everything you enter is stored in your own browser under the key <code>galil-workdesk-v1</code>, and your signed-in session under <code>galil-workdesk-session</code>.</p>
 
     <div class="note warn">
       <span class="tag">Before you rely on it</span>
-      <p>In the standalone build, clearing your browser data deletes the company's records. Whoever administers WorkDesk should download a backup regularly — see <a href="#ch-data">chapter 15</a>. Microsoft sign-in and the shared database are simulated locally in V7.1; the rules, routing and messages are the real ones.</p>
+      <p>In the standalone build, clearing your browser data deletes the company's records. Whoever administers WorkDesk should download a backup regularly — see <a href="#ch-data">chapter 16</a>. Microsoft sign-in and the shared database are simulated locally in V7.1; the rules, routing and messages are the real ones.</p>
     </div>
 
     <h3>The three hour colours</h3>
@@ -374,7 +374,7 @@ table code{background:transparent; padding:0}
         <tr><td><strong>Assignment</strong></td><td>The link between a person and a project or work order. It carries that person's <em>allowance</em> in hours. No assignment means Yellow and Blue time goes to approval.</td></tr>
         <tr><td><strong>Allowance</strong></td><td>Hours one person may report on one assignment. Blank means unlimited within the project budget; <code>0</code> means assigned but not yet funded.</td></tr>
         <tr><td><strong>Budget</strong></td><td>Hours (or money, pages, words, custom units) agreed for a project or work order, across everyone.</td></tr>
-        <tr><td><strong>Entitlement engine</strong></td><td>The checks that decide, the moment you save, whether an entry registers or goes to approval. See <a href="#ch-time">chapter 5</a>.</td></tr>
+        <tr><td><strong>Entitlement engine</strong></td><td>The checks that decide, the moment you save, whether an entry registers or goes to approval. See <a href="#ch-time">chapter 6</a>.</td></tr>
       </tbody>
     </table></div>
 
@@ -383,13 +383,167 @@ table code{background:transparent; padding:0}
   </section>
 
   <!-- ============ 2 ============ -->
+  <section class="ch" id="ch-model" data-title="How WorkDesk fits together">
+    <div class="ch-head"><span class="ch-num">02</span><h2>How WorkDesk fits together</h2></div>
+    <p class="lede">Every screen in WorkDesk works on the same small set of records. Once you know what they are and how they point at each other, every rule in the rest of this handbook — why an entry went to approval, where a budget's hours went, who a request is sent to — follows on its own.</p>
+
+    <h3>The records</h3>
+    <dl class="kv">
+      <dt>Client</dt>
+      <dd>A company GALIL works for, or <em>GALIL (internal)</em> for in-house work. Everything billable starts with a client.</dd>
+      <dt>Project</dt>
+      <dd>A piece of work for one client — a manual, a help system, a training package. A project has an <strong>owner</strong> (usually a Project Manager) and a status.</dd>
+      <dt>Work order</dt>
+      <dd>A contract line inside a project — the client's purchase order for one part of it, with its own code such as <code>WO-IAI-004182</code>. A project can have none, one or many.</dd>
+      <dt>Budget</dt>
+      <dd>The hours the client is paying for, attached to a <strong>work order</strong>, a <strong>project</strong>, or a whole <strong>client</strong>. Money budgets are turned into hours (amount ÷ hourly rate); Pages, Words and Custom budgets also count deliverables.</dd>
+      <dt>Assignment</dt>
+      <dd>The link between one <strong>person</strong> and a <strong>project</strong> or one of its <strong>work orders</strong>, carrying that person's <strong>allowance</strong> — the hours they may report there before their entries need approval.</dd>
+      <dt>Task</dt>
+      <dd>A unit of work inside a project — and, on a work-order-tracked project, inside one work order. A task has assignees, a status, a due date, dependencies and an optional hour allowance.</dd>
+      <dt>Time entry</dt>
+      <dd>Hours one person reports for one day: Red, Yellow or Blue, against a client, project, work order and optionally a task. Sick and Vacation days are entries too.</dd>
+      <dt>Approval request</dt>
+      <dd>Anything that needs someone else's decision: a time entry that failed a check, leave, an expense, an allowance increase, a team loan or transfer, a new account.</dd>
+      <dt>Team and direct manager</dt>
+      <dd>Each person can belong to a <strong>team</strong>, which has a <strong>team lead</strong>, and has a <strong>direct manager</strong>. Between them they decide who receives the person's requests.</dd>
+    </dl>
+
+    <figure>
+      <svg viewBox="0 0 920 470" role="img" aria-labelledby="mdl-t" style="width:100%;height:auto;display:block;background:var(--surface);border:1px solid var(--line);border-radius:10px">
+        <title id="mdl-t">How WorkDesk's records relate: clients contain projects, projects contain work orders, budgets sit on a work order, project or client; assignments link people to projects or work orders; tasks belong to projects or work orders; a time entry draws on an assignment's allowance and on the most specific budget, and goes to approval when a check fails.</title>
+        <defs>
+          <marker id="mdl-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker>
+        </defs>
+        <g font-family="var(--sans)" font-size="13" fill="var(--ink)">
+          <g stroke="var(--line)" stroke-width="1.5" fill="var(--wash)">
+            <rect x="20" y="24" width="150" height="54" rx="9"/><rect x="250" y="24" width="150" height="54" rx="9"/>
+            <rect x="480" y="24" width="150" height="54" rx="9"/><rect x="730" y="24" width="170" height="54" rx="9"/>
+            <rect x="20" y="200" width="150" height="54" rx="9"/><rect x="250" y="200" width="150" height="54" rx="9"/>
+            <rect x="480" y="200" width="150" height="54" rx="9"/>
+            <rect x="20" y="380" width="150" height="54" rx="9"/><rect x="250" y="380" width="380" height="54" rx="9" fill="var(--surface)" stroke="var(--accent)"/>
+            <rect x="730" y="380" width="170" height="54" rx="9"/>
+          </g>
+          <g font-weight="600" text-anchor="middle">
+            <text x="95" y="56">Client</text><text x="325" y="56">Project</text><text x="555" y="56">Work order</text>
+            <text x="815" y="49">Budget</text>
+            <text x="95" y="232">Person</text><text x="325" y="224">Assignment</text><text x="555" y="232">Task</text>
+            <text x="95" y="404">Team</text><text x="440" y="404">Time entry</text><text x="815" y="412">Approval request</text>
+          </g>
+          <g fill="var(--muted)" font-size="11.5" text-anchor="middle">
+            <text x="815" y="66">on a WO, project or client</text>
+            <text x="325" y="242">allowance in hours</text>
+            <text x="95" y="420">lead · direct manager</text>
+            <text x="440" y="422">Red · Yellow · Blue · Sick · Vacation</text>
+          </g>
+          <g stroke="var(--accent)" stroke-width="1.6" fill="none" marker-end="url(#mdl-a)">
+            <path d="M170 51H246"/><path d="M400 51H476"/>
+            <path d="M630 51H726"/><path d="M400 40C560 0 650 0 726 36"/>
+            <path d="M170 227H246"/><path d="M325 196V82"/><path d="M380 196L520 82"/>
+            <path d="M555 196V82"/><path d="M170 214C300 160 420 170 478 214"/>
+            <path d="M95 258V376"/>
+            <path d="M120 258L300 376"/>
+            <path d="M330 376V258"/><path d="M520 376L548 258"/>
+            <path d="M600 380C700 300 790 200 812 82"/>
+            <path d="M630 407H726"/>
+          </g>
+          <g fill="var(--muted)" font-size="11">
+            <text x="182" y="45">has</text><text x="412" y="45">has</text><text x="646" y="45">funded by</text>
+            <text x="178" y="221">to</text><text x="222" y="170">assignee</text>
+            <text x="104" y="320">member of</text><text x="196" y="330">reports</text>
+            <text x="338" y="320">draws on</text><text x="540" y="320">optional</text>
+            <text x="690" y="270">draws on</text><text x="640" y="400">if a check fails</text>
+          </g>
+        </g>
+      </svg>
+      <figcaption><span class="fno">Fig 2.1</span><span>The records and how they point at each other. A time entry is where they all meet: it names a client, project, work order and task, draws on the reporter's assignment and on a budget, and becomes an approval request when a check fails.</span></figcaption>
+    </figure>
+
+    <h3>Setting up a piece of client work, in order</h3>
+    <ol class="steps">
+      <li><strong>Client</strong> — Management → Clients. Usually already there.</li>
+      <li><strong>Project</strong> — Management → Projects. Give it an owner; that Project Manager sees its budgets and decides its <em>Budget exceeded</em> requests.</li>
+      <li><strong>Work orders</strong> (if the client issues them) — Management → Work Orders. The first work order on a project marks it <strong>WO tracked</strong>: from then on every Yellow or Blue entry and every task on it must name a work order. Entering budgeted hours when you create the work order also creates its budget.</li>
+      <li><strong>Budget</strong> — Management → Budgets, on the work order (most common), on the project, or on the client.</li>
+      <li><strong>Assignments</strong> — Management → Assignments &amp; Allowances. Assign each person to the project or to a specific work order, with an allowance: a number of hours, <code>0</code> (assigned but not yet funded) or blank (unlimited within the budget).</li>
+      <li><strong>Tasks</strong> — Tasks → + New task. Bind each task to the project and, on a WO-tracked project, to a work order; add assignees and an hour allowance.</li>
+      <li>People report time against it. Everything else — consumption, warnings, approvals, the Dashboard — follows from those entries.</li>
+    </ol>
+
+    <h3>How work orders work</h3>
+    <ul>
+      <li>A work order always belongs to <strong>one project</strong>, and through it to one client. Its code is proposed from the client's initials.</li>
+      <li>Creating the first work order on a project switches the project to <strong>WO tracked</strong>. On a tracked project, the Time Log form refuses Yellow or Blue time without a work order, and the task editor refuses a task without one.</li>
+      <li>A work order normally carries its own <strong>budget</strong>. Hours reported against the work order are deducted from that budget only — not from a sibling work order's.</li>
+      <li>An <strong>assignment</strong> can name a work order or just the project. A work-order assignment is checked first; if there is none, a project-level assignment covers every work order in the project.</li>
+      <li>Click a work-order code anywhere in a table to copy it.</li>
+    </ul>
+
+    <h3>How tasks work with assignments</h3>
+    <p>Tasks and assignments are two different things, and you usually need both:</p>
+    <div class="tw"><table>
+      <thead><tr><th style="width:170px"></th><th>Assignment</th><th>Task assignee</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Answers</strong></td><td>May this person book hours on this project or work order, and how many?</td><td>Is this person working on this piece of work?</td></tr>
+        <tr><td><strong>Set in</strong></td><td>Management → Assignments &amp; Allowances</td><td>The task editor's <strong>Assignees</strong></td></tr>
+        <tr><td><strong>Controls</strong></td><td>Whether entries register or go to approval (<em>Not assigned</em>, <em>Allowance exceeded</em>)</td><td>Which tasks a person can pick in the Time Log, and <em>Task not assigned</em></td></tr>
+        <tr><td><strong>Hours</strong></td><td>Allowance — enforced by the entitlement engine</td><td>Task hour allowance — tracked on the task card, not enforced</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Binding a task to a project:</strong> open Tasks → <strong>+ New task</strong> (or edit an existing one), choose the <strong>Project</strong>, then the <strong>Work order</strong> if the project is WO tracked. The task now appears in that project's board, in Project view, and in the Time Log's Task dropdown for its assignees whenever they choose that project and work order.</p>
+    <p>When someone reports time with a task selected:</p>
+    <ul>
+      <li>They still need an <strong>assignment</strong> on the project or work order — a task on its own does not let anyone book hours. Without one the entry goes to approval as <em>Not assigned</em>; approving it creates the missing assignment.</li>
+      <li>If they are not one of the task's assignees, the entry goes to approval as <em>Task not assigned</em>. If the task is Done or Cancelled, as <em>Task closed</em>.</li>
+      <li>The hours count toward the task's progress bar (Red, Yellow and Blue alike) and toward the person's assignment allowance and the budget (Yellow and Blue only), exactly as an entry without a task would.</li>
+    </ul>
+    <p>A team loan (see <a href="#h-teams">Teams</a>) does both at once: on approval it creates the assignment — limited to the loan's dates — and adds the person to the task.</p>
+
+    <h3>How hours are deducted from a budget</h3>
+    <p>Only <strong>registered</strong> entries are ever deducted. An entry in approval is shown separately — amber, <em>In approval</em> — and is deducted only if and when it is approved.</p>
+    <ol class="steps">
+      <li><strong>Which hours count.</strong> Yellow · Client and Blue · Management hours. Red · Company hours, Sick and Vacation days are never deducted from a budget or an allowance.</li>
+      <li><strong>Which budget.</strong> The most specific one: the entry's <strong>work-order budget</strong> if the work order has one, otherwise the <strong>project budget</strong>. A project budget counts every Yellow and Blue hour on the project, including hours booked to its work orders.</li>
+      <li><strong>Which allowance.</strong> The person's assignment on that work order, otherwise their project-level assignment on that project. Both the allowance and the budget are reduced by the same hours.</li>
+      <li><strong>The checks.</strong> Before registering, WorkDesk adds the new hours to what is already consumed. Past the allowance → <em>Allowance exceeded</em>, to the team lead. Past the budget → <em>Budget exceeded</em>, to the Project Manager who owns the budget.</li>
+      <li><strong>What the budget card shows.</strong> Budgeted, Consumed, In approval, Remaining, % used (amber at 90 %, red at 100 %) and a projected exhaustion date from the last 30 days' burn. Money budgets also show the value consumed (consumed hours × rate); Pages, Words and Custom budgets show deliverables produced against the target.</li>
+    </ol>
+    <div class="note">
+      <span class="tag">Worked example</span>
+      <p>Work order <code>WO-IAI-004182</code> has a Money budget of ₪180,000 at ₪300/h — <strong>600 budgeted hours</strong>. Yossi is assigned to it with an allowance of <strong>40 h</strong> and has 38 h registered. He reports a 4-hour Yellow entry: 38 + 4 = 42 &gt; 40, so the entry is saved as <em>Pending — Allowance exceeded</em> and routed to his team lead. Nothing is deducted yet; the budget card shows 4 h <em>In approval</em>. When the team lead approves — optionally raising the allowance by the 2-hour overage — the entry registers, the budget's Consumed rises by 4 h and its Value consumed by ₪1,200.</p>
+    </div>
+
+    <h3>Who receives what</h3>
+    <div class="tw"><table>
+      <thead><tr><th style="width:230px">Request</th><th>Goes to</th></tr></thead>
+      <tbody>
+        <tr><td>Time entry — most reasons</td><td>The person's team lead → their direct manager → a Project Manager → Operations → the CEO</td></tr>
+        <tr><td>Time entry — <em>Budget exceeded</em></td><td>A Project Manager → Operations → the CEO</td></tr>
+        <tr><td>Sick or vacation leave</td><td>The person's <strong>direct manager</strong> first, then the chain above. The CEO's own entries register directly.</td></tr>
+        <tr><td>Team loan or transfer</td><td>Whoever the requester picks: the person's team lead, their direct manager, or the CEO</td></tr>
+        <tr><td>Expense above its type's ceiling</td><td>The same chain as a time entry — team lead first</td></tr>
+      </tbody>
+    </table></div>
+    <p>Nobody ever decides their own request, and Operations Managers and the CEO can act on any request. Team leads and direct managers are set in Management → <a href="#h-teams">Teams</a>.</p>
+
+    <h3>Everything else, in one line each</h3>
+    <ul>
+      <li><strong>Week Planner</strong> — planned hours per day against the same clients, projects and work orders; compared with registered actuals as Planned, Actual and Variance. Plans never consume a budget.</li>
+      <li><strong>Expenses</strong> — money or hours claimed against a client, project and work order, with evidence. A claim within its expense type's ceiling is approved on saving; above the ceiling it goes to approval. Approvers then mark it Paid or Rejected. Expenses do not reduce an hour budget.</li>
+      <li><strong>Dashboard</strong> — registered entries only, filtered by period, people, client, project, work order and task.</li>
+      <li><strong>Library</strong> — shared notes, tagged and optionally linked to clients and projects.</li>
+      <li><strong>Audit log</strong> — every change above, with who made it and when.</li>
+    </ul>
+  </section>
+
+  <!-- ============ 3 ============ -->
   <section class="ch" id="ch-signin" data-title="Signing in and signing up">
-    <div class="ch-head"><span class="ch-num">02</span><h2>Signing in and signing up</h2></div>
+    <div class="ch-head"><span class="ch-num">03</span><h2>Signing in and signing up</h2></div>
     <p class="lede">Only <code>@galiltc.co.il</code> addresses may sign in. External contractors do not sign themselves up — an administrator provisions them.</p>
 
     <figure>
       <img src="img/01-signin.png" alt="The WorkDesk sign-in card, with a Microsoft button above an email and password form.">
-      <figcaption><span class="fno">Fig 2.1</span><span>The sign-in screen. <b>Sign in with Microsoft</b> is the normal route; the email-and-password form below it is the fallback. The demo accounts at the foot of the card all use the password <code>GalilWorkdesk1</code>.</span></figcaption>
+      <figcaption><span class="fno">Fig 3.1</span><span>The sign-in screen. <b>Sign in with Microsoft</b> is the normal route; the email-and-password form below it is the fallback. The demo accounts at the foot of the card all use the password <code>GalilWorkdesk1</code>.</span></figcaption>
     </figure>
 
     <h3>Sign in with Microsoft</h3>
@@ -401,7 +555,7 @@ table code{background:transparent; padding:0}
     <p>In the standalone build the account chooser lists the seeded demo accounts so you can try any role — see the <a href="#ch-ref">reference chapter</a>.</p>
     <figure class="fig-narrow">
       <img src="img/02-signin-microsoft.png" alt="The simulated Microsoft Entra ID account chooser listing staff accounts.">
-      <figcaption><span class="fno">Fig 2.2</span><span>The Entra ID account chooser. In the standalone build it stands in for a real Microsoft prompt.</span></figcaption>
+      <figcaption><span class="fno">Fig 3.2</span><span>The Entra ID account chooser. In the standalone build it stands in for a real Microsoft prompt.</span></figcaption>
     </figure>
 
     <h3>Sign in with email and password</h3>
@@ -418,7 +572,7 @@ table code{background:transparent; padding:0}
     <p>Click <strong>Forgot password</strong>, enter your company address, and a single-use reset link valid for <strong>30 minutes</strong> is sent (simulated in the standalone build).</p>
     <figure class="fig-narrow">
       <img src="img/03-forgot-password.png" alt="The password reset panel explaining the 30-minute single-use link.">
-      <figcaption><span class="fno">Fig 2.3</span><span>Password reset. The panel returns to sign-in once the link is sent.</span></figcaption>
+      <figcaption><span class="fno">Fig 3.3</span><span>Password reset. The panel returns to sign-in once the link is sent.</span></figcaption>
     </figure>
 
     <h3>Creating an account — the four-step wizard</h3>
@@ -429,41 +583,41 @@ table code{background:transparent; padding:0}
     <p>A password must be at least <strong>12 characters</strong> and contain an upper-case letter, a lower-case letter and a digit.</p>
     <figure>
       <img src="img/04-signup-step1.png" alt="Step 1 of the sign-up wizard with name, email, password and mobile fields.">
-      <figcaption><span class="fno">Fig 2.4</span><span>Step 1 of the wizard — identity and credentials.</span></figcaption>
+      <figcaption><span class="fno">Fig 3.4</span><span>Step 1 of the wizard — identity and credentials.</span></figcaption>
     </figure>
 
     <h4>Step 2 · Role</h4>
     <p>Employee is the default. You may self-select <strong>Employee</strong>, <strong>Senior Employee</strong> or <strong>Team Lead</strong>. Every role above Team Lead is marked <em>needs approval</em> — requesting one creates an extra administrator task on top of the normal activation request.</p>
     <figure>
       <img src="img/05-signup-step2-roles.png" alt="Step 2 of the sign-up wizard showing role cards to choose from.">
-      <figcaption><span class="fno">Fig 2.5</span><span>Step 2 — choosing a role. The full set of role descriptions is repeated in <a href="#ch-roles">chapter 3</a>.</span></figcaption>
+      <figcaption><span class="fno">Fig 3.5</span><span>Step 2 — choosing a role. The full set of role descriptions is repeated in <a href="#ch-roles">chapter 4</a>.</span></figcaption>
     </figure>
 
     <h4>Step 3 · Profile</h4>
     <p>Job title and department are required. Team, direct manager, start date, contracted weekly and daily hours, employment type and a profile photo are optional but worth filling in — contracted hours drive the capacity warning in the Week Planner.</p>
     <figure>
       <img src="img/06-signup-step3-profile.png" alt="Step 3 of the sign-up wizard with job title, department, team, manager and hours fields.">
-      <figcaption><span class="fno">Fig 2.6</span><span>Step 3 — profile and reporting line.</span></figcaption>
+      <figcaption><span class="fno">Fig 3.6</span><span>Step 3 — profile and reporting line.</span></figcaption>
     </figure>
 
     <h4>Step 4 · Confirm</h4>
     <p>Check the summary, accept the internal usage policy, and click <strong>Submit for activation</strong>.</p>
     <figure>
       <img src="img/07-signup-step4-confirm.png" alt="Step 4 summary panel and the usage-policy acceptance checkbox.">
-      <figcaption><span class="fno">Fig 2.7</span><span>Step 4 — the final review before submitting for activation.</span></figcaption>
+      <figcaption><span class="fno">Fig 3.7</span><span>Step 4 — the final review before submitting for activation.</span></figcaption>
     </figure>
 
     <h3>Waiting for activation</h3>
-    <p>The account exists immediately but is held. Until an Operations Manager or the CEO activates it, signing in shows the holding screen and nothing else — see <a href="#ch-admin">chapter 14</a>.</p>
+    <p>The account exists immediately but is held. Until an Operations Manager or the CEO activates it, signing in shows the holding screen and nothing else — see <a href="#ch-admin">chapter 15</a>.</p>
 
     <h3>Sessions and signing out</h3>
     <p>A session lasts <strong>12 hours of inactivity</strong>. Concurrent sessions on several devices are permitted and can be revoked. Open your profile from the top-right corner to see your sessions and to sign out.</p>
     <p>Every sign-in and sign-out is written to the audit log with actor, timestamp and device.</p>
   </section>
 
-  <!-- ============ 3 ============ -->
+  <!-- ============ 4 ============ -->
   <section class="ch" id="ch-roles" data-title="Roles and permissions">
-    <div class="ch-head"><span class="ch-num">03</span><h2>Roles and permissions</h2></div>
+    <div class="ch-head"><span class="ch-num">04</span><h2>Roles and permissions</h2></div>
     <p class="lede">Nine roles. What you see, what you may change, and whose records you may touch all follow from yours — including which tabs appear at all.</p>
 
     <h3>The nine roles</h3>
@@ -498,7 +652,7 @@ table code{background:transparent; padding:0}
     <div class="tw"><table class="matrix" id="matrix"></table></div>
     <figure>
       <img src="img/58-admin-roles.png" alt="The Roles and permissions section inside the System administration modal, showing the permission matrix.">
-      <figcaption><span class="fno">Fig 3.1</span><span>The same matrix inside the application, under <strong>⚙ → Roles &amp; permissions</strong>.</span></figcaption>
+      <figcaption><span class="fno">Fig 4.1</span><span>The same matrix inside the application, under <strong>⚙ → Roles &amp; permissions</strong>.</span></figcaption>
     </figure>
 
     <h3>Which tabs each role sees</h3>
@@ -518,11 +672,11 @@ table code{background:transparent; padding:0}
     <div class="fig-pair">
       <figure>
         <img src="img/91-ext-tabs.png" alt="The tab bar as an external contractor sees it: four tabs only.">
-        <figcaption><span class="fno">Fig 3.2</span><span>External Contractor — four tabs, no Dashboard.</span></figcaption>
+        <figcaption><span class="fno">Fig 4.2</span><span>External Contractor — four tabs, no Dashboard.</span></figcaption>
       </figure>
       <figure>
         <img src="img/96-view-tabs.png" alt="The tab bar as a viewer sees it: Time Log and Dashboard only.">
-        <figcaption><span class="fno">Fig 3.3</span><span>Viewer — read-only Time Log and Dashboard.</span></figcaption>
+        <figcaption><span class="fno">Fig 4.3</span><span>Viewer — read-only Time Log and Dashboard.</span></figcaption>
       </figure>
     </div>
 
@@ -535,23 +689,23 @@ table code{background:transparent; padding:0}
     </ul>
   </section>
 
-  <!-- ============ 4 ============ -->
+  <!-- ============ 5 ============ -->
   <section class="ch" id="ch-screen" data-title="Finding your way around">
-    <div class="ch-head"><span class="ch-num">04</span><h2>Finding your way around</h2></div>
+    <div class="ch-head"><span class="ch-num">05</span><h2>Finding your way around</h2></div>
     <p class="lede">One dark top bar, one row of tabs, and a few icon buttons that open everything that is not a tab.</p>
 
     <figure>
       <img src="img/50-ops-timelog.png" alt="The full WorkDesk window: dark top bar with brand, icon buttons and user chip; tab row; Time Log page beneath.">
-      <figcaption><span class="fno">Fig 4.1</span><span>The shell, seen by an Operations Manager — every tab and both icon buttons are shown.</span></figcaption>
+      <figcaption><span class="fno">Fig 5.1</span><span>The shell, seen by an Operations Manager — every tab and both icon buttons are shown.</span></figcaption>
     </figure>
 
     <div class="tw"><table>
       <thead><tr><th style="width:150px">Element</th><th>What it does</th></tr></thead>
       <tbody>
-        <tr><td><strong>GALIL · WorkDesk V7.1</strong></td><td>Brand and build. The <code>Standalone</code> chip is a reminder that there is no server behind this build.</td></tr>
+        <tr><td><strong>GALIL · WorkDesk V7.2</strong></td><td>Brand and build. The <code>Standalone</code> chip is a reminder that there is no server behind this build.</td></tr>
         <tr><td><strong>Offline chip</strong></td><td>Appears when the browser goes offline. Changes are still written locally.</td></tr>
-        <tr><td><strong>◱ icon</strong></td><td><em>My assignments and allowances</em> — your funded work and the button that requests more hours. See <a href="#ch-mywork">chapter 13</a>.</td></tr>
-        <tr><td><strong>⚙ icon</strong></td><td><em>System administration</em> — Roles &amp; permissions, Company settings, Backup &amp; restore and the Audit log. Shown to anyone who can back up data or read the audit log. Day-to-day record-keeping lives on the <a href="#ch-budgets">Management</a> tab instead — see chapter 9.</td></tr>
+        <tr><td><strong>◱ icon</strong></td><td><em>My assignments and allowances</em> — your funded work and the button that requests more hours. See <a href="#ch-mywork">chapter 14</a>.</td></tr>
+        <tr><td><strong>⚙ icon</strong></td><td><em>System administration</em> — Roles &amp; permissions, Company settings, Backup &amp; restore and the Audit log. Shown to anyone who can back up data or read the audit log. Day-to-day record-keeping lives on the <a href="#ch-budgets">Management</a> tab instead — see chapter 10.</td></tr>
         <tr><td><strong>☾ / ☀ icon</strong></td><td>Switches between the light and dark theme. The choice is remembered on this device and applies everywhere in WorkDesk, including the mobile shell below.</td></tr>
         <tr><td><strong>? icon</strong></td><td>Opens this handbook in a new tab, from anywhere in the app.</td></tr>
         <tr><td><strong>Your name chip</strong></td><td>Opens your profile — contracted hours, manager, sign-in method, sessions, and <strong>Sign out</strong>.</td></tr>
@@ -562,7 +716,7 @@ table code{background:transparent; padding:0}
 
     <figure class="fig-narrow">
       <img src="img/21-emp-profile.png" alt="The My profile modal showing avatar, role chip, department, team, manager, contracted hours and sessions.">
-      <figcaption><span class="fno">Fig 4.2</span><span>My profile — opened from the name chip in the top-right corner.</span></figcaption>
+      <figcaption><span class="fno">Fig 5.2</span><span>My profile — opened from the name chip in the top-right corner.</span></figcaption>
     </figure>
 
     <h3>On a phone</h3>
@@ -580,11 +734,11 @@ table code{background:transparent; padding:0}
     <div class="fig-pair">
       <figure>
         <img src="img/98-mobile-timelog.png" alt="WorkDesk's mobile Time tab: a large timer card with Start the timer, followed by a scrollable list of this month's entries as cards.">
-        <figcaption><span class="fno">Fig 4.3</span><span>The Time tab on a phone — the timer is the primary way to report a day's work.</span></figcaption>
+        <figcaption><span class="fno">Fig 5.3</span><span>The Time tab on a phone — the timer is the primary way to report a day's work.</span></figcaption>
       </figure>
       <figure>
         <img src="img/99-mobile-more.png" alt="The More bottom sheet: Library, My assignments and allowances, My profile, and a note about switching to the desktop layout.">
-        <figcaption><span class="fno">Fig 4.4</span><span>The More sheet — everything that doesn't fit in the bottom bar.</span></figcaption>
+        <figcaption><span class="fno">Fig 5.4</span><span>The More sheet — everything that doesn't fit in the bottom bar.</span></figcaption>
       </figure>
     </div>
     <div class="note">
@@ -593,16 +747,16 @@ table code{background:transparent; padding:0}
     </div>
   </section>
 
-  <!-- ============ 5 ============ -->
+  <!-- ============ 6 ============ -->
   <section class="ch" id="ch-time" data-title="Time Log" data-caps="reportOwnTime,reportBlueTime,viewOthersTime">
-    <div class="ch-head"><span class="ch-num">05</span><h2>Time Log</h2></div>
+    <div class="ch-head"><span class="ch-num">06</span><h2>Time Log</h2></div>
     <p class="lede">Where the day is reported. A form band at the top, a month of entries below it, and an engine in between that decides whether each entry registers or goes to an approver.</p>
     <div class="locked-note"></div>
     <div class="perm" data-perm="reportOwnTime,reportBlueTime,viewOthersTime,editOthersTime,excelExport"></div>
 
     <figure>
       <img src="img/10-emp-timelog.png" alt="The Time Log tab: Report time form band, month navigator with totals, filter row, and the entry table with the date and weekday shown side by side.">
-      <figcaption><span class="fno">Fig 5.1</span><span>The Time Log as an Employee sees it. Totals sit beside the month navigator: Red, Yellow, Total, Sick and — in amber — anything sitting in approval. The date and weekday sit side by side in each row, and a Work order code can be clicked to copy it.</span></figcaption>
+      <figcaption><span class="fno">Fig 6.1</span><span>The Time Log as an Employee sees it. Totals sit beside the month navigator: Red, Yellow, Total, Sick and — in amber — anything sitting in approval. The date and weekday sit side by side in each row, and a Work order code can be clicked to copy it.</span></figcaption>
     </figure>
 
     <h3>Reporting time</h3>
@@ -618,7 +772,7 @@ table code{background:transparent; padding:0}
 
     <figure>
       <img src="img/11-emp-timelog-form.png" alt="Close-up of the Report time form band showing date, type, start, end, derived hours, the Red/Yellow/Blue toggle and the list fields.">
-      <figcaption><span class="fno">Fig 5.2</span><span>The form band, seen by a Team Lead — note the Blue option, only offered to roles that manage clients' projects and tasks. The dropdowns list only what you are assigned to — if a project is missing, you are not assigned to it yet.</span></figcaption>
+      <figcaption><span class="fno">Fig 6.2</span><span>The form band, seen by a Team Lead — note the Blue option, only offered to roles that manage clients' projects and tasks. The dropdowns list only what you are assigned to — if a project is missing, you are not assigned to it yet.</span></figcaption>
     </figure>
 
     <div class="note">
@@ -701,19 +855,19 @@ table code{background:transparent; padding:0}
     <p>The month navigator moves one month at a time; <strong>Today</strong> returns to the current one. Below it, filter by employee, client, project, work order, task, entry type, project status and entry status. <strong>Clear</strong> resets every filter at once. Totals always describe the filtered view.</p>
 
     <h3>Exporting</h3>
-    <p><strong>⬇ This view</strong> exports the filtered month. <strong>⬇ Everything</strong> exports everything within your permission scope — which for an Employee, Senior Employee or External Contractor means their own records only. Pending entries are moved to a second worksheet so they can never be mistaken for reported time. See <a href="#ch-export">chapter 16</a>.</p>
+    <p><strong>⬇ This view</strong> exports the filtered month. <strong>⬇ Everything</strong> exports everything within your permission scope — which for an Employee, Senior Employee or External Contractor means their own records only. Pending entries are moved to a second worksheet so they can never be mistaken for reported time. See <a href="#ch-export">chapter 17</a>.</p>
   </section>
 
-  <!-- ============ 6 ============ -->
+  <!-- ============ 7 ============ -->
   <section class="ch" id="ch-planner" data-title="Week Planner" data-caps="planOwnWeek">
-    <div class="ch-head"><span class="ch-num">06</span><h2>Week Planner</h2></div>
+    <div class="ch-head"><span class="ch-num">07</span><h2>Week Planner</h2></div>
     <p class="lede">Intent, not record. Planned entries never count as reported hours — they exist so you can see the week before it happens and compare it afterwards.</p>
     <div class="locked-note"></div>
     <div class="perm" data-perm="planOwnWeek,planOthersWeek,excelExport"></div>
 
     <figure>
       <img src="img/12-emp-planner.png" alt="The Week Planner showing seven day columns with planned entries and the view toggle above them.">
-      <figcaption><span class="fno">Fig 6.1</span><span>A week in the planner. Move between Day, Week and Month views with the pills at the top.</span></figcaption>
+      <figcaption><span class="fno">Fig 7.1</span><span>A week in the planner. Move between Day, Week and Month views with the pills at the top.</span></figcaption>
     </figure>
 
     <h3>Planning a block</h3>
@@ -739,9 +893,9 @@ table code{background:transparent; padding:0}
     <p>With <code>planOthersWeek</code> a <strong>Planning for</strong> selector appears. Team Leads see their team, Project Managers their projects' people, Operations Managers and the CEO everyone. Saving a change to someone else's plan notifies them.</p>
   </section>
 
-  <!-- ============ 7 ============ -->
+  <!-- ============ 8 ============ -->
   <section class="ch" id="ch-tasks" data-title="Tasks" data-caps="updateOwnTaskStatus,createTasks,assignTasks">
-    <div class="ch-head"><span class="ch-num">07</span><h2>Tasks</h2></div>
+    <div class="ch-head"><span class="ch-num">08</span><h2>Tasks</h2></div>
     <p class="lede">Four views over the same task list: your own, a drag-and-drop board, a flat table and a per-project roll-up with consumption bars.</p>
     <div class="locked-note"></div>
     <div class="perm" data-perm="createTasks,assignTasks,updateOwnTaskStatus"></div>
@@ -759,21 +913,21 @@ table code{background:transparent; padding:0}
     <div class="fig-pair">
       <figure>
         <img src="img/14-emp-tasks-mine.png" alt="My tasks view as a kanban board filtered to the signed-in user's tasks.">
-        <figcaption><span class="fno">Fig 7.1</span><span><b>My tasks</b> — the board, filtered to you.</span></figcaption>
+        <figcaption><span class="fno">Fig 8.1</span><span><b>My tasks</b> — the board, filtered to you.</span></figcaption>
       </figure>
       <figure>
         <img src="img/34-task-board.png" alt="The full board with six status columns and task cards.">
-        <figcaption><span class="fno">Fig 7.2</span><span><b>Board</b> — every task, six columns.</span></figcaption>
+        <figcaption><span class="fno">Fig 8.2</span><span><b>Board</b> — every task, six columns.</span></figcaption>
       </figure>
     </div>
     <div class="fig-pair">
       <figure>
         <img src="img/15-emp-tasks-list.png" alt="List view: a table of tasks with inline status dropdowns, priority chips, assignees, due dates and hours.">
-        <figcaption><span class="fno">Fig 7.3</span><span><b>List</b> — sorted by due date, with an inline status dropdown on every row.</span></figcaption>
+        <figcaption><span class="fno">Fig 8.3</span><span><b>List</b> — sorted by due date, with an inline status dropdown on every row.</span></figcaption>
       </figure>
       <figure>
         <img src="img/45-pm-tasks-project-view.png" alt="Project view: tasks grouped by project with a consumption bar per project.">
-        <figcaption><span class="fno">Fig 7.4</span><span><b>Project view</b> — grouped by project, with hours consumed against allowance.</span></figcaption>
+        <figcaption><span class="fno">Fig 8.4</span><span><b>Project view</b> — grouped by project, with hours consumed against allowance.</span></figcaption>
       </figure>
     </div>
 
@@ -781,7 +935,7 @@ table code{background:transparent; padding:0}
     <p>Click <strong>+ New task</strong>, or click any card to edit. Title, project and description are all required — the description prompt asks <em>what does done look like?</em></p>
     <figure>
       <img src="img/35-task-editor.png" alt="The task editor dialog with title, project, work order, description, status, priority, dates, allowance, dependencies, link and comments.">
-      <figcaption><span class="fno">Fig 7.5</span><span>The task editor. <b>Assignees</b> only appears if you may assign tasks; without it you can still create a task, but it lands in the project backlog.</span></figcaption>
+      <figcaption><span class="fno">Fig 8.5</span><span>The task editor. <b>Assignees</b> only appears if you may assign tasks; without it you can still create a task, but it lands in the project backlog.</span></figcaption>
     </figure>
 
     <div class="tw"><table>
@@ -808,16 +962,16 @@ table code{background:transparent; padding:0}
     <p>A task past its due date and not Done or Cancelled is marked <strong>overdue</strong> on the card, shown in red in List view, and counted in the amber badge on the Tasks tab and in the manager cockpit.</p>
   </section>
 
-  <!-- ============ 8 ============ -->
+  <!-- ============ 9 ============ -->
   <section class="ch" id="ch-expenses" data-title="Expenses" data-caps="reportExpenses,approveExpenses">
-    <div class="ch-head"><span class="ch-num">08</span><h2>Expenses</h2></div>
+    <div class="ch-head"><span class="ch-num">09</span><h2>Expenses</h2></div>
     <p class="lede">Money or hours, attached to a client and project, with evidence where the expense type demands it.</p>
     <div class="locked-note"></div>
     <div class="perm" data-perm="reportExpenses,approveExpenses,excelExport"></div>
 
     <figure>
       <img src="img/16-emp-expenses.png" alt="The Expenses tab: report form band at the top, month navigator with currency totals, and the expense table.">
-      <figcaption><span class="fno">Fig 8.1</span><span>Expenses. Totals are shown per currency, with an extra chip for expenses recorded in hours.</span></figcaption>
+      <figcaption><span class="fno">Fig 9.1</span><span>Expenses. Totals are shown per currency, with an extra chip for expenses recorded in hours.</span></figcaption>
     </figure>
 
     <h3>Recording an expense</h3>
@@ -848,7 +1002,7 @@ table code{background:transparent; padding:0}
     <p>Once a file is attached, it appears as a chip beside the <strong>Choose file</strong> button with its own two controls: a small replace icon that opens the file picker again and swaps the file in place, and an <strong>✕</strong> that removes it — the expense stays otherwise unchanged. The <strong>📎</strong> count in the table is itself a button: click it to reopen that expense's row in the form so you can replace or remove its attachment.</p>
     <figure class="fig-narrow">
       <img src="img/16b-emp-expense-attach.png" alt="The Edit expense form with an attached receipt shown as a chip carrying a replace icon and a remove (×) button.">
-      <figcaption><span class="fno">Fig 8.2</span><span>An attached receipt, ready to be replaced or removed.</span></figcaption>
+      <figcaption><span class="fno">Fig 9.2</span><span>An attached receipt, ready to be replaced or removed.</span></figcaption>
     </figure>
     <div class="note warn">
       <span class="tag">A required attachment cannot be removed down to zero</span>
@@ -856,10 +1010,10 @@ table code{background:transparent; padding:0}
     </div>
   </section>
 
-  <!-- ============ 9 ============ -->
+  <!-- ============ 10 ============ -->
   <section class="ch" id="ch-budgets" data-title="Management" data-caps="viewBudgets,editBudgets,createWorkOrders,assignTasks,manageClientsProjects,manageEmployeesRoles">
-    <div class="ch-head"><span class="ch-num">09</span><h2>Management</h2></div>
-    <p class="lede">The day-to-day operational tab — budgets, work orders and the company's master records — behind one <strong>Management</strong> tab in the top bar. Up to V7, budgets and work orders lived on their own tab while people, assignments, clients, projects, expense types and the verification queue lived behind the ⚙ button; V7.1 brings all of it together here. Which of the sections below you see depends on your role.</p>
+    <div class="ch-head"><span class="ch-num">10</span><h2>Management</h2></div>
+    <p class="lede">The day-to-day operational tab — budgets, work orders and the company's master records — behind one <strong>Management</strong> tab in the top bar. Up to V7, budgets and work orders lived on their own tab while people, assignments, clients, projects, expense types and the verification queue lived behind the ⚙ button; V7.1 brings all of it together here. Its sub-tabs run, left to right: <strong>People · Teams · Clients · Projects · Work Orders · Budgets · Assignments &amp; Allowances · Expense Types · Verification Queue</strong>, with <strong>Pending Activation</strong> last for Operations and the CEO. Which of them you see depends on your role. For how these records relate to each other, see <a href="#ch-model">chapter 2</a>.</p>
     <div class="locked-note"></div>
     <div class="perm" data-perm="viewBudgets,editBudgets,createWorkOrders,assignTasks,manageTeams,manageClientsProjects,manageEmployeesRoles"></div>
 
@@ -870,7 +1024,7 @@ table code{background:transparent; padding:0}
 
     <figure>
       <img src="img/40-pm-budgets.png" alt="The Budgets tab: one card per budget with a consumption bar and statistic tiles for budgeted, consumed, in approval, remaining and projected exhaustion.">
-      <figcaption><span class="fno">Fig 9.1</span><span>A budget card. The bar carries consumed hours solid and hours in approval hatched behind them, so a budget that is about to be breached is visible before it is.</span></figcaption>
+      <figcaption><span class="fno">Fig 10.1</span><span>A budget card. The bar carries consumed hours solid and hours in approval hatched behind them, so a budget that is about to be breached is visible before it is.</span></figcaption>
     </figure>
 
     <h3>Creating a budget</h3>
@@ -890,7 +1044,7 @@ table code{background:transparent; padding:0}
     </table></div>
     <figure class="fig-narrow">
       <img src="img/43-pm-new-budget.png" alt="The New budget dialog with client, project, work order, basis, currency, amount, rate and derived hours.">
-      <figcaption><span class="fno">Fig 9.2</span><span>The budget editor on a money basis.</span></figcaption>
+      <figcaption><span class="fno">Fig 10.2</span><span>The budget editor on a money basis.</span></figcaption>
     </figure>
 
     <h3>Reading a budget card</h3>
@@ -913,7 +1067,7 @@ table code{background:transparent; padding:0}
     <h3>Work orders</h3>
     <figure>
       <img src="img/41-pm-work-orders.png" alt="The Work orders view: a table of codes, titles, client and project, status, contract reference, dates, budget and consumption.">
-      <figcaption><span class="fno">Fig 9.3</span><span>The work-order register, with consumption against the work order's own budget.</span></figcaption>
+      <figcaption><span class="fno">Fig 10.3</span><span>The work-order register, with consumption against the work order's own budget.</span></figcaption>
     </figure>
     <ol class="steps">
       <li>Switch to <strong>Work orders</strong> and click <strong>+ New work order</strong>.</li>
@@ -923,7 +1077,7 @@ table code{background:transparent; padding:0}
     </ol>
     <figure class="fig-narrow">
       <img src="img/42-pm-new-work-order.png" alt="The New work order dialog showing the proposed code, title, status, contract reference, dates and budgeted hours.">
-      <figcaption><span class="fno">Fig 9.4</span><span>The work-order editor.</span></figcaption>
+      <figcaption><span class="fno">Fig 10.4</span><span>The work-order editor.</span></figcaption>
     </figure>
     <div class="note warn">
       <span class="tag">Side effect worth knowing</span>
@@ -934,21 +1088,46 @@ table code{background:transparent; padding:0}
     <p>Everyone, with email, role, team, manager and status. Operations Managers and the CEO change roles from the dropdown here and can <strong>Deactivate</strong> or <strong>Reactivate</strong> an account. Everyone else sees the same list read-only. The <strong>Used by</strong> column counts the records each person is attached to.</p>
     <figure>
       <img src="img/51-admin-people.png" alt="The Management tab's People section listing staff with role dropdowns, team, manager and active status.">
-      <figcaption><span class="fno">Fig 9.5</span><span>People. Deactivating keeps the person's history intact; it only stops them signing in.</span></figcaption>
+      <figcaption><span class="fno">Fig 10.5</span><span>People. Deactivating keeps the person's history intact; it only stops them signing in.</span></figcaption>
     </figure>
 
     <h3 id="h-teams">Teams</h3>
-    <p>To the right of <strong>People</strong>. Team Leads, Project Managers, Operations Managers and the CEO set up teams here, add people to them and choose each member's <strong>direct manager</strong> — normally themselves.</p>
+    <p>The second sub-tab, after <strong>People</strong>. Team Leads, Project Managers, Operations Managers and the CEO set up teams here, place people in them, choose each member's <strong>direct manager</strong> and ask other teams for people. Every team in the company is shown as a card; your own teams come first.</p>
+
+    <h4>The team card</h4>
+    <p>Each card shows the team's colour and initials, its <strong>name</strong>, <strong>department</strong> and short code, its <strong>description</strong>, the team lead, location and contact, its main clients, and its members as avatars — temporary members (on loan from another team) have a dashed outline. On your own teams the card offers <strong>Manage</strong> and <strong>Edit details</strong>; on other teams it offers <strong>Request a member</strong>.</p>
+
+    <h4>Creating or customising a team</h4>
     <ol class="steps">
-      <li>Type a <strong>New team name</strong> and click <strong>+ Create team</strong>. You become its team lead. Operations Managers and the CEO can pick any manager as the <strong>Team lead</strong> instead.</li>
-      <li>In the team's card, choose a person under <strong>Add a person</strong>, set <strong>Their direct manager</strong> (it starts on the team lead) and click <strong>+ Add to team</strong>.</li>
-      <li>Change a member's direct manager at any time from the dropdown in their row, or take them out of the team with <strong>Remove</strong> — their direct manager stays as it was.</li>
-      <li>Rename a team in place. <strong>Delete team</strong> works once the team has no members.</li>
+      <li>Click <strong>+ New team</strong> (or <strong>Edit details</strong> on a card).</li>
+      <li>Fill the three required fields: <strong>Name</strong>, <strong>Description</strong> and <strong>Department</strong>. The department list covers the usual departments of a technical-writing company — Technical Writing, Documentation, Training &amp; Instructional Design, e-Learning Development, Localization &amp; Translation, Editing &amp; Proofreading, Illustration &amp; Graphics, Information Architecture, Content Strategy, API &amp; Developer Documentation, Quality Assurance, Project Management, Operations, Finance &amp; Administration, Sales &amp; Business Development, IT &amp; Tools — or choose <strong>Other — type it</strong> and type your own.</li>
+      <li>Optionally set a <strong>short code</strong>, a <strong>colour</strong>, a <strong>team email or channel</strong>, a <strong>location</strong> and the team's <strong>main clients</strong>. Main clients are offered first when the team asks for a person on loan.</li>
+      <li>Operations Managers and the CEO also choose the <strong>Team lead</strong>; anyone else who creates a team becomes its lead.</li>
+      <li>Click <strong>Create team</strong> or <strong>Save team</strong>.</li>
     </ol>
-    <p>Team Leads and Project Managers see and manage only the teams they lead, and can add anyone who is not already in another team — but not themselves, an Operations Manager or the CEO. Nobody changes their own direct manager; that is set by the person above them. Operations Managers and the CEO manage every team.</p>
+
+    <h4>Placing available people</h4>
+    <p>The <strong>Available people</strong> panel lists everyone who has <strong>no team</strong>, <strong>no direct manager</strong>, or both. Choose one of your teams in <strong>Place in team…</strong>: the person joins it and its team lead becomes their direct manager. Usually a person is placed with a manager who leads a team, or in a team whose lead becomes their manager.</p>
+    <p><strong>Manage</strong> on one of your cards opens the team: change each member's direct manager from the dropdown, take someone out with <strong>Remove</strong> (their direct manager is kept), or add a person with <strong>Add a person</strong> and <strong>Their direct manager</strong>. <strong>Delete team</strong> works once the team has no members.</p>
+
+    <h4>Requesting a person from another team</h4>
+    <p>Use <strong>Request a member</strong> on another team's card, <strong>Request a team member</strong> at the top, or <strong>Request someone from another team</strong> inside Manage. Choose what you are asking for:</p>
+    <div class="tw"><table>
+      <thead><tr><th style="width:190px"></th><th>Temporary — for a client's project or task</th><th>Permanent transfer</th></tr></thead>
+      <tbody>
+        <tr><td><strong>You fill in</strong></td><td>The person, your team, the <strong>client</strong>, <strong>project</strong> and optionally <strong>task</strong>, <strong>from</strong> and <strong>to</strong> dates, an optional hour allowance and a reason</td><td>The person, your team and a reason</td></tr>
+        <tr><td><strong>Sent to</strong></td><td colspan="2">The person you choose in <strong>Send the request to</strong>: the person's team lead, their direct manager, or the CEO</td></tr>
+        <tr><td><strong>Appears as</strong></td><td>A <em>Team loan</em> in Approvals</td><td>A <em>Team transfer</em> in Approvals</td></tr>
+        <tr><td><strong>On approval</strong></td><td>The person keeps their own team and manager, shows in your team as a temporary member for those dates, gets an assignment on the project (with the allowance you set, valid only between the dates) and is added to the task</td><td>The person moves to your team and your team lead becomes their direct manager</td></tr>
+      </tbody>
+    </table></div>
+    <p>The <strong>Team requests</strong> list at the bottom of the sub-tab shows the requests you sent, the ones you were asked to decide, and those involving your teams, with their status.</p>
+
+    <h4>Who can do what</h4>
+    <p>Team Leads and Project Managers manage only the teams they lead. They can place people who have no team or who are in another of their own teams — but not themselves, an Operations Manager or the CEO; anyone else has to be requested. Nobody changes their own direct manager. Operations Managers and the CEO manage every team and choose each team's lead.</p>
     <div class="note">
       <span class="tag">Why it matters</span>
-      <p>The <strong>direct manager</strong> receives the person's sick and vacation requests. The <strong>team lead</strong> is first in line for the person's other approval requests, with the direct manager next.</p>
+      <p>The <strong>direct manager</strong> receives the person's sick and vacation requests. The <strong>team lead</strong> is first in line for the person's other approval requests, with the direct manager next. See <a href="#ch-model">chapter 2</a> for the full routing.</p>
     </div>
 
     <h3>Pending activation</h3>
@@ -961,7 +1140,7 @@ table code{background:transparent; padding:0}
     </ol>
     <figure>
       <img src="img/52-admin-activation.png" alt="The Pending activation section showing a new sign-up card with role, team, initial project and allowance selectors.">
-      <figcaption><span class="fno">Fig 9.6</span><span>Activation. Doing it here also closes the matching request in the approvals queue.</span></figcaption>
+      <figcaption><span class="fno">Fig 10.6</span><span>Activation. Doing it here also closes the matching request in the approvals queue.</span></figcaption>
     </figure>
 
     <h3>Assignments &amp; allowances</h3>
@@ -977,7 +1156,7 @@ table code{background:transparent; padding:0}
     <p>Allowance is set <em>per assignment</em>, not per person: the same writer can hold 40 hours on one work order and 200 on another. Edit a number in place and it saves when you leave the field; <strong>🗑</strong> removes the assignment. Blue hours draw on the allowance and the budget just like Yellow hours.</p>
     <figure>
       <img src="img/53-admin-assignments.png" alt="The Assignments and allowances section: a form band to create an assignment above a table of person, project, work order, allowance, consumed, in approval and remaining.">
-      <figcaption><span class="fno">Fig 9.7</span><span>Assignments. Leaving <b>Work order</b> blank creates a project-level assignment that covers every work order on it.</span></figcaption>
+      <figcaption><span class="fno">Fig 10.7</span><span>Assignments. Leaving <b>Work order</b> blank creates a project-level assignment that covers every work order on it.</span></figcaption>
     </figure>
 
     <h3>Clients, Projects and Expense types</h3>
@@ -989,36 +1168,36 @@ table code{background:transparent; padding:0}
     <div class="fig-pair">
       <figure>
         <img src="img/54-admin-clients.png" alt="The Clients section with name, initials, contact and verified columns.">
-        <figcaption><span class="fno">Fig 9.8</span><span>Clients. <b>Initials</b> feed the work-order code, so keep them short and stable.</span></figcaption>
+        <figcaption><span class="fno">Fig 10.8</span><span>Clients. <b>Initials</b> feed the work-order code, so keep them short and stable.</span></figcaption>
       </figure>
       <figure>
         <img src="img/55-admin-projects.png" alt="The Projects section with project, client, status, owner and WO tracked columns.">
-        <figcaption><span class="fno">Fig 9.9</span><span>Projects. The owner list offers Project Managers, Team Leads, Operations Managers and the CEO.</span></figcaption>
+        <figcaption><span class="fno">Fig 10.9</span><span>Projects. The owner list offers Project Managers, Team Leads, Operations Managers and the CEO.</span></figcaption>
       </figure>
     </div>
     <figure class="fig-narrow">
       <img src="img/57-admin-expense-types.png" alt="The Expense types section with an evidence-required checkbox and an auto-approval ceiling per type.">
-      <figcaption><span class="fno">Fig 9.10</span><span>Expense types. The ceiling and the evidence flag are what drive the expense form's behaviour.</span></figcaption>
+      <figcaption><span class="fno">Fig 10.10</span><span>Expense types. The ceiling and the evidence flag are what drive the expense form's behaviour.</span></figcaption>
     </figure>
 
     <h3>Verification queue</h3>
     <p>Clients and projects created by approving an unlisted item wait here until a manager clicks <strong>Confirm</strong>. It is the tidy-up step after a busy week of typed-in names.</p>
     <figure class="fig-narrow">
       <img src="img/59-admin-verify.png" alt="The Verification queue section, empty, with the message Nothing to verify.">
-      <figcaption><span class="fno">Fig 9.11</span><span>An empty verification queue — the state to aim for.</span></figcaption>
+      <figcaption><span class="fno">Fig 10.11</span><span>An empty verification queue — the state to aim for.</span></figcaption>
     </figure>
   </section>
 
-  <!-- ============ 10 ============ -->
+  <!-- ============ 11 ============ -->
   <section class="ch" id="ch-approvals" data-title="Approvals" data-caps="approveTime,approveExpenses">
-    <div class="ch-head"><span class="ch-num">10</span><h2>Approvals</h2></div>
+    <div class="ch-head"><span class="ch-num">11</span><h2>Approvals</h2></div>
     <p class="lede">One queue for everything the engine could not decide by itself: time entries, allowance increases, unlisted list items, over-ceiling expenses, new accounts, role changes and retroactive edits.</p>
     <div class="locked-note"></div>
     <div class="perm" data-perm="approveTime,approveExpenses,manageEmployeesRoles"></div>
 
     <figure>
       <img src="img/31-tl-approvals.png" alt="The Approvals queue: filter pills by request type, a status selector, and request cards with context and action buttons.">
-      <figcaption><span class="fno">Fig 10.1</span><span>The queue. Each card carries everything needed to decide without leaving the page — the hours, the assignment allowance, the affected budget, and the requester's own words.</span></figcaption>
+      <figcaption><span class="fno">Fig 11.1</span><span>The queue. Each card carries everything needed to decide without leaving the page — the hours, the assignment allowance, the affected budget, and the requester's own words.</span></figcaption>
     </figure>
 
     <h3>What lands in your queue</h3>
@@ -1032,6 +1211,7 @@ table code{background:transparent; padding:0}
     <h3>How a request is routed</h3>
     <p>For most reasons, WorkDesk tries in order: <strong>your team's lead → your direct manager → a Project Manager → the Operations Manager → the CEO</strong>, skipping anyone who is inactive, cannot approve time, or is the requester.</p>
     <p>For a <strong>Leave request</strong> (Sick or Vacation) it tries <strong>your direct manager first</strong>, then falls back to the order above.</p>
+    <p>A <strong>Team loan</strong> or <strong>Team transfer</strong> goes to whoever the requester chose — the person's team lead, their direct manager or the CEO. The card shows the person, the two teams and, for a loan, the client, project, task, dates and hour allowance. Approving a loan creates the person's assignment and task membership; approving a transfer moves them and makes the new team's lead their direct manager. See <a href="#h-teams">Teams</a>.</p>
     <p>For <strong>Budget exceeded</strong> it skips the team entirely and goes <strong>Project Manager → Operations Manager → CEO</strong>, because the decision belongs to whoever owns the budget.</p>
 
     <h3>The four actions</h3>
@@ -1047,11 +1227,11 @@ table code{background:transparent; padding:0}
     <div class="fig-pair">
       <figure>
         <img src="img/32-tl-decline.png" alt="The Decline request dialog with a mandatory reason field.">
-        <figcaption><span class="fno">Fig 10.2</span><span>Declining. Without a reason the dialog refuses.</span></figcaption>
+        <figcaption><span class="fno">Fig 11.2</span><span>Declining. Without a reason the dialog refuses.</span></figcaption>
       </figure>
       <figure>
         <img src="img/33-tl-request-info.png" alt="The Request information dialog with a question field.">
-        <figcaption><span class="fno">Fig 10.3</span><span>Asking for more. Nothing changes status.</span></figcaption>
+        <figcaption><span class="fno">Fig 11.3</span><span>Asking for more. Nothing changes status.</span></figcaption>
       </figure>
     </div>
 
@@ -1070,20 +1250,20 @@ table code{background:transparent; padding:0}
     <p>Switch the <strong>Status</strong> selector to <em>Approved</em> or <em>Declined</em> to see history. You will see decisions you made, decisions routed to you, and — as <code>OPS</code> or <code>CEO</code> — everything. Each shows who decided, when, and any note.</p>
     <figure>
       <img src="img/63-ops-approvals.png" alt="The Approvals queue as an Operations Manager, showing requests from across the company.">
-      <figcaption><span class="fno">Fig 10.4</span><span>The same queue for an Operations Manager — company-wide, with the type filter pills carrying live counts.</span></figcaption>
+      <figcaption><span class="fno">Fig 11.4</span><span>The same queue for an Operations Manager — company-wide, with the type filter pills carrying live counts.</span></figcaption>
     </figure>
   </section>
 
-  <!-- ============ 11 ============ -->
+  <!-- ============ 12 ============ -->
   <section class="ch" id="ch-dashboard" data-title="Dashboard" data-caps="dashboardOwn,dashboardCompany">
-    <div class="ch-head"><span class="ch-num">11</span><h2>Dashboard</h2></div>
+    <div class="ch-head"><span class="ch-num">12</span><h2>Dashboard</h2></div>
     <p class="lede">Registered time only, over a period you choose, with a manager cockpit on top for anyone who has people or budgets to watch.</p>
     <div class="locked-note"></div>
     <div class="perm" data-perm="dashboardOwn,dashboardCompany,excelExport"></div>
 
     <figure>
       <img src="img/44-pm-dashboard.png" alt="The Dashboard: range pills, filters, the manager cockpit, statistic tiles, an hours-over-time area chart and hours-by-client bars.">
-      <figcaption><span class="fno">Fig 11.1</span><span>The Dashboard for a Project Manager. Ranges run from this week to all time; the <b>%</b> toggle restates every figure as a share of total hours.</span></figcaption>
+      <figcaption><span class="fno">Fig 12.1</span><span>The Dashboard for a Project Manager. Ranges run from this week to all time; the <b>%</b> toggle restates every figure as a share of total hours.</span></figcaption>
     </figure>
 
     <h3>Scope</h3>
@@ -1102,23 +1282,23 @@ table code{background:transparent; padding:0}
     <p>Total hours · Red · Yellow · <strong>Utilisation</strong> (Yellow as a share of total) · Sick days · Vacation days · Expenses per currency · Entries reported. Below them, hours over time as a stacked Red-and-Yellow area chart, hours by client as a ranked bar list, and two comparison bars: the Red/Yellow split and planned against actual with its variance.</p>
     <figure>
       <img src="img/17-emp-dashboard.png" alt="The Dashboard as an Employee: own figures only, no manager cockpit.">
-      <figcaption><span class="fno">Fig 11.2</span><span>The same Dashboard for an Employee — own figures, no cockpit, no employee filter.</span></figcaption>
+      <figcaption><span class="fno">Fig 12.2</span><span>The same Dashboard for an Employee — own figures, no cockpit, no employee filter.</span></figcaption>
     </figure>
 
     <h3>Filters and export</h3>
     <p>Filter by employee, client, project, work order and task; <strong>Clear</strong> resets them. <strong>⬇ Export</strong> writes the underlying entries — not the chart — so the numbers can be checked.</p>
   </section>
 
-  <!-- ============ 12 ============ -->
+  <!-- ============ 13 ============ -->
   <section class="ch" id="ch-library" data-title="Library" data-caps="libraryRead,libraryWrite">
-    <div class="ch-head"><span class="ch-num">12</span><h2>Library</h2></div>
+    <div class="ch-head"><span class="ch-num">13</span><h2>Library</h2></div>
     <p class="lede">The house knowledge base — style decisions, terminology rulings, snippets, client conventions — searchable across titles, bodies and tags.</p>
     <div class="locked-note"></div>
     <div class="perm" data-perm="libraryRead,libraryWrite"></div>
 
     <figure>
       <img src="img/18-emp-library.png" alt="The Library as a grid of cards with titles, bodies, tags and author lines, above a search field and tag filter.">
-      <figcaption><span class="fno">Fig 12.1</span><span>The Library. Search is full-text; the tag selector narrows further.</span></figcaption>
+      <figcaption><span class="fno">Fig 13.1</span><span>The Library. Search is full-text; the tag selector narrows further.</span></figcaption>
     </figure>
 
     <h3>Adding an item</h3>
@@ -1139,15 +1319,15 @@ table code{background:transparent; padding:0}
     </ul>
   </section>
 
-  <!-- ============ 13 ============ -->
+  <!-- ============ 14 ============ -->
   <section class="ch" id="ch-mywork" data-title="My assignments and allowances" data-caps="reportOwnTime">
-    <div class="ch-head"><span class="ch-num">13</span><h2>My assignments and allowances</h2></div>
+    <div class="ch-head"><span class="ch-num">14</span><h2>My assignments and allowances</h2></div>
     <p class="lede">The ◱ button in the top bar. Where your funded work lives, and where you ask for more hours before you run out.</p>
     <div class="locked-note"></div>
 
     <figure>
       <img src="img/19-emp-my-assignments.png" alt="The My assignments and allowances dialog: a table of projects, work orders, allowance, consumed, in approval and remaining, with Request hours buttons.">
-      <figcaption><span class="fno">Fig 13.1</span><span>Your assignments. A percentage chip appears from 75 % and turns amber at 90 %, red at 100 % — or past it, as here.</span></figcaption>
+      <figcaption><span class="fno">Fig 14.1</span><span>Your assignments. A percentage chip appears from 75 % and turns amber at 90 %, red at 100 % — or past it, as here.</span></figcaption>
     </figure>
 
     <h3>Requesting additional hours</h3>
@@ -1159,7 +1339,7 @@ table code{background:transparent; padding:0}
     </ol>
     <figure class="fig-narrow">
       <img src="img/20-emp-request-hours.png" alt="The Request additional hours dialog with allowance, consumed, remaining and in-approval tiles above the hours and justification fields.">
-      <figcaption><span class="fno">Fig 13.2</span><span>On approval the allowance is raised automatically — no one has to remember to edit it.</span></figcaption>
+      <figcaption><span class="fno">Fig 14.2</span><span>On approval the allowance is raised automatically — no one has to remember to edit it.</span></figcaption>
     </figure>
     <p>The request appears in the approval queue as an <strong>Allowance increase</strong>, showing the hours asked for and your justification. On approval, the allowance is raised automatically.</p>
     <div class="note">
@@ -1168,15 +1348,15 @@ table code{background:transparent; padding:0}
     </div>
   </section>
 
-  <!-- ============ 14 ============ -->
+  <!-- ============ 15 ============ -->
   <section class="ch" id="ch-admin" data-title="System administration" data-caps="backupRestore,viewAuditLog">
-    <div class="ch-head"><span class="ch-num">14</span><h2>System administration</h2></div>
+    <div class="ch-head"><span class="ch-num">15</span><h2>System administration</h2></div>
     <p class="lede">One modal behind the ⚙ button, with sections down its left side. Up to V7 this was called <strong>Lists &amp; data administration</strong> and held everything from people to the audit log; in V7.1 the day-to-day record-keeping (people, activation, assignments, clients, projects, expense types, verification) moved to the <a href="#ch-budgets">Management</a> tab, so this modal now holds only the settings a company runs once and rarely touches.</p>
     <div class="locked-note"></div>
     <div class="perm" data-perm="backupRestore,viewAuditLog"></div>
 
     <h3>Roles &amp; permissions</h3>
-    <p>A read-only view of the same permission matrix printed in <a href="#ch-roles">chapter 3</a>, for reference while you are signed in as a particular role.</p>
+    <p>A read-only view of the same permission matrix printed in <a href="#ch-roles">chapter 4</a>, for reference while you are signed in as a particular role.</p>
 
     <h3>Company settings</h3>
     <p><code>OPS</code> and <code>CEO</code> only.</p>
@@ -1194,30 +1374,30 @@ table code{background:transparent; padding:0}
     </ol>
     <figure>
       <img src="img/60-admin-settings.png" alt="The Company settings section with soft and hard daily limits, default weekly hours and the month-close control.">
-      <figcaption><span class="fno">Fig 14.1</span><span>Company settings.</span></figcaption>
+      <figcaption><span class="fno">Fig 15.1</span><span>Company settings.</span></figcaption>
     </figure>
 
     <h3>Backup &amp; restore</h3>
-    <p>See <a href="#ch-data">chapter 15</a> for the file format and the three restore operations — it has its own chapter because it matters that much.</p>
+    <p>See <a href="#ch-data">chapter 16</a> for the file format and the three restore operations — it has its own chapter because it matters that much.</p>
 
     <h3>Audit log</h3>
     <p>Append-only. Every sign-in, sign-out, role change, approval decision, budget edit, allowance change and deletion is recorded with actor, timestamp, entity and device. Visible to <code>OPS</code>, <code>FIN</code> and <code>CEO</code>; the most recent 400 entries are shown, 4,000 retained.</p>
     <figure>
       <img src="img/62-admin-audit.png" alt="The Audit log section: a table of timestamp, actor, action, entity and IP.">
-      <figcaption><span class="fno">Fig 14.2</span><span>The audit log.</span></figcaption>
+      <figcaption><span class="fno">Fig 15.2</span><span>The audit log.</span></figcaption>
     </figure>
   </section>
 
-  <!-- ============ 15 ============ -->
+  <!-- ============ 16 ============ -->
   <section class="ch" id="ch-data" data-title="Backup and restore" data-caps="backupRestore">
-    <div class="ch-head"><span class="ch-num">15</span><h2>Backup and restore</h2></div>
+    <div class="ch-head"><span class="ch-num">16</span><h2>Backup and restore</h2></div>
     <p class="lede">In a standalone build this is the only safety net there is. <code>OPS</code> and <code>CEO</code> only.</p>
     <div class="locked-note"></div>
     <div class="perm" data-perm="backupRestore"></div>
 
     <figure>
       <img src="img/61-admin-backup.png" alt="The Backup and restore tab showing the download, restore and import lists panels.">
-      <figcaption><span class="fno">Fig 15.1</span><span>Backup &amp; restore, inside System administration.</span></figcaption>
+      <figcaption><span class="fno">Fig 16.1</span><span>Backup &amp; restore, inside System administration.</span></figcaption>
     </figure>
 
     <h3>The file format</h3>
@@ -1247,9 +1427,9 @@ table code{background:transparent; padding:0}
     </div>
   </section>
 
-  <!-- ============ 16 ============ -->
+  <!-- ============ 17 ============ -->
   <section class="ch" id="ch-export" data-title="Excel exports" data-caps="excelExport">
-    <div class="ch-head"><span class="ch-num">16</span><h2>Excel exports</h2></div>
+    <div class="ch-head"><span class="ch-num">17</span><h2>Excel exports</h2></div>
     <p class="lede">Five modules export. Every file is a real <code>.xlsx</code> with a branded title band, a line recording the filter and who exported it, a frozen and filtered header row, true Excel dates, and a totals row.</p>
     <div class="locked-note"></div>
     <div class="perm" data-perm="excelExport"></div>
@@ -1270,9 +1450,9 @@ table code{background:transparent; padding:0}
     <p>Date columns carry real Excel dates formatted <code>Sunday, 26/07/2026</code>, so they sort and filter properly. Red and Yellow columns are accent-coloured to match the application.</p>
   </section>
 
-  <!-- ============ 17 ============ -->
+  <!-- ============ 18 ============ -->
   <section class="ch" id="ch-ref" data-title="Reference">
-    <div class="ch-head"><span class="ch-num">17</span><h2>Reference</h2></div>
+    <div class="ch-head"><span class="ch-num">18</span><h2>Reference</h2></div>
     <p class="lede">The fixed vocabularies, defaults and limits, in one place.</p>
 
     <h3>Statuses</h3>
@@ -1285,7 +1465,7 @@ table code{background:transparent; padding:0}
         <tr><td><strong>Task priority</strong></td><td>Low · Normal · High · Critical</td></tr>
         <tr><td><strong>Work-order status</strong></td><td>Active · On hold · Closed</td></tr>
         <tr><td><strong>Reimbursement</strong></td><td>Submitted · Approved · Paid · Rejected</td></tr>
-        <tr><td><strong>Request types</strong></td><td>Time entry · Leave request · Allowance increase · New list item · Expense · Account activation · Role change · Retroactive edit</td></tr>
+        <tr><td><strong>Request types</strong></td><td>Time entry · Leave request · Team loan · Team transfer · Allowance increase · New list item · Expense · Account activation · Role change · Retroactive edit</td></tr>
         <tr><td><strong>Pricing bases</strong></td><td>Money · Hours · Pages · Words · Custom</td></tr>
       </tbody>
     </table></div>
@@ -1332,11 +1512,11 @@ table code{background:transparent; padding:0}
     <div class="fig-pair">
       <figure>
         <img src="img/71-fin-budgets.png" alt="The Management tab's Budgets section as Finance: same cards, no edit buttons.">
-        <figcaption><span class="fno">Fig 17.1</span><span>Finance sees every budget on the Management tab, with an Export button and no edit rights.</span></figcaption>
+        <figcaption><span class="fno">Fig 18.1</span><span>Finance sees every budget on the Management tab, with an Export button and no edit rights.</span></figcaption>
       </figure>
       <figure>
         <img src="img/95-view-landing.png" alt="The Time Log as a Viewer: read-only, with a message that the role carries no time-reporting rights.">
-        <figcaption><span class="fno">Fig 17.2</span><span>A Viewer's Time Log — read-only, no reporting rights.</span></figcaption>
+        <figcaption><span class="fno">Fig 18.2</span><span>A Viewer's Time Log — read-only, no reporting rights.</span></figcaption>
       </figure>
     </div>
   </section>
@@ -1346,7 +1526,7 @@ table code{background:transparent; padding:0}
 
 <footer class="foot">
   <h3>Keeping this handbook current</h3>
-  <p>This handbook describes <strong>GALIL WorkDesk V7.1, standalone build</strong>. The permission matrix in chapter 3 is generated from one table in this page's own script, so a permission change there is a one-line edit that updates the matrix, the chips and the role filter together.</p>
+  <p>This handbook describes <strong>GALIL WorkDesk V7.2, standalone build</strong>. The permission matrix in chapter 4 is generated from one table in this page's own script, so a permission change there is a one-line edit that updates the matrix, the chips and the role filter together.</p>
   <p>Questions this handbook doesn't answer: <a href="mailto:info@galiltc.co.il">info@galiltc.co.il</a>.</p>
 </footer>
 
