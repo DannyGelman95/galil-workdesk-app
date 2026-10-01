@@ -38,7 +38,7 @@ site/                     The other two products published to GitHub Pages
                            (carried into the deploy as-is, unrelated to the
                            site-mui build).
   app/
-    index.html              The WorkDesk app (V7.1). Self-contained build: React
+    index.html              The WorkDesk app (V7.2). Self-contained build: React
                            inlined, no network calls. Open it directly in a
                            browser or serve the folder statically.
   handbook/
@@ -111,6 +111,24 @@ orders, assignments, expense types and the verification queue live on the
 window now holds only company settings, backup & restore, the audit log and a
 read-only roles & permissions reference.
 
+### What's new in V7.2
+
+- **Management sub-tabs reordered**: People · Teams · Clients · Projects ·
+  Work Orders · Budgets · Assignments & Allowances · Expense Types ·
+  Verification Queue (Pending Activation last).
+- **Teams redesigned as cards** with a required name, description and
+  department (built-in technical-writing departments or a typed one) and
+  optional colour, short code, contact, location and main clients.
+- **Available people** panel: anyone without a team and/or direct manager can
+  be placed in a team, whose lead becomes their manager.
+- **Team loans and transfers**: ask another team's lead, the person's manager
+  or the CEO for a person — temporarily, for a client's project or task
+  between two dates (the approved loan creates a date-limited assignment and
+  task membership), or permanently. Both are decided in Approvals.
+- **Handbook chapter 2, "How WorkDesk fits together"**: the records, how they
+  relate (diagram), work orders, tasks vs. assignments, and exactly how hours
+  are deducted from budgets and allowances.
+
 ### What's new in V7.1
 
 - A third hour type, **Blue · Management**, for Team Leads, Project Managers,
@@ -128,11 +146,14 @@ read-only roles & permissions reference.
 ### Teams
 
 **Management → Teams** (to the right of People) lets Team Leads, Project
-Managers, Operations Managers and the CEO create teams, add people to them and
-set each member's direct manager — normally themselves. Leads manage only the
-teams they lead; Operations and the CEO manage every team. The direct manager
-receives the person's sick and vacation requests. Governed by the
-`manageTeams` capability; see `TeamsPanel` in `site/app/index.html`.
+Managers, Operations Managers and the CEO create and customise teams (shown as
+cards), place available people in them, set each member's direct manager —
+normally themselves — and request people from other teams as a temporary loan
+or a permanent transfer (stored in `db.teamRequests`, decided in Approvals).
+Leads manage only the teams they lead; Operations and the CEO manage every
+team. The direct manager receives the person's sick and vacation requests.
+Governed by the `manageTeams` capability; see `TeamsPanel`, `TeamEditor`,
+`TeamRequestModal` and `applyTeamRequest` in `site/app/index.html`.
 
 ### Sick and vacation requests
 
