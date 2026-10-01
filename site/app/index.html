@@ -18734,6 +18734,11 @@ var CSS = [
 ".pop{position:absolute;right:0;top:100%;z-index:60;background:var(--surface);border:1px solid var(--line);border-radius:11px;box-shadow:0 14px 34px var(--shadow2);padding:5px;display:flex;flex-direction:column;gap:2px;min-width:190px}",
 ".pop button{background:transparent;border:0;border-radius:8px;padding:8px 10px;text-align:left;font:600 12.5px var(--font);color:var(--ink);cursor:pointer;min-height:36px;white-space:nowrap}",
 ".pop button:hover{background:var(--wash)}",
+".duppop{min-width:268px;padding:6px 8px 9px}",
+".dupgrid{display:grid;grid-template-columns:1fr 1fr;gap:4px}",
+".pop button.dupq,.dupq{border:1px solid var(--line);background:var(--wash);border-radius:8px;padding:7px 9px;font:600 12.5px var(--font);color:var(--ink);cursor:pointer;min-height:36px;text-align:center}",
+".pop button.dupq:hover,.dupq:hover{border-color:var(--deep);background:var(--surface)}",
+".duppop .ph{padding:6px 2px 0}",
 ".pop .ph{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:6px 10px 3px}",
 /* attachment row */
 ".att{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);background:var(--wash);border-radius:999px;padding:2px 4px 2px 10px;font-size:12.5px;font-weight:600;color:var(--deep);max-width:100%}",
@@ -19640,7 +19645,7 @@ function LeaveBand(p) {
 /* ---------- the one path an entry takes into the store (§7.2, §8) ----------
    Desktop Time Log, the duplicate action and the mobile timer all go through
    this, so the entitlement engine and approval routing can never diverge. */
-function commitEntry(mutate, user, form, after) {
+function commitEntry(mutate, user, form, after, quiet) {
   if (isLeave(form.type)) { commitLeave(mutate, user, form, after); return; }
   mutate(function (d) {
     var e = formToEntry(d, form);
@@ -19668,11 +19673,85 @@ function commitEntry(mutate, user, form, after) {
     e.__soft = verdict.softFlag;
     return e;
   }, function (e) {
-    if (e.status === "pending") toast("Saved as Pending \u2014 " + e.statusReason + ". It is excluded from totals until an approver decides.", "");
-    else if (e.softFlag) toast("Entry registered and flagged: a long day.", "");
-    else toast("Entry registered.", "ok");
+    if (!quiet) {
+      if (e.status === "pending") toast("Saved as Pending \u2014 " + e.statusReason + ". It is excluded from totals until an approver decides.", "");
+      else if (e.softFlag) toast("Entry registered and flagged: a long day.", "");
+      else toast("Entry registered.", "ok");
+    }
     if (after) after(e);
   });
+}
+
+/* ---------- §7.4 duplicate an entry to other dates ----------
+   Each copy goes through commitEntry, so the entitlement engine runs on every one.
+   Dates that fail validation (future, closed month, overlap, identical entry) are skipped. */
+function duplicateEntry(db, user, mutate, e, dates, after) {
+  var ok = [], skipped = [];
+  dates.forEach(function (nd) {
+    if (nd === e.date) return;
+    if (nd > todayStr()) { skipped.push(il(nd) + ": a future date \u2014 plan it in the Week Planner"); return; }
+    var form = toForm(Object.assign({}, e, {
+      id: null, date: nd, status: "registered", statusReason: "", submittedAt: null,
+      approvedBy: null, approvedAt: null, decisionNote: "", softFlag: false
+    }));
+    var bad = validateEntry(db, form, user), keys = Object.keys(bad);
+    if (keys.length) { skipped.push(il(nd) + ": " + bad[keys[0]]); return; }
+    ok.push(form);
+  });
+  if (!ok.length) { toast("Not duplicated \u2014 " + (skipped[0] || "choose a different date."), "error"); return; }
+  if (ok.length === 1 && !skipped.length) { commitEntry(mutate, user, ok[0], after); return; }
+  var done = 0, pending = 0;
+  ok.forEach(function (form) {
+    commitEntry(mutate, user, form, function (saved) {
+      done++; if (saved.status === "pending") pending++;
+      if (done === ok.length) {
+        toast("Duplicated to " + done + " day" + (done === 1 ? "" : "s") + (pending ? " \u2014 " + pending + " pending approval" : "") +
+          (skipped.length ? ". Skipped " + skipped.length + " (" + skipped[0] + (skipped.length > 1 ? "\u2026" : "") + ")" : "."), skipped.length || pending ? "" : "ok");
+        if (after) after(saved);
+      }
+    }, true);
+  });
+}
+/* the dates a duplicate choice resolves to */
+function dupDates(base, opt) {
+  var out = [];
+  if (opt.date) return [opt.date];
+  var n = Math.max(1, Math.min(365, Math.round(Number(opt.days) || 1))), dir = opt.dir === "forward" ? 1 : -1;
+  if (!opt.every) { var d = s2d(base); d.setDate(d.getDate() + dir * n); return [d2s(d)]; }
+  for (var i = 1; i <= n; i++) {
+    var x = s2d(base); x.setDate(x.getDate() + dir * i);
+    if (x.getDay() !== 5 && x.getDay() !== 6) out.push(d2s(x));  /* Fri/Sat weekend */
+  }
+  return out;
+}
+/* the choices offered by the duplicate menu (desktop popover and phone sheet) */
+function DupOptions(p) {
+  var cs = useState({ days: 1, dir: "back", every: false }), c = cs[0], setC = cs[1];
+  var ds = useState(""), date = ds[0], setDate = ds[1];
+  var quick = function (label, days, dir) {
+    return h("button", { type: "button", className: "dupq", onClick: function () { p.onPick(dupDates(p.base, { days: days, dir: dir })); } }, label);
+  };
+  var preview = dupDates(p.base, c);
+  return h("div", { className: "col", style: { gap: 8 } },
+    h("div", { className: "dupgrid" },
+      quick("\u2190 Previous day", 1, "back"), quick("Next day \u2192", 1, "forward"),
+      quick("\u2190 Previous week", 7, "back"), quick("Next week \u2192", 7, "forward")),
+    h("div", { className: "ph" }, "Custom"),
+    h("div", { className: "row", style: { gap: 6, flexWrap: "nowrap" } },
+      h("input", { type: "number", min: 1, max: 365, value: c.days, "aria-label": "Number of days", className: "miniinp", style: { width: 64 },
+        onChange: function (e) { setC(Object.assign({}, c, { days: e.target.value })); } }),
+      h("select", { className: "minisel", value: c.dir, "aria-label": "Direction", onChange: function (e) { setC(Object.assign({}, c, { dir: e.target.value })); } },
+        h("option", { value: "back" }, "days back"), h("option", { value: "forward" }, "days forward"))),
+    h("label", { className: "row cap", style: { gap: 6, cursor: "pointer" } },
+      h("input", { type: "checkbox", checked: c.every, onChange: function (e) { setC(Object.assign({}, c, { every: e.target.checked })); } }),
+      "Copy to every working day in between"),
+    h("div", { className: "row", style: { gap: 6, flexWrap: "nowrap", justifyContent: "space-between" } },
+      h("span", { className: "cap mono" }, preview.length ? (preview.length === 1 ? "\u2192 " + il(preview[0]) : "\u2192 " + preview.length + " days") : "\u2014"),
+      h(Btn, { sm: true, kind: "p", onClick: function () { p.onPick(preview); } }, "Duplicate")),
+    h("div", { className: "ph" }, "Specific date"),
+    h("div", { className: "row", style: { gap: 6, flexWrap: "nowrap" } },
+      h("input", { type: "date", value: date, max: todayStr(), "aria-label": "Duplicate to date", className: "miniinp", style: { flex: 1 }, onChange: function (e) { setDate(e.target.value); } }),
+      h(Btn, { sm: true, kind: "p", disabled: !date, onClick: function () { if (date) p.onPick([date]); } }, "Duplicate")));
 }
 
 /* ---------- Sick / Vacation: one request for the whole range ----------
@@ -19737,13 +19816,12 @@ function DupMenu(p) {
   return h("span", { className: "rel", ref: ref, style: { display: "inline-flex" } },
     h(Btn, {
       sm: true, kind: "t", className: "tap", title: "Duplicate this entry",
-      "aria-expanded": open ? "true" : "false", "aria-haspopup": "menu",
+      "aria-expanded": open ? "true" : "false", "aria-haspopup": "dialog",
       onClick: function () { setOpen(!open); }
     }, "\u29c9"),
-    open ? h("div", { className: "pop", role: "menu" },
+    open ? h("div", { className: "pop duppop", role: "dialog", "aria-label": "Duplicate to" },
       h("div", { className: "ph" }, "Duplicate to"),
-      h("button", { role: "menuitem", onClick: function () { setOpen(false); p.onPick(1); } }, "The next day"),
-      h("button", { role: "menuitem", onClick: function () { setOpen(false); p.onPick(7); } }, "The next week")) : null);
+      h(DupOptions, { base: p.base, onPick: function (dates) { setOpen(false); p.onPick(dates); } })) : null);
 }
 
 /* ---------- the Time Log tab ---------- */
@@ -19800,18 +19878,8 @@ function TimeLogTab(p) {
     toast("Entry deleted.", "", { label: "Undo", fn: function () { p.mutate(function (d) { d.entries.unshift(snapshot); audit(d, user.id, "Entry delete undone", "entries", snapshot.id, null, snapshot); }); } });
   }
   /* §7.4 — duplicate an entry forward, then re-run the entitlement engine on the copy */
-  function dupEntry(e, days) {
-    var d = s2d(e.date); d.setDate(d.getDate() + days);
-    var nd = d2s(d);
-    if (nd > todayStr()) { toast("That date has not happened yet — plan it in the Week Planner instead.", "error"); return; }
-    var form = toForm(Object.assign({}, e, {
-      id: null, date: nd, status: "registered", statusReason: "", submittedAt: null,
-      approvedBy: null, approvedAt: null, decisionNote: "", softFlag: false
-    }));
-    var bad = validateEntry(db, form, user);
-    var keys = Object.keys(bad);
-    if (keys.length) { toast("Not duplicated \u2014 " + bad[keys[0]], "error"); return; }
-    saveEntry(form);
+  function dupEntry(e, dates) {
+    duplicateEntry(db, user, p.mutate, e, dates, function () { setEditing(null); bump(formKey + 1); });
   }
   function cycleProjectStatus(e) {
     if (!canEditEntry(db, user, e)) return;
@@ -19932,7 +20000,7 @@ function TimeLogTab(p) {
                   e.status === "cancelled" && e.decisionNote ? h("div", { className: "cap", style: { color: C.error, fontWeight: 600 } }, "Declined: ", e.decisionNote) : null),
                 h("td", { style: { whiteSpace: "nowrap" } },
                   editable ? h(Btn, { sm: true, kind: "t", className: "tap", title: "Edit", onClick: function () { setEditing(e); window.scrollTo(0, 0); } }, "✎") : null,
-                  can(user, "reportOwnTime") && e.type === "Work" ? h(DupMenu, { onPick: function (days) { dupEntry(e, days); } }) : null,
+                  can(user, "reportOwnTime") && e.type === "Work" ? h(DupMenu, { base: e.date, onPick: function (dates) { dupEntry(e, dates); } }) : null,
                   editable ? h(Btn, { sm: true, kind: "t", className: "tap", title: "Delete", onClick: function () { delEntry(e); } }, "🗑") : null));
             })))));
 }
@@ -22585,6 +22653,7 @@ function MobileTime(p) {
   var timer = ts[0], setTimer = ts[1];
   var ns = useState(Date.now()), now = ns[0], setNow = ns[1];
   var sh = useState(null), sheet = sh[0], setSheet = sh[1];
+  var dps = useState(null), dup = dps[0], setDup = dps[1];
 
   useEffect(function () {
     if (!timer) return;
@@ -22666,15 +22735,17 @@ function MobileTime(p) {
         e.status === "pending" && e.statusReason ? h("div", { className: "mrow", style: { color: C.amber, fontWeight: 600 } }, "Reason: ", e.statusReason) : null,
         h("div", { className: "row", style: { gap: 6 } },
           editable ? h(Btn, { sm: true, onClick: function () { setSheet(toForm(e)); } }, "✎ Edit") : null,
-          reportRights && e.type === "Work" ? h(Btn, { sm: true, onClick: function () { p.onDuplicate(e, 1); } }, "⧉ Next day") : null,
-          reportRights && e.type === "Work" ? h(Btn, { sm: true, onClick: function () { p.onDuplicate(e, 7); } }, "⧉ Next week") : null,
+          reportRights && e.type === "Work" ? h(Btn, { sm: true, onClick: function () { setDup(e); } }, "⧉ Duplicate…") : null,
           editable ? h(Btn, { sm: true, kind: "d", onClick: function () { p.onDelete(e); } }, "🗑") : null));
     }),
 
     sheet ? h(MobileEntrySheet, {
       db: db, user: user, mutate: p.mutate, value: sheet,
       onClose: function () { setSheet(null); }, onSaved: function () { setSheet(null); }
-    }) : null);
+    }) : null,
+    dup ? h(Sheet, { title: "Duplicate entry", onClose: function () { setDup(null); } },
+      h("div", { className: "cap" }, il(dup.date), dup.start ? " \u00b7 " + dup.start + "\u2013" + dup.end : "", " \u00b7 ", dup.description),
+      h(DupOptions, { base: dup.date, onPick: function (dates) { var e = dup; setDup(null); p.onDuplicate(e, dates); } })) : null);
 }
 
 /* ---------- Week Planner ---------- */
@@ -22972,18 +23043,7 @@ function MobileApp(p) {
     });
     toast("Entry deleted.", "", { label: "Undo", fn: function () { p.mutate(function (d) { d.entries.unshift(snapshot); }); } });
   }
-  function dupEntry(e, days) {
-    var d = s2d(e.date); d.setDate(d.getDate() + days);
-    var nd = d2s(d);
-    if (nd > todayStr()) { toast("That date has not happened yet — plan it in the Week Planner instead.", "error"); return; }
-    var form = toForm(Object.assign({}, e, {
-      id: null, date: nd, status: "registered", statusReason: "", submittedAt: null,
-      approvedBy: null, approvedAt: null, decisionNote: "", softFlag: false
-    }));
-    var bad = validateEntry(db, form, user), keys = Object.keys(bad);
-    if (keys.length) { toast("Not duplicated — " + bad[keys[0]], "error"); return; }
-    commitEntry(p.mutate, user, form);
-  }
+  function dupEntry(e, dates) { duplicateEntry(db, user, p.mutate, e, dates); }
 
   var common = { db: db, user: user, mutate: p.mutate };
 

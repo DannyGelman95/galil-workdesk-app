@@ -129,6 +129,12 @@ read-only roles & permissions reference.
   relate (diagram), work orders, tasks vs. assignments, and exactly how hours
   are deducted from budgets and allowances.
 
+### Since V7.2
+
+- Duplicate a time entry to the previous or next day or week, a custom number
+  of days back or forward (optionally onto every working day in between), or
+  a specific date — on desktop (⧉ menu) and phone (⧉ Duplicate…).
+
 ### What's new in V7.1
 
 - A third hour type, **Blue · Management**, for Team Leads, Project Managers,
