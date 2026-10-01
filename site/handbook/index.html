@@ -724,7 +724,7 @@ table code{background:transparent; padding:0}
     <div class="tw"><table>
       <thead><tr><th style="width:120px">Bottom tab</th><th>What it holds</th></tr></thead>
       <tbody>
-        <tr><td><strong>Time</strong></td><td>A running <strong>timer</strong> — <strong>▶ Start the timer</strong>, then <strong>■ Stop and report</strong> when you're done, which opens the entry form pre-filled with the start and end times. <strong>Report without the timer</strong> skips straight to that form. Each entry below can be edited, duplicated to <strong>Next day</strong> or <strong>Next week</strong>, or deleted, the same as on the desktop Time Log.</td></tr>
+        <tr><td><strong>Time</strong></td><td>A running <strong>timer</strong> — <strong>▶ Start the timer</strong>, then <strong>■ Stop and report</strong> when you're done, which opens the entry form pre-filled with the start and end times. <strong>Report without the timer</strong> skips straight to that form. Each entry below can be edited, duplicated with <strong>⧉ Duplicate…</strong> (the same choices as on the desktop — see <a href="#ch-time">Duplicating an entry</a>), or deleted, the same as on the desktop Time Log.</td></tr>
         <tr><td><strong>Plan</strong></td><td>The Week Planner, one day at a time.</td></tr>
         <tr><td><strong>Tasks</strong></td><td><strong>My tasks</strong> / <strong>All I can see</strong> and a status filter above a list of cards; change a task's status from the dropdown on its card.</td></tr>
         <tr><td><strong>Expenses</strong></td><td><strong>+ Report an expense</strong> opens a bottom sheet with the same fields — and the same evidence attachment control — as the desktop form.</td></tr>
@@ -849,7 +849,13 @@ table code{background:transparent; padding:0}
     </ul>
 
     <h3>Duplicating an entry</h3>
-    <p>The <strong>⧉</strong> button next to a Work entry opens a small menu: <strong>The next day</strong> or <strong>The next week</strong>. Either copies the entry's client, project, work order, task, hour type and description onto the new date and re-runs it through the entitlement engine as a fresh entry — it can land Pending even if the original was Registered, for example if the copy would now exceed an allowance. Duplicating past today is refused; plan those days in the Week Planner instead.</p>
+    <p>The <strong>⧉</strong> button next to a Work entry (<strong>⧉ Duplicate…</strong> on the phone) opens the duplicate options:</p>
+    <ul>
+      <li><strong>← Previous day</strong>, <strong>Next day →</strong>, <strong>← Previous week</strong>, <strong>Next week →</strong> — one copy, one day or seven days away.</li>
+      <li><strong>Custom</strong> — type a number of days and choose <strong>days back</strong> or <strong>days forward</strong>. On its own this makes one copy that many days away. Tick <strong>Copy to every working day in between</strong> to copy the entry onto every Sunday-to-Thursday in that range instead — for example 5 days back copies it onto each working day of the past five days. The line under the field shows the date, or how many days, before you click <strong>Duplicate</strong>.</li>
+      <li><strong>Specific date</strong> — pick any date up to today and click <strong>Duplicate</strong>.</li>
+    </ul>
+    <p>Every copy takes the entry's client, project, work order, task, hour type, times and description, and goes through the entitlement engine as a fresh entry — it can land Pending even if the original was Registered, for example if the copy would now exceed an allowance. Dates that can't take a copy are skipped and named in the message: dates after today (plan those in the Week Planner), closed months, and days where the copy would overlap an entry already there or repeat it exactly.</p>
 
     <h3>Filtering and totals</h3>
     <p>The month navigator moves one month at a time; <strong>Today</strong> returns to the current one. Below it, filter by employee, client, project, work order, task, entry type, project status and entry status. <strong>Clear</strong> resets every filter at once. Totals always describe the filtered view.</p>
