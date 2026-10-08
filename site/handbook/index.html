@@ -719,6 +719,17 @@ table code{background:transparent; padding:0}
       <figcaption><span class="fno">Fig 5.2</span><span>My profile — opened from the name chip in the top-right corner.</span></figcaption>
     </figure>
 
+    <h3 id="h-tables">Working with tables</h3>
+    <p>Every table in WorkDesk — the Time Log, the Tasks list and project views, Expenses, every Management section, the Roles matrix and Audit log, and My assignments — works the same way. Each one has a toolbar row directly above it.</p>
+    <ul>
+      <li><strong>Sort</strong> — click a column heading to sort A→Z (lowest first), again for Z→A (highest first), and a third time to clear it. A ▲ or ▼ beside the heading shows the sort in use. The <strong>Sort</strong> picker and its <strong>A→Z</strong>, <strong>Z→A</strong> and <strong>✕</strong> buttons in the toolbar do the same. Dates and numbers sort by value, and empty cells always go last.</li>
+      <li><strong>Move a column</strong> — drag its heading onto another column, or choose it in <strong>Move column</strong> and use <strong>←</strong> and <strong>→</strong>.</li>
+      <li><strong>Resize a column</strong> — drag the right edge of its heading. Double-click that edge, or click <strong>↔ Widths</strong>, to return to automatic widths that fit the content.</li>
+      <li><strong>Reset</strong> — <strong>⇄ Order</strong> restores the original column order; <strong>↺ All</strong> clears the sort, order and widths together.</li>
+    </ul>
+    <p><strong>Saved views.</strong> Click <strong>＋ Save</strong> to keep the current sort, column order and widths under a name; saving under an existing name replaces it. Pick a view from the <strong>View</strong> list to apply it. With a view chosen, <strong>☆</strong> makes it open automatically every time you open that table (it turns to <strong>★</strong>, and the view is marked ★ in the list); click again to stop. <strong>🗑</strong> deletes the chosen view. Views belong to you and to that one table — each person keeps their own, and a view saved on the Time Log is not offered on Expenses.</p>
+    <div class="note">Saved views are stored in this browser under <code>galil-workdesk-table-views</code>, separately from your WorkDesk data, so they are not part of a backup and do not follow you to another computer. A sort or column change you have not saved lasts until the page is reloaded; after that the table opens with your ★ default view, or in its original layout.</div>
+
     <h3>On a phone</h3>
     <p>Below 820 px WorkDesk swaps the whole shell for a dedicated mobile build, rather than just squeezing the desktop layout into a narrow column: one page at a time, a bottom navigation bar, native date and time pickers, and every tap target at least 44 px tall. It is the same data and the same rules underneath — every entry still runs through the entitlement engine — just laid out for a thumb instead of a mouse.</p>
     <div class="tw"><table>
@@ -858,7 +869,7 @@ table code{background:transparent; padding:0}
     <p>Every copy takes the entry's client, project, work order, task, hour type, times and description, and goes through the entitlement engine as a fresh entry — it can land Pending even if the original was Registered, for example if the copy would now exceed an allowance. Dates that can't take a copy are skipped and named in the message: dates after today (plan those in the Week Planner), closed months, and days where the copy would overlap an entry already there or repeat it exactly.</p>
 
     <h3>Filtering and totals</h3>
-    <p>The month navigator moves one month at a time; <strong>Today</strong> returns to the current one. Below it, filter by employee, client, project, work order, task, entry type, project status and entry status. <strong>Clear</strong> resets every filter at once. Totals always describe the filtered view.</p>
+    <p>The month navigator moves one month at a time; <strong>Today</strong> returns to the current one. Below it, filter by employee, client, project, work order, task, entry type, project status and entry status. <strong>Clear</strong> resets every filter at once. Totals always describe the filtered view. To sort the entries, rearrange or resize columns, or save the layout as a view, see <a href="#h-tables">Working with tables</a>.</p>
 
     <h3>Exporting</h3>
     <p><strong>⬇ This view</strong> exports the filtered month. <strong>⬇ Everything</strong> exports everything within your permission scope — which for an Employee, Senior Employee or External Contractor means their own records only. Pending entries are moved to a second worksheet so they can never be mistaken for reported time. See <a href="#ch-export">chapter 17</a>.</p>
@@ -929,7 +940,7 @@ table code{background:transparent; padding:0}
     <div class="fig-pair">
       <figure>
         <img src="img/15-emp-tasks-list.png" alt="List view: a table of tasks with inline status dropdowns, priority chips, assignees, due dates and hours.">
-        <figcaption><span class="fno">Fig 8.3</span><span><b>List</b> — sorted by due date, with an inline status dropdown on every row.</span></figcaption>
+        <figcaption><span class="fno">Fig 8.3</span><span><b>List</b> — sorted by due date until you sort by another column, with an inline status dropdown on every row.</span></figcaption>
       </figure>
       <figure>
         <img src="img/45-pm-tasks-project-view.png" alt="Project view: tasks grouped by project with a consumption bar per project.">
