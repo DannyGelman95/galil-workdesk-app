@@ -781,7 +781,7 @@ table code{background:transparent; padding:0}
       <li>Choose the <strong>Type</strong>: <em>Work</em>, <em>Sick</em> or <em>Vacation</em>. Sick and Vacation hide the time fields — see <a href="#h-leave">Sick and vacation days</a> below.</li>
       <li>Set <strong>Start</strong> and <strong>End</strong> from the hour and minute dropdowns. <strong>Hours</strong> fills itself, rounded to the nearest half hour.</li>
       <li>Pick the <strong>Hour type</strong> — <span class="swatch" style="background:var(--red)"></span> Red · Company, <span class="swatch" style="background:var(--yellow)"></span> Yellow · Client, or — if you manage clients' projects and tasks — <span class="swatch" style="background:var(--blue)"></span> Blue · Management.</li>
-      <li>For Yellow or Blue, choose <strong>Client</strong>, <strong>Project</strong>, and <strong>Work order</strong> if the project is work-order tracked. Optionally pick a <strong>Task</strong> and set the <strong>Project status</strong>.</li>
+      <li>For Yellow or Blue, choose <strong>Client</strong>, <strong>Project</strong>, and <strong>Work order</strong> if the project is work-order tracked. Optionally pick a <strong>Task</strong>.</li>
       <li>Write a <strong>Description</strong> — it is required. <strong>Notes</strong> are optional.</li>
       <li>Click <strong>Add entry</strong>.</li>
     </ol>
@@ -859,7 +859,7 @@ table code{background:transparent; padding:0}
     <ul>
       <li><strong>✎</strong> loads an entry back into the form band. Saving a pending entry re-runs the engine; saving a registered entry as an approver leaves it registered.</li>
       <li><strong>🗑</strong> deletes it and cancels any pending approval attached. The toast offers <strong>Undo</strong>.</li>
-      <li>Click the <strong>Project status</strong> cell in a row to cycle it through the eight project statuses without opening the form.</li>
+      <li>The <strong>Project status</strong> column shows the project's current status as set under <a href="#ch-budgets">Management → Projects</a>. It is read-only here; the project status filter uses the same value.</li>
       <li>You may always edit your own entries. Editing someone else's needs <code>editOthersTime</code> — Team Lead within their team, Project Manager within their projects, Operations Manager and CEO anywhere.</li>
       <li>Click a <strong>Work order</strong> code anywhere in the table to copy it to the clipboard — useful when pasting it into an email or another system. A small confirmation toast names what was copied.</li>
     </ul>
@@ -931,7 +931,7 @@ table code{background:transparent; padding:0}
     </ul>
 
     <h3>The four views</h3>
-    <p><strong>My tasks</strong> — the board, filtered to you; the default view for Employees and contractors. <strong>Board</strong> — six columns: To do, In progress, Blocked, In review, Done, Cancelled. <strong>List</strong> — sorted by due date, with an inline status dropdown on every row. <strong>Project view</strong> — grouped by project, with hours consumed against allowance per task and in total.</p>
+    <p><strong>My tasks</strong> — the board, filtered to you; the default view for Employees and contractors. <strong>Board</strong> — six columns: To do, In progress, Blocked, In review, Done, Cancelled. <strong>List</strong> — sorted by due date, with an inline status dropdown on every task whose status you may change. <strong>Project view</strong> — grouped by project, with hours consumed against allowance per task and in total.</p>
     <div class="fig-pair">
       <figure>
         <img src="img/14-emp-tasks-mine.png" alt="My tasks view as a kanban board filtered to the signed-in user's tasks.">
@@ -945,7 +945,7 @@ table code{background:transparent; padding:0}
     <div class="fig-pair">
       <figure>
         <img src="img/15-emp-tasks-list.png" alt="List view: a table of tasks with inline status dropdowns, priority chips, assignees, due dates and hours.">
-        <figcaption><span class="fno">Fig 8.3</span><span><b>List</b> — sorted by due date until you sort by another column, with an inline status dropdown on every row.</span></figcaption>
+        <figcaption><span class="fno">Fig 8.3</span><span><b>List</b> — sorted by due date until you sort by another column, with an inline status dropdown on the tasks you may move.</span></figcaption>
       </figure>
       <figure>
         <img src="img/45-pm-tasks-project-view.png" alt="Project view: tasks grouped by project with a consumption bar per project.">
@@ -973,6 +973,9 @@ table code{background:transparent; padding:0}
         <tr><td><strong>Comments</strong></td><td>Available once the task is saved.</td></tr>
       </tbody>
     </table></div>
+
+    <h3>Who can change or edit a task</h3>
+    <p>Its assignees (<code>updateOwnTaskStatus</code>), and anyone who creates tasks on that task's project (<code>createTasks</code>). Only they can drag its card on the board, change its status in the List view or on the phone, or open it in the task editor with <strong>✎</strong>. Everyone else sees the status as a chip and the task read-only — including a colleague's task on a project you share. Finance sees every task read-only.</p>
 
     <h3>Blocking and unblocking</h3>
     <p>A task with an unfinished dependency is forced to <strong>Blocked</strong> and cannot be dragged to another active column — the toast explains why. Completing the dependency releases every task waiting on it back to <strong>To do</strong> automatically.</p>
@@ -1012,7 +1015,7 @@ table code{background:transparent; padding:0}
     </div>
 
     <h3>Reimbursement status</h3>
-    <p>Four states — <strong>Submitted</strong>, <strong>Approved</strong>, <strong>Paid</strong>, <strong>Rejected</strong>. Anyone who may approve expenses changes it from the dropdown in the table; everyone else sees a coloured chip.</p>
+    <p>Four states — <strong>Submitted</strong>, <strong>Approved</strong>, <strong>Paid</strong>, <strong>Rejected</strong>. Anyone who may approve expenses changes it from the dropdown in the table — except on their own expenses, which someone else decides. Everyone else sees a coloured chip.</p>
 
     <h3>Reporting for someone else</h3>
     <p>With <code>approveExpenses</code> an <strong>Assignee</strong> selector appears on the form, scoped to the people you can see. The same people appear in the month filter.</p>
@@ -1107,7 +1110,7 @@ table code{background:transparent; padding:0}
     </div>
 
     <h3>People</h3>
-    <p>Everyone, with email, role, team, manager and status. Operations Managers and the CEO change roles from the dropdown here and can <strong>Deactivate</strong> or <strong>Reactivate</strong> an account. Everyone else sees the same list read-only. The <strong>Used by</strong> column counts the records each person is attached to.</p>
+    <p>Everyone, with email, role, team, manager and status. Operations Managers and the CEO change roles from the dropdown here and can <strong>Deactivate</strong> or <strong>Reactivate</strong> an account — except their own, which another administrator changes. Everyone else sees the same list read-only. The <strong>Used by</strong> column counts the records each person is attached to.</p>
     <figure>
       <img src="img/51-admin-people.png" alt="The Management tab's People section listing staff with role dropdowns, team, manager and active status.">
       <figcaption><span class="fno">Fig 10.5</span><span>People. Deactivating keeps the person's history intact; it only stops them signing in.</span></figcaption>
@@ -1175,7 +1178,7 @@ table code{background:transparent; padding:0}
         <tr><td><strong>A number</strong></td><td>Hours that person may report on that assignment before approval is required.</td></tr>
       </tbody>
     </table></div>
-    <p>Allowance is set <em>per assignment</em>, not per person: the same writer can hold 40 hours on one work order and 200 on another. Edit a number in place and it saves when you leave the field; <strong>🗑</strong> removes the assignment. Blue hours draw on the allowance and the budget just like Yellow hours.</p>
+    <p>Allowance is set <em>per assignment</em>, not per person: the same writer can hold 40 hours on one work order and 200 on another. Edit a number in place and it saves when you leave the field. Your own allowance is shown read-only here — raise it through <a href="#ch-mywork">My assignments → Request hours</a>, like anyone else; <strong>🗑</strong> removes the assignment. Blue hours draw on the allowance and the budget just like Yellow hours.</p>
     <figure>
       <img src="img/53-admin-assignments.png" alt="The Assignments and allowances section: a form band to create an assignment above a table of person, project, work order, allowance, consumed, in approval and remaining.">
       <figcaption><span class="fno">Fig 10.7</span><span>Assignments. Leaving <b>Work order</b> blank creates a project-level assignment that covers every work order on it.</span></figcaption>
