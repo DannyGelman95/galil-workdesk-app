@@ -18597,6 +18597,40 @@ var CSS = [
 ".tbl .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}",
 /* the Hours column carries pills, so it reads left like every other value */
 ".tbl .hrs,.tbl th.hrs{text-align:left;white-space:nowrap}",
+/* cell lines — every table draws its grid, header separators included */
+".tbl{border:1px solid var(--line);border-radius:10px}",
+".tbl th{border-right:1px solid rgba(255,255,255,.18)}",
+".tbl td{border-right:1px solid var(--line)}",
+".tbl th:last-child,.tbl td:last-child{border-right:0}",
+".tbl tbody tr:last-child td{border-bottom:0}",
+".tbl tbody tr:last-child td:first-child{border-radius:0 0 0 10px}",
+".tbl tbody tr:last-child td:last-child{border-radius:0 0 10px 0}",
+/* STable — sortable headings, drag to move, drag the edge to resize */
+".tbl th.srt{cursor:pointer;user-select:none}",
+".tbl th.srt:hover{background:color-mix(in srgb,var(--chrome) 80%,#8CC63E)}",
+".tbl th[draggable=true]{cursor:grab}",
+".tbl th.srt[draggable=true]{cursor:pointer}",
+".tbl th.dragging{opacity:.55}",
+".tbl th.dragover{box-shadow:inset 3px 0 0 var(--green)}",
+".tbl th .sa{margin-left:5px;font-size:9px;color:var(--green)}",
+".tbl th .rz{position:absolute;top:0;right:0;width:7px;height:100%;cursor:col-resize;touch-action:none;z-index:3}",
+".tbl th .rz:hover,.tbl th .rz.on{background:rgba(140,198,62,.6)}",
+".tbl.sized td,.tbl.sized th{overflow:hidden;text-overflow:ellipsis}",
+".tblbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:5px 6px;font-size:12px;min-height:36px}",
+".tblchip{display:inline-flex;align-items:center;gap:3px}",
+".tblchip .x{border:0;background:transparent;color:inherit;cursor:pointer;font-size:11px;padding:0 0 0 5px;line-height:1}",
+".tblbtn{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:4px 10px;font:600 12px var(--font);cursor:pointer;min-height:30px;white-space:nowrap}",
+".tblbtn:hover,.tblbtn[aria-expanded=true]{border-color:var(--deep);background:var(--wash)}",
+".tblpop{z-index:90}",
+".tblpop button:disabled{opacity:.4;cursor:default;background:transparent}",
+".tvrow{display:flex;align-items:center;gap:2px;border-radius:8px}",
+".tvrow.on{background:var(--wash)}",
+".tvrow .tvlbl{padding:4px 10px;font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}",
+".tvrow>button.grow{min-width:0;overflow:hidden;text-overflow:ellipsis}",
+".pop button.ic,.tvsort .ic{min-height:30px;min-width:30px;padding:4px 7px;text-align:center;flex:0 0 auto}",
+".pop button.ic.on{background:var(--sel);color:var(--selfg)}",
+".tvsort{display:flex;align-items:center;gap:4px;padding:2px 6px 6px}",
+".tvsort select{flex:1;min-width:0}",
 ".copy{white-space:nowrap;cursor:pointer;border:0;background:transparent;padding:0;font:inherit;color:inherit;text-align:left;display:inline-flex;align-items:center;gap:5px;border-radius:6px}",
 ".copy:hover{color:var(--deep);text-decoration:underline;text-underline-offset:2px}",
 ".copy .ci{opacity:0;font-size:10px}",
@@ -19052,6 +19086,346 @@ function statusBadge(e) {
 function psChip(status) {
   if (!status) return null;
   return h(Chip, { k: "gr", style: { background: (PS_COLOR[status] || C.muted) + "1F", color: PS_COLOR[status] || C.muted, borderColor: (PS_COLOR[status] || C.muted) + "66" } }, status);
+}
+
+/* =====================================================================
+   STable — every data table in the app renders through this wrapper.
+   It takes the same <thead>/<tbody> children a plain table would and adds:
+   · click a column heading to sort A→Z / Z→A (a third click clears it);
+   · drag a heading to move the column, drag its right edge to size it;
+   · "Default widths" returns to automatic sizing that fits the content;
+   · saved views — the sort, column order and widths, saved by name per
+     person and per table, with one view optionally applied on open.
+   Views are kept in this browser under their own key, never in the data.
+   ===================================================================== */
+var TV_KEY = "galil-workdesk-table-views";
+var _tvLive = {}, _tvSubs = {};
+
+function tvUser() { try { return localStorage.getItem(SESSION_KEY) || "anon"; } catch (e) { return "anon"; } }
+function tvReadAll() { try { var s = localStorage.getItem(TV_KEY); return s ? JSON.parse(s) || {} : {}; } catch (e) { return {}; } }
+function tvSaved(id) {
+  var u = tvReadAll()[tvUser()] || {};
+  var r = u[id] || {};
+  return { views: r.views || [], dflt: r.dflt || null };
+}
+function tvSetSaved(id, rec) {
+  var all = tvReadAll(), uk = tvUser();
+  all[uk] = all[uk] || {};
+  all[uk][id] = rec;
+  try { localStorage.setItem(TV_KEY, JSON.stringify(all)); return true; }
+  catch (e) { toast("Could not save the view in this browser.", "error"); return false; }
+}
+function tvBlank() { return { sort: null, order: null, widths: null, view: null }; }
+function tvFromView(v) {
+  return { sort: v.sort || null, order: v.order ? v.order.slice() : null, widths: v.widths ? Object.assign({}, v.widths) : null, view: v.name };
+}
+function tvGet(id) {
+  var k = tvUser() + "|" + id;
+  if (!_tvLive[k]) {
+    var s = tvSaved(id), d = s.dflt ? s.views.filter(function (v) { return v.name === s.dflt; })[0] : null;
+    _tvLive[k] = d ? tvFromView(d) : tvBlank();
+  }
+  return _tvLive[k];
+}
+function tvSet(id, patch) {
+  var k = tvUser() + "|" + id;
+  _tvLive[k] = Object.assign({}, tvGet(id), patch);
+  (_tvSubs[id] || []).slice().forEach(function (f) { f(); });
+}
+
+/* the text a cell shows, read from its React elements — the sort key when no data-sort is given */
+function cellText(n) {
+  if (n === null || n === undefined || n === false || n === true) return "";
+  if (typeof n === "string" || typeof n === "number") return String(n);
+  if (Array.isArray(n)) return n.map(cellText).join(" ");
+  if (n.props) {
+    var pp = n.props;
+    if (pp["data-sort"] !== undefined && pp["data-sort"] !== null) return String(pp["data-sort"]);
+    if (n.type === "select") return pp.value !== undefined ? String(pp.value) : "";
+    if (n.type === "input") return String(pp.value !== undefined ? pp.value : pp.defaultValue !== undefined && pp.defaultValue !== null ? pp.defaultValue : "");
+    if (pp.children !== undefined) return cellText(pp.children);
+    if (pp.value !== undefined && pp.value !== null) return String(pp.value);
+    if (pp.label !== undefined) return String(pp.label);
+  }
+  return "";
+}
+function cellSortKey(td) {
+  var raw = td && td.props && td.props["data-sort"] !== undefined && td.props["data-sort"] !== null ? td.props["data-sort"] : cellText(td);
+  if (typeof raw === "number") return { n: raw };
+  var s = String(raw).replace(/\s+/g, " ").trim();
+  if (!s || s === "—" || s === "-" || s === "–") return { e: true };
+  /* dd/mm/yyyy, optionally with a time — the way il() and en-GB print dates */
+  var d = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:,?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (d) return { n: Number(d[3]) * 1e10 + Number(d[2]) * 1e8 + Number(d[1]) * 1e6 + Number(d[4] || 0) * 1e4 + Number(d[5] || 0) * 100 + Number(d[6] || 0) };
+  var iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return { n: Number(iso[1]) * 1e10 + Number(iso[2]) * 1e8 + Number(iso[3]) * 1e6 };
+  var m = s.replace(/^[₪$€£\s]+/, "").match(/^-?\d[\d,]*(\.\d+)?/);
+  if (m) return { n: Number(m[0].replace(/,/g, "")) };
+  return { s: s };
+}
+function cmpSortKey(a, b) {
+  if (a.e || b.e) return a.e && b.e ? 0 : a.e ? 1 : -1;
+  if (a.n !== undefined && b.n !== undefined) return a.n - b.n;
+  if (a.n !== undefined) return -1;
+  if (b.n !== undefined) return 1;
+  return a.s.localeCompare(b.s, undefined, { numeric: true, sensitivity: "base" });
+}
+
+function STable(p) {
+  var id = p.id;
+  var fs = useState(0), force = fs[1];
+  var ds = useState(null), dragCol = ds[0], setDragCol = ds[1];
+  var os = useState(null), overCol = os[0], setOverCol = os[1];
+  var ms = useState(null), menu = ms[0], setMenu = ms[1];
+  var headRef = useRef(null), btnRef = useRef(null), popRef = useRef(null), busy = useRef(0);
+
+  useEffect(function () {
+    var f = function () { force(function (n) { return n + 1; }); };
+    (_tvSubs[id] = _tvSubs[id] || []).push(f);
+    return function () { _tvSubs[id] = (_tvSubs[id] || []).filter(function (x) { return x !== f; }); };
+  }, [id]);
+  useEffect(function () {
+    if (!menu) return;
+    var close = function (ev) {
+      if (ev.type === "mousedown" && ((popRef.current && popRef.current.contains(ev.target)) || (btnRef.current && btnRef.current.contains(ev.target)))) return;
+      if (ev.type === "scroll" && popRef.current && popRef.current.contains(ev.target)) return;
+      setMenu(null);
+    };
+    var esc = function (ev) { if (ev.key === "Escape") setMenu(null); };
+    document.addEventListener("mousedown", close);
+    window.addEventListener("resize", close);
+    window.addEventListener("scroll", close, true);
+    document.addEventListener("keydown", esc);
+    return function () {
+      document.removeEventListener("mousedown", close);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("scroll", close, true);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [menu]);
+
+  var live = tvGet(id);
+  var kids = React.Children.toArray(p.children);
+  var thead = kids.filter(function (k) { return k.type === "thead"; })[0];
+  var tbody = kids.filter(function (k) { return k.type === "tbody"; })[0];
+  var rest = kids.filter(function (k) { return k !== thead && k !== tbody; });
+  var hrow = thead ? React.Children.toArray(thead.props.children)[0] : null;
+  var ths = hrow ? React.Children.toArray(hrow.props.children) : [];
+  var n = ths.length;
+
+  /* column ids come from the heading text, so a saved view survives a column being added */
+  var seen = {};
+  var cols = ths.map(function (th, i) {
+    var label = cellText(th.props.children).trim();
+    var cid = label || "#" + i;
+    if (seen[cid]) cid = cid + "#" + i;
+    seen[cid] = 1;
+    return { id: cid, label: label, idx: i, th: th };
+  });
+  var byCid = {};
+  cols.forEach(function (c) { byCid[c.id] = c; });
+
+  var order = cols.map(function (c) { return c.id; });
+  if (live.order) {
+    var kept = live.order.filter(function (x) { return byCid[x]; });
+    order.forEach(function (x, i) {
+      if (kept.indexOf(x) >= 0) return;
+      var prev = i > 0 ? kept.indexOf(order[i - 1]) : -1;
+      kept.splice(prev + 1, 0, x);
+    });
+    order = kept;
+  }
+  var seq = order.map(function (x) { return byCid[x].idx; });
+  var sort = live.sort && byCid[live.sort.col] ? live.sort : null;
+  var widths = live.widths || null;
+  var sized = !!(widths && Object.keys(widths).length);
+
+  var rows = tbody ? React.Children.toArray(tbody.props.children) : [];
+  var regular = [], other = [];
+  rows.forEach(function (tr) {
+    var cells = tr && tr.props ? React.Children.toArray(tr.props.children) : [];
+    var ok = cells.length === n && !cells.some(function (c) { return c.props && c.props.colSpan > 1; });
+    if (ok) regular.push({ tr: tr, cells: cells }); else other.push(tr);
+  });
+  if (sort) {
+    var si = byCid[sort.col].idx, dir = sort.dir === "desc" ? -1 : 1;
+    regular = regular.map(function (r, i) { return { r: r, k: cellSortKey(r.cells[si]), i: i }; })
+      .sort(function (a, b) {
+        if (a.k.e || b.k.e) return a.k.e && b.k.e ? a.i - b.i : a.k.e ? 1 : -1;
+        return (cmpSortKey(a.k, b.k) * dir) || a.i - b.i;
+      })
+      .map(function (x) { return x.r; });
+  }
+  var bodyRows = regular.map(function (r) {
+    return React.cloneElement(r.tr, null, seq.map(function (i) { return r.cells[i]; }));
+  }).concat(other);
+
+  function setSort(cid) {
+    if (busy.current > Date.now()) return;
+    var next = !sort || sort.col !== cid ? { col: cid, dir: "asc" } : sort.dir === "asc" ? { col: cid, dir: "desc" } : null;
+    tvSet(id, { sort: next, view: null });
+  }
+  function moveCol(cid, to) {
+    var o = order.slice(), from = o.indexOf(cid);
+    if (from < 0 || to < 0 || to >= o.length || from === to) return;
+    o.splice(from, 1); o.splice(to, 0, cid);
+    tvSet(id, { order: o, view: null });
+  }
+  function measure() {
+    var out = {};
+    var cells = headRef.current ? headRef.current.children : [];
+    for (var i = 0; i < cells.length && i < order.length; i++) out[order[i]] = Math.round(cells[i].getBoundingClientRect().width);
+    return out;
+  }
+  function startResize(ev, cid) {
+    ev.preventDefault(); ev.stopPropagation();
+    var base = Object.assign(measure(), widths || {});
+    var x0 = ev.clientX, w0 = base[cid] || 80;
+    var handle = ev.currentTarget;
+    handle.classList.add("on");
+    busy.current = Date.now() + 100000;
+    var mv = function (e) {
+      var w = Math.max(36, Math.round(w0 + (e.clientX - x0)));
+      var nw = Object.assign({}, base); nw[cid] = w;
+      tvSet(id, { widths: nw, view: null });
+    };
+    var up = function () {
+      handle.classList.remove("on");
+      busy.current = Date.now() + 250;
+      document.removeEventListener("pointermove", mv);
+      document.removeEventListener("pointerup", up);
+      document.removeEventListener("pointercancel", up);
+    };
+    document.addEventListener("pointermove", mv);
+    document.addEventListener("pointerup", up);
+    document.addEventListener("pointercancel", up);
+    tvSet(id, { widths: base, view: null });
+  }
+
+  var head = h("tr", Object.assign({}, hrow ? hrow.props : {}, { ref: headRef, children: undefined }),
+    order.map(function (cid) {
+      var c = byCid[cid], th = c.th, srt = sort && sort.col === cid ? sort.dir : null;
+      var st = Object.assign({}, th.props.style || {});
+      if (sized) { st.width = widths[cid] ? widths[cid] : 120; st.minWidth = 0; st.maxWidth = "none"; }
+      return React.cloneElement(th, {
+        key: cid, style: st,
+        className: (th.props.className || "") + (c.label ? " srt" : "") + (overCol === cid && dragCol && dragCol !== cid ? " dragover" : "") + (dragCol === cid ? " dragging" : ""),
+        title: c.label ? "Click to sort · drag to move the column · drag the right edge to resize" : "Drag to move the column · drag the right edge to resize",
+        "aria-sort": srt === "asc" ? "ascending" : srt === "desc" ? "descending" : null,
+        draggable: true,
+        onClick: c.label ? function () { setSort(cid); } : undefined,
+        onDragStart: function (e) {
+          if (busy.current > Date.now()) { e.preventDefault(); return; }
+          setDragCol(cid);
+          try { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", cid); } catch (x) {}
+        },
+        onDragOver: function (e) { if (!dragCol) return; e.preventDefault(); if (overCol !== cid) setOverCol(cid); },
+        onDragLeave: function () { if (overCol === cid) setOverCol(null); },
+        onDrop: function (e) { e.preventDefault(); if (dragCol) moveCol(dragCol, order.indexOf(cid)); setDragCol(null); setOverCol(null); busy.current = Date.now() + 250; },
+        onDragEnd: function () { setDragCol(null); setOverCol(null); }
+      },
+        th.props.children,
+        srt ? h("span", { className: "sa", "aria-hidden": "true" }, srt === "asc" ? "▲" : "▼") : null,
+        h("span", {
+          className: "rz", "aria-hidden": "true", title: "Drag to resize · double-click for automatic widths",
+          onPointerDown: function (e) { startResize(e, cid); },
+          onClick: function (e) { e.stopPropagation(); },
+          onDoubleClick: function (e) { e.stopPropagation(); tvSet(id, { widths: null, view: null }); }
+        }));
+    }));
+
+  var tStyle = Object.assign({}, p.style || {});
+  if (sized) {
+    tStyle.tableLayout = "fixed";
+    tStyle.width = order.reduce(function (a, cid) { return a + (widths[cid] || 120); }, 0);
+    tStyle.minWidth = 0;
+  }
+  var table = h("table", { className: (p.className || "tbl") + (sized ? " sized" : ""), style: tStyle },
+    h("thead", thead ? thead.props : null, head),
+    tbody ? React.cloneElement(tbody, null, bodyRows) : null,
+    rest);
+
+  /* ---- toolbar: current sort, saved views, reset ---- */
+  var saved = menu ? tvSaved(id) : null;
+  function applyView(v) { tvSet(id, tvFromView(v)); setMenu(null); toast("View “" + v.name + "” applied.", "ok"); }
+  function saveView() {
+    var s = tvSaved(id);
+    var name = window.prompt("Save the current sort, column order and widths as a view. Name:", live.view || "");
+    if (!name || !name.trim()) return;
+    name = name.trim();
+    var exists = s.views.some(function (v) { return v.name === name; });
+    if (exists && !window.confirm("A view called “" + name + "” already exists. Replace it?")) return;
+    var v = { name: name, sort: sort, order: live.order ? order.slice() : null, widths: sized ? Object.assign({}, widths) : null };
+    var views = s.views.filter(function (x) { return x.name !== name; }).concat([v]);
+    if (tvSetSaved(id, { views: views, dflt: s.dflt })) { tvSet(id, { view: name }); setMenu(null); toast("View “" + name + "” saved.", "ok"); }
+  }
+  function delView(v) {
+    var s = tvSaved(id);
+    if (!window.confirm("Delete the saved view “" + v.name + "”?")) return;
+    tvSetSaved(id, { views: s.views.filter(function (x) { return x.name !== v.name; }), dflt: s.dflt === v.name ? null : s.dflt });
+    if (live.view === v.name) tvSet(id, { view: null }); else force(function (k) { return k + 1; });
+  }
+  function toggleDefault(v) {
+    var s = tvSaved(id);
+    tvSetSaved(id, { views: s.views, dflt: s.dflt === v.name ? null : v.name });
+    force(function (k) { return k + 1; });
+    toast(s.dflt === v.name ? "“" + v.name + "” no longer opens by default." : "“" + v.name + "” now opens by default on this table.", "ok");
+  }
+  function openMenu() {
+    if (menu) { setMenu(null); return; }
+    var r = btnRef.current.getBoundingClientRect();
+    var w = 290, left = Math.max(8, Math.min(window.innerWidth - w - 8, r.right - w));
+    var top = r.bottom + 4, maxH = window.innerHeight - top - 10;
+    if (maxH < 260 && r.top > window.innerHeight / 2) { maxH = r.top - 14; top = Math.max(8, r.top - 4 - Math.min(maxH, 520)); }
+    setMenu({ left: left, top: top, maxH: Math.min(maxH, 520), w: w });
+  }
+  var sortLabel = sort ? (byCid[sort.col].label || sort.col) : null;
+  var bar = h("div", { className: "tblbar" },
+    sort ? h("span", { className: "chip mut tblchip" }, "Sorted by ", h("b", null, sortLabel), sort.dir === "asc" ? " A→Z ▲" : " Z→A ▼",
+      h("button", { className: "x", title: "Clear the sort", "aria-label": "Clear the sort", onClick: function () { tvSet(id, { sort: null, view: null }); } }, "✕")) : null,
+    live.view ? h("span", { className: "chip gr tblchip", title: "Saved view in use" }, "★ ", live.view) : null,
+    h("span", { className: "grow" }),
+    h("button", {
+      ref: btnRef, className: "tblbtn", "aria-haspopup": "menu", "aria-expanded": menu ? "true" : "false",
+      title: "Sort, columns and saved views for this table", onClick: openMenu
+    }, "☰ View", h("span", { "aria-hidden": "true", style: { fontSize: 9 } }, " ▾")),
+    menu ? h("div", {
+      ref: popRef, className: "pop tblpop", role: "menu",
+      style: { position: "fixed", left: menu.left, top: menu.top, right: "auto", width: menu.w, maxHeight: menu.maxH, overflow: "auto" }
+    },
+      h("div", { className: "ph" }, "Saved views"),
+      saved.views.length ? saved.views.map(function (v) {
+        var isD = saved.dflt === v.name;
+        return h("div", { key: v.name, className: "tvrow" + (live.view === v.name ? " on" : "") },
+          h("button", { className: "grow", role: "menuitem", title: "Apply this view", onClick: function () { applyView(v); } }, v.name, isD ? h("span", { className: "cap" }, " · default") : null),
+          h("button", { className: "ic", title: isD ? "Stop opening this view by default" : "Open this table with this view", "aria-label": isD ? "Unset default" : "Set as default", onClick: function () { toggleDefault(v); } }, isD ? "★" : "☆"),
+          h("button", { className: "ic", title: "Delete this view", "aria-label": "Delete view " + v.name, onClick: function () { delView(v); } }, "🗑"));
+      }) : h("div", { className: "cap", style: { padding: "2px 10px 6px" } }, "No saved views for this table yet."),
+      h("button", { role: "menuitem", onClick: saveView }, "＋ Save current view…"),
+      h("div", { className: "ph" }, "Sort"),
+      h("div", { className: "tvsort" },
+        h("select", {
+          className: "minisel", "aria-label": "Sort by column", value: sort ? sort.col : "",
+          onChange: function (e) { tvSet(id, { sort: e.target.value ? { col: e.target.value, dir: sort ? sort.dir : "asc" } : null, view: null }); }
+        }, h("option", { value: "" }, "— not sorted —"),
+          cols.filter(function (c) { return c.label; }).map(function (c) { return h("option", { key: c.id, value: c.id }, c.label); })),
+        h("button", { className: "ic" + (sort && sort.dir === "asc" ? " on" : ""), disabled: !sort, title: "A→Z / lowest first", onClick: function () { tvSet(id, { sort: { col: sort.col, dir: "asc" }, view: null }); } }, "A→Z"),
+        h("button", { className: "ic" + (sort && sort.dir === "desc" ? " on" : ""), disabled: !sort, title: "Z→A / highest first", onClick: function () { tvSet(id, { sort: { col: sort.col, dir: "desc" }, view: null }); } }, "Z→A")),
+      h("div", { className: "ph" }, "Column order"),
+      order.map(function (cid, i) {
+        var c = byCid[cid];
+        return h("div", { key: cid, className: "tvrow" },
+          h("span", { className: "grow tvlbl" }, c.label || h("span", { className: "cap" }, "(actions)")),
+          h("button", { className: "ic", disabled: i === 0, title: "Move left", "aria-label": "Move " + (c.label || "column") + " left", onClick: function () { moveCol(cid, i - 1); } }, "←"),
+          h("button", { className: "ic", disabled: i === order.length - 1, title: "Move right", "aria-label": "Move " + (c.label || "column") + " right", onClick: function () { moveCol(cid, i + 1); } }, "→"));
+      }),
+      h("div", { className: "ph" }, "Reset"),
+      h("button", { role: "menuitem", disabled: !sized, onClick: function () { tvSet(id, { widths: null, view: null }); } }, "↔ Default widths (fit to content)"),
+      h("button", { role: "menuitem", disabled: !live.order, onClick: function () { tvSet(id, { order: null, view: null }); } }, "⇄ Default column order"),
+      h("button", { role: "menuitem", disabled: !sort, onClick: function () { tvSet(id, { sort: null, view: null }); } }, "✕ Clear the sort"),
+      h("button", { role: "menuitem", onClick: function () { tvSet(id, tvBlank()); setMenu(null); } }, "↺ Reset everything")) : null);
+
+  return h(React.Fragment, null, bar, table);
 }
 </script>
 <script>"use strict";
@@ -19973,7 +20347,7 @@ function TimeLogTab(p) {
     h("div", { className: "panel scroll" },
       rows.length === 0
         ? h("div", { className: "empty" }, "No entries for ", MONTHS_FULL[m], " ", y, " with these filters.")
-        : h("table", { className: "tbl mid" },
+        : h(STable, { id: "time-log", className: "tbl mid" },
             h("thead", null, h("tr", null,
               ["Date", "Employee", "Type", "Time", "Hours", "Client", "Project", "Work order", "Task", "Project status", "Description", ""].map(function (c, i) {
                 return h("th", { key: i, className: c === "Hours" ? "hrs" : "" }, c);
@@ -19987,7 +20361,7 @@ function TimeLogTab(p) {
                 h("td", null, userName(db, e.assignee)),
                 h("td", null, e.type === "Work" ? h("span", { className: "cap" }, "Work") : h(Chip, { k: "mut", style: { background: e.type === "Sick" ? "var(--sickbg)" : "var(--vacbg)", color: e.type === "Sick" ? "var(--sicktx)" : "var(--vactx)", borderColor: e.type === "Sick" ? "var(--sickline)" : "var(--vacline)" } }, e.type)),
                 h("td", { className: "tnum", style: { whiteSpace: "nowrap" } }, e.start ? e.start + "–" + e.end : "—"),
-                h("td", { className: "hrs" }, hoursChips(e)),
+                h("td", { className: "hrs", "data-sort": (Number(e.red) || 0) + (Number(e.yellow) || 0) + (Number(e.blue) || 0) + (Number(e.day) || 0) }, hoursChips(e)),
                 h("td", null, e.clientId ? nameOf(db.clients, e.clientId) : e.client ? h("span", { title: "Typed by the employee — not in the master list" }, e.client, " ", h(Chip, { k: "amber" }, "new")) : "—"),
                 h("td", null, e.projectId ? nameOf(db.projects, e.projectId) : e.project ? h("span", null, e.project, " ", h(Chip, { k: "amber" }, "new")) : "—"),
                 h("td", null, h(CopyCell, { value: e.workOrderId ? nameOf(db.workOrders, e.workOrderId, "code") : (e.workOrder || "") })),
@@ -20239,7 +20613,7 @@ function TasksTab(p) {
       : null,
 
     view === "list" ? h("div", { className: "panel scroll" },
-      h("table", { className: "tbl" },
+      h(STable, { id: "tasks-list", className: "tbl" },
         h("thead", null, h("tr", null, ["Task", "Project", "Work order", "Status", "Priority", "Assignees", "Due", "Hours", ""].map(function (c, i) { return h("th", { key: i, className: c === "Hours" ? "num" : "" }, c); }))),
         h("tbody", null, list.sort(function (a, b) { return String(a.dueDate || "9").localeCompare(String(b.dueDate || "9")); }).map(function (t) {
           var cons = taskConsumed(db, t.id);
@@ -20267,7 +20641,7 @@ function TasksTab(p) {
             psChip(pr.status),
             h("span", { className: "cap mono" }, num(use), " of ", num(alw), " h across ", tks.length, " tasks"),
             h(Bar, { used: use, total: alw, style: { width: 130 } })),
-          h("table", { className: "tbl" },
+          h(STable, { id: "tasks-project", className: "tbl" },
             h("thead", null, h("tr", null, ["Task", "Status", "Assignees", "Due", "Consumption"].map(function (c, i) { return h("th", { key: i }, c); }))),
             h("tbody", null, tks.map(function (t) {
               var cons = taskConsumed(db, t.id);
@@ -21060,7 +21434,7 @@ function ExpensesTab(p) {
 
     h("div", { className: "panel scroll" },
       rows.length === 0 ? h("div", { className: "empty" }, "No expenses this month.")
-        : h("table", { className: "tbl" },
+        : h(STable, { id: "expenses", className: "tbl" },
             h("thead", null, h("tr", null, ["Date", "Employee", "Type", "Value", "Client / project", "Work order", "Evidence", "Reimbursement", "Description", ""].map(function (c, i) { return h("th", { key: i, className: c === "Value" ? "num" : "" }, c); }))),
             h("tbody", null, rows.map(function (x) {
               var own = x.userId === user.id;
@@ -21240,7 +21614,7 @@ function ManagementTab(p) {
       })) : null,
 
     tab === "wos" ? h("div", { className: "panel scroll" },
-      h("table", { className: "tbl" },
+      h(STable, { id: "mgmt-wos", className: "tbl" },
         h("thead", null, h("tr", null, ["Code", "Title", "Client / project", "Status", "Contract ref", "Dates", "Budget", "Consumed", ""].map(function (c, i) { return h("th", { key: i, className: ["Budget", "Consumed"].indexOf(c) >= 0 ? "num" : "" }, c); }))),
         h("tbody", null, wos.map(function (w) {
           var pr = byId(db.projects, w.projectId) || {};
@@ -21267,7 +21641,7 @@ function ManagementTab(p) {
       onDelete: function (f) { p.mutate(function (d) { d.budgets = d.budgets.filter(function (x) { return x.id !== f.id; }); audit(d, user.id, "Budget deleted", "budgets", f.id, f, null); }); setEditing(null); } }) : null,
     woEdit ? h(WOEditor, { db: db, value: woEdit, nextCode: nextCode, onSave: saveWO, onClose: function () { setWoEdit(null); } }) : null,
     history ? h(Modal, { title: "Budget change history", size: "md", onClose: function () { setHistory(null); } },
-      h("table", { className: "tbl" },
+      h(STable, { id: "budget-history", className: "tbl" },
         h("thead", null, h("tr", null, ["When", "Actor", "Field", "From", "To"].map(function (c, i) { return h("th", { key: i }, c); }))),
         h("tbody", null, (history.history || []).slice().reverse().map(function (x, i) {
           return h("tr", { key: i },
@@ -21672,7 +22046,7 @@ function ListEditor(pp) {
           addItem(o); setDraft({}); toast("Added.", "ok");
         } }, "+ Add"))) : null,
     h("div", { style: { overflowX: "auto" } },
-      h("table", { className: "tbl mid" },
+      h(STable, { id: "mgmt-" + kind, className: "tbl mid" },
         h("thead", null, h("tr", null, pp.cols.map(function (c, i) { return h("th", { key: i }, c); }), h("th", null, "Used by"), pp.canEdit ? h("th", null, "") : null)),
         h("tbody", null, (db[kind] || []).map(function (o) {
           return h("tr", { key: o.id },
@@ -22065,7 +22439,7 @@ function TeamsPanel(p) {
 
     myRequests.length ? h("div", { className: "panel pad col", style: { gap: 6 } },
       h("b", null, "Team requests"),
-      h("div", { style: { overflowX: "auto" } }, h("table", { className: "tbl" },
+      h("div", { style: { overflowX: "auto" } }, h(STable, { id: "team-requests", className: "tbl" },
         h("thead", null, h("tr", null, ["Type", "Person", "From → to", "For", "Asked by", "Decided by", "Status"].map(function (c) { return h("th", { key: c }, c); }))),
         h("tbody", null, myRequests.map(function (r) {
           return h("tr", { key: r.id },
@@ -22107,7 +22481,7 @@ function TeamManage(p) {
       h("span", { className: "cap" }, "Lead ", h("b", null, t.leadUserId ? userName(db, t.leadUserId) : "—")),
       h("div", { className: "grow" }),
       h(Btn, { sm: true, onClick: p.onRequest }, "Request someone from another team")),
-    members.length ? h("div", { style: { overflowX: "auto" } }, h("table", { className: "tbl", style: { tableLayout: "fixed", minWidth: 640 } },
+    members.length ? h("div", { style: { overflowX: "auto" } }, h(STable, { id: "team-members", className: "tbl", style: { tableLayout: "fixed", minWidth: 640 } },
       h("thead", null, h("tr", null, [["Member", "34%"], ["Role", "20%"], ["Direct manager", "32%"], ["", "14%"]].map(function (c, i) { return h("th", { key: i, style: { width: c[1] } }, c[0]); }))),
       h("tbody", null, members.map(function (u) {
         var self = u.id === user.id && !all;
@@ -22229,7 +22603,7 @@ function MgmtPanel(p) {
           toast("Assignment created.", "ok");
         } }, "+ Assign"))) : null,
     h("div", { style: { overflowX: "auto" } },
-      h("table", { className: "tbl mid" },
+      h(STable, { id: "mgmt-assignments", className: "tbl mid" },
         h("thead", null, h("tr", null, ["Person", "Project", "Work order", "Allowance", "Consumed", "In approval", "Remaining", ""].map(function (c, i) { return h("th", { key: i, className: ["Allowance", "Consumed", "In approval"].indexOf(c) >= 0 ? "num" : "" }, c); }))),
         h("tbody", null, db.assignments.map(function (a) {
           var used = consumedOn(db, a.userId, a), pend = pendingOn(db, a.userId, a);
@@ -22311,7 +22685,7 @@ function MgmtPanel(p) {
       var pendC = db.clients.filter(function (c) { return !c.isVerified; });
       var pendP = db.projects.filter(function (x) { return !x.isVerified; });
       if (!pendC.length && !pendP.length) return h("div", { className: "empty panel" }, "Nothing to verify.");
-      return h("div", { style: { overflowX: "auto" } }, h("table", { className: "tbl mid" },
+      return h("div", { style: { overflowX: "auto" } }, h(STable, { id: "mgmt-verify", className: "tbl mid" },
         h("thead", null, h("tr", null, ["Kind", "Name", "Context", ""].map(function (c, i) { return h("th", { key: i }, c); }))),
         h("tbody", null,
           pendC.map(function (c) {
@@ -22397,7 +22771,7 @@ function AdminModal(p) {
         tab === "roles" ? h("div", { className: "col", style: { gap: 10 } },
           h("div", { className: "cap" }, "Y permitted · O own records only · T own team only · P own projects only · – denied. In the cloud build every rule below is enforced by PostgreSQL Row Level Security, not by the browser."),
           h("div", { style: { overflow: "auto" } },
-            h("table", { className: "tbl" },
+            h(STable, { id: "admin-roles", className: "tbl" },
               h("thead", null, h("tr", null, h("th", null, "Capability"), ROLE_ORDER.map(function (r) { return h("th", { key: r, style: { textAlign: "center" } }, r); }))),
               h("tbody", null, Object.keys(PERM).map(function (cap) {
                 return h("tr", { key: cap },
@@ -22483,7 +22857,7 @@ function AdminModal(p) {
 
         tab === "audit" ? h("div", { className: "col", style: { gap: 8 } },
           h("div", { className: "cap" }, "Append-only. Every sign-in, sign-out, role change and approval action is recorded with actor, timestamp and IP."),
-          h("div", { style: { overflowX: "auto" } }, h("table", { className: "tbl" },
+          h("div", { style: { overflowX: "auto" } }, h(STable, { id: "admin-audit", className: "tbl" },
             h("thead", null, h("tr", null, ["When", "Actor", "Action", "Entity", "IP"].map(function (c, i) { return h("th", { key: i }, c); }))),
             h("tbody", null, db.audit.slice(0, 400).map(function (a) {
               return h("tr", { key: a.id },
@@ -23128,7 +23502,7 @@ function MyWork(p) {
     h("div", { className: "cap", style: { textAlign: "center" } }, "Yellow time on an unassigned project is accepted, but routed to approval. A manager grants assignments under Management \u2192 Assignments & allowances."));
   return h(Modal, { title: "My assignments and allowances", size: "lg", onClose: p.onClose },
     h("div", { style: { overflowX: "auto" } },
-    h("table", { className: "tbl mid" },
+    h(STable, { id: "my-assignments", className: "tbl mid" },
       h("thead", null, h("tr", null, ["Project", "Work order", "Allowance", "Consumed", "In approval", "Remaining", ""].map(function (c, i) { return h("th", { key: i, className: i > 1 && i < 5 ? "num" : "" }, c); }))),
       h("tbody", null, mine.map(function (a) {
         var used = consumedOn(db, user.id, a), pend = pendingOn(db, user.id, a);
