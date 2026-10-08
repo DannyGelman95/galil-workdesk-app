@@ -20181,19 +20181,42 @@ function commitLeave(mutate, user, form, after) {
 /* ---------- duplicate menu (§7.4) ---------- */
 function DupMenu(p) {
   var st = useState(false), open = st[0], setOpen = st[1];
-  var ref = useRef(null);
+  var ps = useState(null), pos = ps[0], setPos = ps[1];
+  var ref = useRef(null), popRef = useRef(null), btnRef = useRef(null);
   useEffect(function () {
     var f = function (ev) { if (ref.current && !ref.current.contains(ev.target)) setOpen(false); };
     document.addEventListener("mousedown", f);
     return function () { document.removeEventListener("mousedown", f); };
   }, []);
+  /* the menu floats above the page (position: fixed), so a table cell or a
+     scrolling panel never clips it; it opens upwards when there is no room below */
+  useEffect(function () {
+    if (!open) { setPos(null); return; }
+    var place = function () {
+      var b = btnRef.current, m = popRef.current;
+      if (!b || !m) return;
+      var r = b.getBoundingClientRect(), mw = m.offsetWidth, mh = m.offsetHeight;
+      var left = Math.max(8, Math.min(window.innerWidth - mw - 8, r.right - mw));
+      var top = r.bottom + 4;
+      if (top + mh > window.innerHeight - 8 && r.top - mh - 4 >= 8) top = r.top - mh - 4;
+      setPos({ left: left, top: Math.max(8, top), maxH: window.innerHeight - 16 });
+    };
+    place();
+    var close = function (ev) { if (popRef.current && popRef.current.contains(ev.target)) return; setOpen(false); };
+    window.addEventListener("resize", close);
+    window.addEventListener("scroll", close, true);
+    return function () { window.removeEventListener("resize", close); window.removeEventListener("scroll", close, true); };
+  }, [open]);
   return h("span", { className: "rel", ref: ref, style: { display: "inline-flex" } },
-    h(Btn, {
+    h("span", { ref: btnRef, style: { display: "inline-flex" } }, h(Btn, {
       sm: true, kind: "t", className: "tap", title: "Duplicate this entry",
       "aria-expanded": open ? "true" : "false", "aria-haspopup": "dialog",
       onClick: function () { setOpen(!open); }
-    }, "\u29c9"),
-    open ? h("div", { className: "pop duppop", role: "dialog", "aria-label": "Duplicate to" },
+    }, "\u29c9")),
+    open ? h("div", {
+      ref: popRef, className: "pop duppop", role: "dialog", "aria-label": "Duplicate to",
+      style: { position: "fixed", right: "auto", zIndex: 90, left: pos ? pos.left : -9999, top: pos ? pos.top : 0, maxHeight: pos ? pos.maxH : null, overflow: "auto", visibility: pos ? "visible" : "hidden" }
+    },
       h("div", { className: "ph" }, "Duplicate to"),
       h(DupOptions, { base: p.base, onPick: function (dates) { setOpen(false); p.onPick(dates); } })) : null);
 }
