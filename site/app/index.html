@@ -19822,7 +19822,7 @@ function EntryForm(p) {
     if (k === "clientId") { n.projectId = ""; n.workOrderId = ""; n.taskId = ""; }
     if (k === "projectId") {
       n.workOrderId = ""; n.taskId = "";
-      var pr = byId(db.projects, v); if (pr) { n.clientId = pr.clientId; n.projectStatus = n.projectStatus || pr.status; }
+      var pr = byId(db.projects, v); if (pr) n.clientId = pr.clientId;
     }
     if (k === "workOrderId") n.taskId = "";
     if (k === "type" && v !== "Work") { n.hourType = "yellow"; }
@@ -19937,8 +19937,7 @@ function EntryForm(p) {
         onFreeToggle: function (v) { set(Object.assign({}, f, { freeWO: v, workOrderId: "", workOrder: "" })); },
         onChange: function (v) { up("workOrderId", v); }, onFreeChange: function (v) { up("workOrder", v); }
       }),
-      h(Sel, { label: "Task", cls: "grow", value: f.taskId, placeholder: opts.tasks.length ? "— none —" : "— no assigned task —", options: opts.tasks, onChange: function (e) { up("taskId", e.target.value); } }),
-      h(Sel, { label: "Project status", cls: "grow", value: f.projectStatus, placeholder: "— unchanged —", options: PROJECT_STATUSES, onChange: function (e) { up("projectStatus", e.target.value); } })
+      h(Sel, { label: "Task", cls: "grow", value: f.taskId, placeholder: opts.tasks.length ? "— none —" : "— no assigned task —", options: opts.tasks, onChange: function (e) { up("taskId", e.target.value); } })
     ),
     h("div", { className: "band" },
       h(Inp, {
@@ -20203,7 +20202,7 @@ function TimeLogTab(p) {
     if (flt.workOrderId && e.workOrderId !== flt.workOrderId) return false;
     if (flt.taskId && e.taskId !== flt.taskId) return false;
     if (flt.type && e.type !== flt.type) return false;
-    if (flt.projectStatus && e.projectStatus !== flt.projectStatus) return false;
+    if (flt.projectStatus && entryProjectStatus(db, e) !== flt.projectStatus) return false;
     if (flt.status && e.status !== flt.status) return false;
     return true;
   }).sort(function (a, b) { return a.date === b.date ? String(a.start).localeCompare(String(b.start)) : a.date.localeCompare(b.date); });
@@ -20237,16 +20236,6 @@ function TimeLogTab(p) {
   function dupEntry(e, dates) {
     duplicateEntry(db, user, p.mutate, e, dates, function () { setEditing(null); bump(formKey + 1); });
   }
-  function cycleProjectStatus(e) {
-    if (!canEditEntry(db, user, e)) return;
-    var i = PROJECT_STATUSES.indexOf(e.projectStatus);
-    var next = PROJECT_STATUSES[(i + 1) % PROJECT_STATUSES.length];
-    p.mutate(function (d) {
-      var t = byId(d.entries, e.id); if (!t) return;
-      var b = t.projectStatus; t.projectStatus = next;
-      audit(d, user.id, "Project status on entry: " + b + " → " + next, "entries", e.id, null, null);
-    });
-  }
 
   function doExport(scope) {
     var src = scope === "view" ? rows : visible.filter(function (e) {
@@ -20261,7 +20250,7 @@ function TimeLogTab(p) {
         project: e.projectId ? nameOf(db.projects, e.projectId) : (e.project || ""),
         workOrder: e.workOrderId ? nameOf(db.workOrders, e.workOrderId, "code") : (e.workOrder || ""),
         task: e.taskId ? nameOf(db.tasks, e.taskId, "title") : "",
-        projectStatus: e.projectStatus, status: ENTRY_STATUS_LABEL[e.status] || e.status,
+        projectStatus: entryProjectStatus(db, e), status: ENTRY_STATUS_LABEL[e.status] || e.status,
         reason: e.statusReason, description: e.description, notes: e.notes
       };
     };
@@ -20348,7 +20337,7 @@ function TimeLogTab(p) {
                 h("td", null, e.projectId ? nameOf(db.projects, e.projectId) : e.project ? h("span", null, e.project, " ", h(Chip, { k: "amber" }, "new")) : "—"),
                 h("td", null, h(CopyCell, { value: e.workOrderId ? nameOf(db.workOrders, e.workOrderId, "code") : (e.workOrder || "") })),
                 h("td", null, e.taskId ? nameOf(db.tasks, e.taskId, "title") : "—"),
-                h("td", null, h("span", { onClick: function () { cycleProjectStatus(e); }, style: { cursor: editable ? "pointer" : "default" }, title: editable ? "Click to change" : "" }, psChip(e.projectStatus) || h("span", { className: "cap" }, "—"))),
+                h("td", null, psChip(entryProjectStatus(db, e)) || h("span", { className: "cap" }, "—")),
                 h("td", null, h("div", { className: "row", style: { gap: 6 } }, statusBadge(e), h("span", null, e.description)),
                   e.notes ? h("div", { className: "cap" }, e.notes) : null,
                   (e.attachments || []).length ? h(AttachmentLinks, { value: e.attachments }) : null,
@@ -20386,6 +20375,20 @@ function overdueCount(db, user) {
   return mine.filter(isOverdue).length;
 }
 /* which tasks may this user see */
+/* the project status shown beside a time entry is the project's own, set under
+   Management → Projects; it is never edited from the Time Log */
+function entryProjectStatus(db, e) {
+  var pr = e && e.projectId ? byId(db.projects, e.projectId) : null;
+  return pr ? pr.status || "" : "";
+}
+
+/* who may move a task between statuses: anyone who creates tasks within their
+   scope, otherwise only its assignees (updateOwnTaskStatus) */
+function canMoveTask(db, user, t) {
+  if (can(user, "createTasks") && taskScope(db, user).indexOf(t) >= 0) return true;
+  return can(user, "updateOwnTaskStatus") && taskAssigneeIds(db, t.id).indexOf(user.id) >= 0;
+}
+
 function taskScope(db, user) {
   if (["OPS", "CEO", "FIN"].indexOf(user.role) >= 0) return db.tasks;
   if (user.role === "EXT") return db.tasks.filter(function (t) { return taskAssigneeIds(db, t.id).indexOf(user.id) >= 0; });
@@ -20517,6 +20520,7 @@ function TasksTab(p) {
   }
   function setStatus(t, status) {
     if (status === t.status) return;
+    if (!canMoveTask(db, user, t)) { toast("Only this task's assignees, or someone who manages its project's tasks, can change its status.", "error"); return; }
     if (["Done", "Cancelled"].indexOf(status) < 0 && taskIsBlocked(db, t)) { toast("This task is blocked by a dependency that is not Done.", "error"); return; }
     p.mutate(function (d) {
       var rec = byId(d.tasks, t.id); if (!rec) return;
@@ -20541,13 +20545,14 @@ function TasksTab(p) {
     });
   }
   function openEdit(t) {
+    if (!canMoveTask(db, user, t)) { toast("This task belongs to colleagues — only its assignees, or someone who manages its project's tasks, can edit it.", ""); return; }
     setEditing(Object.assign({}, t, { assignees: taskAssigneeIds(db, t.id), linkText: (t.attachments && t.attachments[0]) ? t.attachments[0].name : "" }));
   }
 
   function TaskCard(pp) {
     var t = pp.t, cons = taskConsumed(db, t.id), who = taskAssigneeIds(db, t.id);
     return h("div", {
-      className: "kcard", draggable: can(user, "createTasks") || who.indexOf(user.id) >= 0,
+      className: "kcard", draggable: canMoveTask(db, user, t),
       onDragStart: function () { setDrag(t.id); }, onDragEnd: function () { setDrag(null); },
       onClick: function () { openEdit(t); }, tabIndex: 0,
       onKeyDown: function (e) { if (e.key === "Enter") openEdit(t); },
@@ -20603,13 +20608,15 @@ function TasksTab(p) {
             h("td", null, h("b", null, t.title), h("div", { className: "cap" }, t.description.slice(0, 90))),
             h("td", null, nameOf(db.projects, t.projectId)),
             h("td", { className: "mono", style: { fontSize: 12 } }, t.workOrderId ? nameOf(db.workOrders, t.workOrderId, "code") : "—"),
-            h("td", null, h("select", { value: t.status, onChange: function (e) { setStatus(t, e.target.value); }, className: "minisel" },
-              TASK_STATUSES.map(function (s) { return h("option", { key: s, value: s }, s); }))),
+            h("td", { "data-sort": t.status }, canMoveTask(db, user, t)
+              ? h("select", { value: t.status, onChange: function (e) { setStatus(t, e.target.value); }, className: "minisel" },
+                  TASK_STATUSES.map(function (s) { return h("option", { key: s, value: s }, s); }))
+              : h(Chip, { k: "mut", style: { background: TS_COLOR[t.status] + "1E", color: TS_COLOR[t.status], borderColor: TS_COLOR[t.status] + "55" } }, t.status)),
             h("td", null, h(Chip, { k: "mut", style: { background: PR_COLOR[t.priority] + "1E", color: PR_COLOR[t.priority], borderColor: PR_COLOR[t.priority] + "55" } }, t.priority)),
             h("td", null, taskAssigneeIds(db, t.id).map(function (u) { return userName(db, u); }).join(", ") || h("span", { className: "cap" }, "backlog")),
             h("td", { className: "mono" }, t.dueDate ? h("span", { style: isOverdue(t) ? { color: C.error, fontWeight: 700 } : null }, il(t.dueDate)) : "—"),
             h("td", { className: "num" }, t.allowanceHours ? num(cons) + " / " + num(t.allowanceHours) : num(cons)),
-            h("td", null, h(Btn, { sm: true, kind: "t", className: "tap", onClick: function () { openEdit(t); } }, "✎")));
+            h("td", null, canMoveTask(db, user, t) ? h(Btn, { sm: true, kind: "t", className: "tap", title: "Edit", onClick: function () { openEdit(t); } }, "✎") : null));
         })))) : null,
 
     view === "project" ? h("div", { className: "scroll col", style: { gap: 10 } },
@@ -20627,7 +20634,8 @@ function TasksTab(p) {
             h("thead", null, h("tr", null, ["Task", "Status", "Assignees", "Due", "Consumption"].map(function (c, i) { return h("th", { key: i }, c); }))),
             h("tbody", null, tks.map(function (t) {
               var cons = taskConsumed(db, t.id);
-              return h("tr", { key: t.id, onClick: function () { openEdit(t); }, style: { cursor: "pointer" } },
+              var ed = canMoveTask(db, user, t);
+              return h("tr", { key: t.id, onClick: ed ? function () { openEdit(t); } : undefined, style: ed ? { cursor: "pointer" } : null },
                 h("td", null, t.title),
                 h("td", null, h(Chip, { k: "mut", style: { background: TS_COLOR[t.status] + "1E", color: TS_COLOR[t.status], borderColor: TS_COLOR[t.status] + "55" } }, t.status)),
                 h("td", null, taskAssigneeIds(db, t.id).map(function (u) { return userName(db, u); }).join(", ") || "—"),
@@ -21340,6 +21348,7 @@ function ExpensesTab(p) {
     toast("Expense deleted.", "", { label: "Undo", fn: function () { p.mutate(function (d) { d.expenses.unshift(snap); }); } });
   }
   function setStatus(x, s) {
+    if (x.userId === user.id) { toast("Your own expense is decided by someone else.", "error"); return; }
     p.mutate(function (d) { var r = byId(d.expenses, x.id); if (r) { r.status = s; audit(d, user.id, "Expense status → " + s, "expenses", x.id, null, null); } });
   }
   function doExport(scopeKind) {
@@ -21430,7 +21439,7 @@ function ExpensesTab(p) {
                 h("td", null, (x.attachments || []).length
                   ? h(Btn, { sm: true, kind: "t", title: (x.attachments || []).map(function (a) { return a.name; }).join("\n") + "\n\nOpen the expense to replace or remove attachments.", onClick: function () { set(Object.assign({}, x)); window.scrollTo(0, 0); } }, "\ud83d\udcce ", String(x.attachments.length))
                   : h("span", { className: "cap" }, "\u2014")),
-                h("td", null, can(user, "approveExpenses")
+                h("td", { "data-sort": x.status }, can(user, "approveExpenses") && !own
                   ? h("select", { value: x.status, onChange: function (e) { setStatus(x, e.target.value); }, className: "minisel" }, REIMB.map(function (s) { return h("option", { key: s, value: s }, s); }))
                   : h(Chip, { k: x.status === "Paid" ? "gr" : x.status === "Rejected" ? "err" : x.status === "Approved" ? "teal" : "amber" }, x.status)),
                 h("td", null, x.description, x.notes ? h("div", { className: "cap" }, x.notes) : null),
@@ -22510,17 +22519,17 @@ function MgmtPanel(p) {
       return [
         h("div", null, h("b", null, u.fullName), u.fullNameHe ? h("div", { className: "cap he" }, u.fullNameHe) : null),
         h("span", { className: "cap" }, u.email),
-        isAdmin ? h("select", { value: u.role, onChange: function (e) {
+        isAdmin && u.id !== user.id ? h("select", { value: u.role, onChange: function (e) {
             var v = e.target.value;
             p.mutate(function (d) { var t = byId(d.users, u.id); if (t) { var b = t.role; t.role = v; audit(d, user.id, "Role change " + b + " → " + v + " for " + t.fullName, "users", u.id, null, null); } });
           }, className: "minisel" },
             ROLES.map(function (r) { return h("option", { key: r.code, value: r.code }, r.name); }))
-          : h(Chip, { k: "gr" }, roleName(u.role)),
+          : h(Chip, { k: "gr", title: u.id === user.id ? "Your own role is changed by another administrator" : null }, roleName(u.role)),
         u.teamId ? nameOf(db.teams, u.teamId) : "—",
         u.managerId ? userName(db, u.managerId) : "—",
         h("div", { className: "row", style: { gap: 5 } },
           u.pendingActivation ? h(Chip, { k: "amber" }, "pending") : u.isActive ? h(Chip, { k: "gr" }, "active") : h(Chip, { k: "mut" }, "Inactive"),
-          isAdmin && !u.pendingActivation ? h(Btn, { sm: true, kind: "t", onClick: function () {
+          isAdmin && !u.pendingActivation && u.id !== user.id ? h(Btn, { sm: true, kind: "t", onClick: function () {
             p.mutate(function (d) { var t = byId(d.users, u.id); if (t) { t.isActive = !t.isActive; audit(d, user.id, (t.isActive ? "Activated " : "Deactivated ") + t.fullName, "users", u.id, null, null); } });
           } }, u.isActive ? "Deactivate" : "Reactivate") : null)
       ];
@@ -22596,10 +22605,13 @@ function MgmtPanel(p) {
             h("td", { style: { whiteSpace: "nowrap" } }, nameOf(db.projects, a.projectId),
               a.until ? h("div", { className: "cap" }, "team loan \u00b7 ", il(a.from), " \u2013 ", il(a.until)) : null),
             h("td", null, h(CopyCell, { value: a.workOrderId ? nameOf(db.workOrders, a.workOrderId, "code") : "" })),
-            h("td", { className: "num" }, h("input", {
+            h("td", { className: "num", "data-sort": unlimited ? "" : Number(a.allowanceHours) }, a.userId === user.id
+              ? h("span", { className: "tnum", title: "Your own allowance is raised through My assignments → Request hours" }, unlimited ? "∞" : num(a.allowanceHours))
+              : h("input", {
               type: "number", defaultValue: unlimited ? "" : a.allowanceHours, placeholder: "∞", className: "miniinp", style: { width: 78 },
               onBlur: function (e) {
                 var v = e.target.value === "" ? null : Number(e.target.value);
+                if (v === (unlimited ? null : Number(a.allowanceHours))) return;
                 p.mutate(function (d) { var t = byId(d.assignments, a.id); if (t) { var b = t.allowanceHours; t.allowanceHours = v; audit(d, user.id, "Allowance " + b + " → " + v, "assignments", a.id, null, null); } });
               }
             })),
@@ -22928,7 +22940,7 @@ function MobileEntrySheet(p) {
     if (k === "clientId") { n.projectId = ""; n.workOrderId = ""; n.taskId = ""; }
     if (k === "projectId") {
       n.workOrderId = ""; n.taskId = "";
-      var pr = byId(db.projects, v); if (pr) { n.clientId = pr.clientId; n.projectStatus = n.projectStatus || pr.status; }
+      var pr = byId(db.projects, v); if (pr) n.clientId = pr.clientId;
     }
     if (k === "workOrderId") n.taskId = "";
     if (k === "type" && v !== "Work") n.hourType = "yellow";
@@ -23179,6 +23191,7 @@ function MobileTasks(p) {
 
   function move(t, v) {
     if (v === t.status) return;
+    if (!canMoveTask(db, user, t)) { toast("Only this task's assignees, or someone who manages its project's tasks, can change its status.", "error"); return; }
     if (["Done", "Cancelled"].indexOf(v) < 0 && taskIsBlocked(db, t)) { toast("This task is blocked by a dependency that is not Done.", "error"); return; }
     p.mutate(function (d) {
       var rec = byId(d.tasks, t.id); if (!rec) return;
@@ -23212,9 +23225,11 @@ function MobileTasks(p) {
           t.dueDate ? h("span", { className: "tnum", style: isOverdue(t) ? { color: C.error, fontWeight: 700 } : null }, "due ", il(t.dueDate)) : null,
           h("span", { className: "tnum" }, num(cons), t.allowanceHours ? " / " + num(t.allowanceHours) : "", " h")),
         h("div", { className: "row", style: { gap: 6 } },
-          h("select", { className: "minisel", style: { minHeight: 40, flex: 1 }, value: t.status, "aria-label": "Status of " + t.title,
-            onChange: function (e) { move(t, e.target.value); } },
-            TASK_STATUSES.map(function (sname) { return h("option", { key: sname, value: sname }, sname); })),
+          canMoveTask(db, user, t)
+            ? h("select", { className: "minisel", style: { minHeight: 40, flex: 1 }, value: t.status, "aria-label": "Status of " + t.title,
+                onChange: function (e) { move(t, e.target.value); } },
+                TASK_STATUSES.map(function (sname) { return h("option", { key: sname, value: sname }, sname); }))
+            : h("span", { className: "grow" }, h(Chip, { k: "mut", style: { background: TS_COLOR[t.status] + "1E", color: TS_COLOR[t.status], borderColor: TS_COLOR[t.status] + "55" } }, t.status)),
           can(user, "createTasks") || can(user, "assignTasks") ? h(Btn, { sm: true, onClick: function () { setEditing(Object.assign({}, t, { assignees: taskAssigneeIds(db, t.id) })); } }, "✎") : null));
     }),
     editing ? h(TaskEditor, {
