@@ -18926,6 +18926,61 @@ function Toasts(p) {
     }));
 }
 
+/* In-app question dialog — replaces the browser's own prompt() and confirm()
+   boxes. ask({ title, message, input, label, value, placeholder, okLabel, danger })
+   resolves with the typed text (input) or true, and with null on Cancel. */
+var _askFn = null;
+function ask(opts) {
+  return new Promise(function (resolve) {
+    if (!_askFn) { resolve(null); return; }
+    _askFn(Object.assign({}, opts, { resolve: resolve }));
+  });
+}
+function AskHost() {
+  var st = useState(null), req = st[0], setReq = st[1];
+  var vs = useState(""), val = vs[0], setVal = vs[1];
+  var boxRef = useRef(null), okRef = useRef(null);
+  useEffect(function () {
+    _askFn = function (r) { setVal(r.value == null ? "" : String(r.value)); setReq(r); };
+    return function () { _askFn = null; };
+  }, []);
+  function done(result) { var r = req; setReq(null); if (r) r.resolve(result); }
+  function ok() {
+    if (req.input) { var v = val.trim(); if (v) done(v); }
+    else done(true);
+  }
+  useEffect(function () {
+    if (!req) return;
+    var t = setTimeout(function () {
+      var inp = boxRef.current ? boxRef.current.querySelector("input") : null;
+      if (inp) { inp.focus(); inp.select(); }
+      else if (okRef.current) okRef.current.focus();
+    }, 0);
+    /* capture phase, so Escape closes only this dialog and not a modal underneath */
+    var key = function (e) {
+      if (e.key === "Escape") { e.preventDefault(); e.stopImmediatePropagation(); done(null); }
+    };
+    window.addEventListener("keydown", key, true);
+    return function () { clearTimeout(t); window.removeEventListener("keydown", key, true); };
+  }, [req]);
+  if (!req) return null;
+  return h("div", { className: "ovl", style: { zIndex: 95 }, onMouseDown: function (e) { if (e.target === e.currentTarget) done(null); } },
+    h("div", { className: "modal sm", role: "dialog", "aria-modal": "true", "aria-label": req.title, ref: boxRef },
+      h("header", null, h("div", { className: "h2 grow" }, req.title),
+        h("button", { className: "iconbtn", style: { color: C.muted }, onClick: function () { done(null); }, "aria-label": "Close" }, "\u2715")),
+      h("div", { className: "body col", style: { gap: 10 } },
+        req.message ? h("p", { style: { margin: 0 } }, req.message) : null,
+        req.input ? h(Inp, {
+          label: req.label || "Name", value: val, placeholder: req.placeholder || "",
+          onChange: function (e) { setVal(e.target.value); },
+          onKeyDown: function (e) { if (e.key === "Enter") { e.preventDefault(); ok(); } }
+        }) : null),
+      h("footer", null,
+        h("div", { className: "grow" }),
+        h(Btn, { onClick: function () { done(null); } }, "Cancel"),
+        h("button", { ref: okRef, type: "button", className: "btn " + (req.danger ? "d" : "p"), disabled: !!req.input && !val.trim(), onClick: ok }, req.okLabel || "OK"))));
+}
+
 /* multi-select dropdown — §7.1 "a compact multi-select dropdown replaces the older chip row" */
 function MultiSelect(p) {
   var st = useState(false), open = st[0], setOpen = st[1];
@@ -19339,21 +19394,26 @@ function STable(p) {
   var cur = live.view ? saved.views.filter(function (v) { return v.name === live.view; })[0] : null;
   function applyView(v) { tvSet(id, tvFromView(v)); toast("View “" + v.name + "” applied.", "ok"); }
   function saveView() {
-    var s = tvSaved(id);
-    var name = window.prompt("Save the current sort, column order and widths as a view. Name:", live.view || "");
-    if (!name || !name.trim()) return;
-    name = name.trim();
-    var exists = s.views.some(function (v) { return v.name === name; });
-    if (exists && !window.confirm("A view called “" + name + "” already exists. Replace it?")) return;
-    var v = { name: name, sort: sort, order: live.order ? order.slice() : null, widths: sized ? Object.assign({}, widths) : null };
-    var views = s.views.filter(function (x) { return x.name !== name; }).concat([v]);
-    if (tvSetSaved(id, { views: views, dflt: s.dflt })) { tvSet(id, { view: name }); toast("View “" + name + "” saved.", "ok"); }
+    var snap = { sort: sort, order: live.order ? order.slice() : null, widths: sized ? Object.assign({}, widths) : null };
+    ask({ title: "Save view", message: "Saves the current sort, column order and column widths of this table under a name.", input: true, label: "View name", value: live.view || "", placeholder: "e.g. Newest first", okLabel: "Save view" }).then(function (name) {
+      if (!name) return null;
+      var exists = tvSaved(id).views.some(function (v) { return v.name === name; });
+      var go = exists ? ask({ title: "Replace view?", message: "A view called \u201c" + name + "\u201d already exists on this table. Replace it with the current layout?", okLabel: "Replace" }) : Promise.resolve(true);
+      return go.then(function (yes) {
+        if (!yes) return;
+        var cur = tvSaved(id);
+        var views = cur.views.filter(function (x) { return x.name !== name; }).concat([Object.assign({ name: name }, snap)]);
+        if (tvSetSaved(id, { views: views, dflt: cur.dflt })) { tvSet(id, { view: name }); toast("View \u201c" + name + "\u201d saved.", "ok"); }
+      });
+    });
   }
   function delView(v) {
-    var s = tvSaved(id);
-    if (!window.confirm("Delete the saved view “" + v.name + "”?")) return;
-    tvSetSaved(id, { views: s.views.filter(function (x) { return x.name !== v.name; }), dflt: s.dflt === v.name ? null : s.dflt });
-    tvSet(id, { view: null });
+    ask({ title: "Delete view?", message: "Delete the saved view \u201c" + v.name + "\u201d from this table?", okLabel: "Delete", danger: true }).then(function (yes) {
+      if (!yes) return;
+      var s = tvSaved(id);
+      tvSetSaved(id, { views: s.views.filter(function (x) { return x.name !== v.name; }), dflt: s.dflt === v.name ? null : s.dflt });
+      tvSet(id, { view: null });
+    });
   }
   function toggleDefault(v) {
     var s = tvSaved(id);
@@ -22061,8 +22121,10 @@ function ListEditor(pp) {
             h("td", { className: "num" }, h(Chip, { k: "mut" }, usageCount(db, kind, o.id), " records")),
             pp.canEdit ? h("td", { style: { whiteSpace: "nowrap" } },
               h(Btn, { sm: true, kind: "t", className: "tap", title: "Rename", onClick: function () {
-                var v = window.prompt("New name", o[pp.nameField || "name"]);
-                if (v) renameItem(o.id, pp.nameField || "name", v);
+                var field = pp.nameField || "name", old = o[field];
+                ask({ title: "Rename " + (pp.itemLabel || "item"), input: true, label: "New name", value: old, okLabel: "Rename" }).then(function (v) {
+                  if (v && v !== old) { renameItem(o.id, field, v); toast("Renamed to \u201c" + v + "\u201d.", "ok"); }
+                });
               } }, "✎"),
               h(Btn, { sm: true, kind: "t", className: "tap", title: "Remove", onClick: function () { removeItem(o.id); } }, "🗑")) : null);
         })))));
@@ -22528,7 +22590,7 @@ function MgmtPanel(p) {
 
   if (section === "teams") return h(TeamsPanel, { db: db, user: user, mutate: p.mutate });
 
-  if (section === "people") return h(ListEditor, {
+  if (section === "people") return h(ListEditor, { itemLabel: "person",
     db: db, user: user, mutate: p.mutate, kind: "users", canEdit: false,
     cols: ["Name", "Email", "Role", "Team", "Manager", "Status"],
     row: function (u) {
@@ -22644,7 +22706,7 @@ function MgmtPanel(p) {
             } }, "🗑") : null));
         })))));
 
-  if (section === "clients") return h(ListEditor, {
+  if (section === "clients") return h(ListEditor, { itemLabel: "client",
     db: db, user: user, mutate: p.mutate, kind: "clients", canEdit: canLists, nameField: "name",
     cols: ["Name", "Initials", "Contact", "Verified"],
     row: function (c) {
@@ -22658,7 +22720,7 @@ function MgmtPanel(p) {
     }
   });
 
-  if (section === "projects") return h(ListEditor, {
+  if (section === "projects") return h(ListEditor, { itemLabel: "project",
     db: db, user: user, mutate: p.mutate, kind: "projects", canEdit: canLists, nameField: "name",
     cols: ["Project", "Client", "Status", "Owner", "WO tracked"],
     row: function (x) {
@@ -22677,7 +22739,7 @@ function MgmtPanel(p) {
     }
   });
 
-  if (section === "expenseTypes") return h(ListEditor, {
+  if (section === "expenseTypes") return h(ListEditor, { itemLabel: "expense type",
     db: db, user: user, mutate: p.mutate, kind: "expenseTypes", canEdit: isAdmin, nameField: "name",
     cols: ["Type", "Evidence required", "Auto-approval ceiling"],
     row: function (t) {
@@ -22861,8 +22923,9 @@ function AdminModal(p) {
             h("div", { className: "h3" }, "Reset"),
             h("div", { className: "cap" }, "Wipes local data and reloads the demonstration seed. The storage key ", h("span", { className: "mono" }, KEY), " itself never changes."),
             h(Btn, { kind: "d", onClick: function () {
-              if (!window.confirm("Wipe local data and reload the seed?")) return;
-              writeRaw(wrap(seed())); location.reload();
+              ask({ title: "Reset to seed data?", message: "This wipes every record stored in this browser and reloads the demonstration data. It cannot be undone \u2014 download a backup first if you need one.", okLabel: "Wipe and reload", danger: true }).then(function (yes) {
+                if (yes) { writeRaw(wrap(seed())); location.reload(); }
+              });
             } }, "Reset to seed data"))) : null,
 
         tab === "audit" ? h("div", { className: "col", style: { gap: 8 } },
@@ -23692,12 +23755,12 @@ function App() {
       authMode === "signup"
         ? h(SignUp, { db: db, onSubmit: register, onCancel: function () { setAuthMode("signin"); } })
         : h(SignIn, { db: db, onSignIn: signIn, onSignUp: function () { setAuthMode("signup"); } }),
-      h(Toasts, { items: toasts, dismiss: dismiss }));
+      h(Toasts, { items: toasts, dismiss: dismiss }), h(AskHost));
   }
   if (user.pendingActivation || !user.isActive) {
     return h(React.Fragment, null,
       h(PendingActivation, { user: user, onSignOut: signOut }),
-      h(Toasts, { items: toasts, dismiss: dismiss }));
+      h(Toasts, { items: toasts, dismiss: dismiss }), h(AskHost));
   }
 
   /* §14.4 — below the breakpoint the phone shell renders instead, unless the
@@ -23709,7 +23772,7 @@ function App() {
         db: db, user: user, mutate: mutate, theme: theme, setTheme: setTheme, onSignOut: signOut,
         onForceDesktop: function () { setViewPref("desktop"); toast("Desktop layout pinned on this device. My profile \u2192 Layout switches back.", ""); }
       }),
-      h(Toasts, { items: toasts, dismiss: dismiss }));
+      h(Toasts, { items: toasts, dismiss: dismiss }), h(AskHost));
   }
 
   var approvalCount = openApprovalsFor(db, user).length;
@@ -23778,7 +23841,7 @@ function App() {
     admin ? h(AdminModal, Object.assign({ onClose: function () { setAdmin(false); } }, common)) : null,
     profile ? h(Profile, { db: db, user: user, viewPref: viewPref, setViewPref: setViewPref, onClose: function () { setProfile(false); }, onSignOut: signOut }) : null,
     mywork ? h(MyWork, Object.assign({ onClose: function () { setMyWork(false); } }, common)) : null,
-    h(Toasts, { items: toasts, dismiss: dismiss }));
+    h(Toasts, { items: toasts, dismiss: dismiss }), h(AskHost));
 }
 
 /* open-book line icon, drawn in currentColor like the other top-bar glyphs */
