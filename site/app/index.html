@@ -18616,21 +18616,15 @@ var CSS = [
 ".tbl th .rz{position:absolute;top:0;right:0;width:7px;height:100%;cursor:col-resize;touch-action:none;z-index:3}",
 ".tbl th .rz:hover,.tbl th .rz.on{background:rgba(140,198,62,.6)}",
 ".tbl.sized td,.tbl.sized th{overflow:hidden;text-overflow:ellipsis}",
-".tblbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:5px 6px;font-size:12px;min-height:36px}",
-".tblchip{display:inline-flex;align-items:center;gap:3px}",
-".tblchip .x{border:0;background:transparent;color:inherit;cursor:pointer;font-size:11px;padding:0 0 0 5px;line-height:1}",
-".tblbtn{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:4px 10px;font:600 12px var(--font);cursor:pointer;min-height:30px;white-space:nowrap}",
-".tblbtn:hover,.tblbtn[aria-expanded=true]{border-color:var(--deep);background:var(--wash)}",
-".tblpop{z-index:90}",
-".tblpop button:disabled{opacity:.4;cursor:default;background:transparent}",
-".tvrow{display:flex;align-items:center;gap:2px;border-radius:8px}",
-".tvrow.on{background:var(--wash)}",
-".tvrow .tvlbl{padding:4px 10px;font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}",
-".tvrow>button.grow{min-width:0;overflow:hidden;text-overflow:ellipsis}",
-".pop button.ic,.tvsort .ic{min-height:30px;min-width:30px;padding:4px 7px;text-align:center;flex:0 0 auto}",
-".pop button.ic.on{background:var(--sel);color:var(--selfg)}",
-".tvsort{display:flex;align-items:center;gap:4px;padding:2px 6px 6px}",
-".tvsort select{flex:1;min-width:0}",
+".tblbar{display:flex;align-items:center;gap:6px 16px;flex-wrap:wrap;padding:6px 8px;font-size:12px}",
+".tbg{display:flex;align-items:center;gap:4px;flex-wrap:nowrap}",
+".tbg .tbl-l{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-right:2px;white-space:nowrap}",
+".tbg .minisel{max-width:190px}",
+".tblbtn{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:4px 9px;font:600 12px var(--font);cursor:pointer;min-height:32px;white-space:nowrap}",
+".tblbtn.ic{min-width:32px;padding:4px 7px;text-align:center}",
+".tblbtn:hover:not(:disabled){border-color:var(--deep);background:var(--wash)}",
+".tblbtn.on{background:var(--sel);color:var(--selfg);border-color:var(--sel)}",
+".tblbtn:disabled{opacity:.4;cursor:default}",
 ".copy{white-space:nowrap;cursor:pointer;border:0;background:transparent;padding:0;font:inherit;color:inherit;text-align:left;display:inline-flex;align-items:center;gap:5px;border-radius:6px}",
 ".copy:hover{color:var(--deep);text-decoration:underline;text-underline-offset:2px}",
 ".copy .ci{opacity:0;font-size:10px}",
@@ -19176,33 +19170,14 @@ function STable(p) {
   var fs = useState(0), force = fs[1];
   var ds = useState(null), dragCol = ds[0], setDragCol = ds[1];
   var os = useState(null), overCol = os[0], setOverCol = os[1];
-  var ms = useState(null), menu = ms[0], setMenu = ms[1];
-  var headRef = useRef(null), btnRef = useRef(null), popRef = useRef(null), busy = useRef(0);
+  var mc = useState(""), moveSel = mc[0], setMoveSel = mc[1];
+  var headRef = useRef(null), busy = useRef(0);
 
   useEffect(function () {
     var f = function () { force(function (n) { return n + 1; }); };
     (_tvSubs[id] = _tvSubs[id] || []).push(f);
     return function () { _tvSubs[id] = (_tvSubs[id] || []).filter(function (x) { return x !== f; }); };
   }, [id]);
-  useEffect(function () {
-    if (!menu) return;
-    var close = function (ev) {
-      if (ev.type === "mousedown" && ((popRef.current && popRef.current.contains(ev.target)) || (btnRef.current && btnRef.current.contains(ev.target)))) return;
-      if (ev.type === "scroll" && popRef.current && popRef.current.contains(ev.target)) return;
-      setMenu(null);
-    };
-    var esc = function (ev) { if (ev.key === "Escape") setMenu(null); };
-    document.addEventListener("mousedown", close);
-    window.addEventListener("resize", close);
-    window.addEventListener("scroll", close, true);
-    document.addEventListener("keydown", esc);
-    return function () {
-      document.removeEventListener("mousedown", close);
-      window.removeEventListener("resize", close);
-      window.removeEventListener("scroll", close, true);
-      document.removeEventListener("keydown", esc);
-    };
-  }, [menu]);
 
   var live = tvGet(id);
   var kids = React.Children.toArray(p.children);
@@ -19345,9 +19320,10 @@ function STable(p) {
     tbody ? React.cloneElement(tbody, null, bodyRows) : null,
     rest);
 
-  /* ---- toolbar: current sort, saved views, reset ---- */
-  var saved = menu ? tvSaved(id) : null;
-  function applyView(v) { tvSet(id, tvFromView(v)); setMenu(null); toast("View “" + v.name + "” applied.", "ok"); }
+  /* ---- toolbar: saved views, sort, column order and resets, all on one row ---- */
+  var saved = tvSaved(id);
+  var cur = live.view ? saved.views.filter(function (v) { return v.name === live.view; })[0] : null;
+  function applyView(v) { tvSet(id, tvFromView(v)); toast("View “" + v.name + "” applied.", "ok"); }
   function saveView() {
     var s = tvSaved(id);
     var name = window.prompt("Save the current sort, column order and widths as a view. Name:", live.view || "");
@@ -19357,13 +19333,13 @@ function STable(p) {
     if (exists && !window.confirm("A view called “" + name + "” already exists. Replace it?")) return;
     var v = { name: name, sort: sort, order: live.order ? order.slice() : null, widths: sized ? Object.assign({}, widths) : null };
     var views = s.views.filter(function (x) { return x.name !== name; }).concat([v]);
-    if (tvSetSaved(id, { views: views, dflt: s.dflt })) { tvSet(id, { view: name }); setMenu(null); toast("View “" + name + "” saved.", "ok"); }
+    if (tvSetSaved(id, { views: views, dflt: s.dflt })) { tvSet(id, { view: name }); toast("View “" + name + "” saved.", "ok"); }
   }
   function delView(v) {
     var s = tvSaved(id);
     if (!window.confirm("Delete the saved view “" + v.name + "”?")) return;
     tvSetSaved(id, { views: s.views.filter(function (x) { return x.name !== v.name; }), dflt: s.dflt === v.name ? null : s.dflt });
-    if (live.view === v.name) tvSet(id, { view: null }); else force(function (k) { return k + 1; });
+    tvSet(id, { view: null });
   }
   function toggleDefault(v) {
     var s = tvSaved(id);
@@ -19371,59 +19347,42 @@ function STable(p) {
     force(function (k) { return k + 1; });
     toast(s.dflt === v.name ? "“" + v.name + "” no longer opens by default." : "“" + v.name + "” now opens by default on this table.", "ok");
   }
-  function openMenu() {
-    if (menu) { setMenu(null); return; }
-    var r = btnRef.current.getBoundingClientRect();
-    var w = 290, left = Math.max(8, Math.min(window.innerWidth - w - 8, r.right - w));
-    var top = r.bottom + 4, maxH = window.innerHeight - top - 10;
-    if (maxH < 260 && r.top > window.innerHeight / 2) { maxH = r.top - 14; top = Math.max(8, r.top - 4 - Math.min(maxH, 520)); }
-    setMenu({ left: left, top: top, maxH: Math.min(maxH, 520), w: w });
-  }
-  var sortLabel = sort ? (byCid[sort.col].label || sort.col) : null;
+  var isD = cur && saved.dflt === cur.name;
+  var mv = byCid[moveSel] ? moveSel : "";
+  var mvAt = mv ? order.indexOf(mv) : -1;
   var bar = h("div", { className: "tblbar" },
-    sort ? h("span", { className: "chip mut tblchip" }, "Sorted by ", h("b", null, sortLabel), sort.dir === "asc" ? " A→Z ▲" : " Z→A ▼",
-      h("button", { className: "x", title: "Clear the sort", "aria-label": "Clear the sort", onClick: function () { tvSet(id, { sort: null, view: null }); } }, "✕")) : null,
-    live.view ? h("span", { className: "chip gr tblchip", title: "Saved view in use" }, "★ ", live.view) : null,
-    h("span", { className: "grow" }),
-    h("button", {
-      ref: btnRef, className: "tblbtn", "aria-haspopup": "menu", "aria-expanded": menu ? "true" : "false",
-      title: "Sort, columns and saved views for this table", onClick: openMenu
-    }, "☰ View", h("span", { "aria-hidden": "true", style: { fontSize: 9 } }, " ▾")),
-    menu ? h("div", {
-      ref: popRef, className: "pop tblpop", role: "menu",
-      style: { position: "fixed", left: menu.left, top: menu.top, right: "auto", width: menu.w, maxHeight: menu.maxH, overflow: "auto" }
-    },
-      h("div", { className: "ph" }, "Saved views"),
-      saved.views.length ? saved.views.map(function (v) {
-        var isD = saved.dflt === v.name;
-        return h("div", { key: v.name, className: "tvrow" + (live.view === v.name ? " on" : "") },
-          h("button", { className: "grow", role: "menuitem", title: "Apply this view", onClick: function () { applyView(v); } }, v.name, isD ? h("span", { className: "cap" }, " · default") : null),
-          h("button", { className: "ic", title: isD ? "Stop opening this view by default" : "Open this table with this view", "aria-label": isD ? "Unset default" : "Set as default", onClick: function () { toggleDefault(v); } }, isD ? "★" : "☆"),
-          h("button", { className: "ic", title: "Delete this view", "aria-label": "Delete view " + v.name, onClick: function () { delView(v); } }, "🗑"));
-      }) : h("div", { className: "cap", style: { padding: "2px 10px 6px" } }, "No saved views for this table yet."),
-      h("button", { role: "menuitem", onClick: saveView }, "＋ Save current view…"),
-      h("div", { className: "ph" }, "Sort"),
-      h("div", { className: "tvsort" },
-        h("select", {
-          className: "minisel", "aria-label": "Sort by column", value: sort ? sort.col : "",
-          onChange: function (e) { tvSet(id, { sort: e.target.value ? { col: e.target.value, dir: sort ? sort.dir : "asc" } : null, view: null }); }
-        }, h("option", { value: "" }, "— not sorted —"),
-          cols.filter(function (c) { return c.label; }).map(function (c) { return h("option", { key: c.id, value: c.id }, c.label); })),
-        h("button", { className: "ic" + (sort && sort.dir === "asc" ? " on" : ""), disabled: !sort, title: "A→Z / lowest first", onClick: function () { tvSet(id, { sort: { col: sort.col, dir: "asc" }, view: null }); } }, "A→Z"),
-        h("button", { className: "ic" + (sort && sort.dir === "desc" ? " on" : ""), disabled: !sort, title: "Z→A / highest first", onClick: function () { tvSet(id, { sort: { col: sort.col, dir: "desc" }, view: null }); } }, "Z→A")),
-      h("div", { className: "ph" }, "Column order"),
-      order.map(function (cid, i) {
-        var c = byCid[cid];
-        return h("div", { key: cid, className: "tvrow" },
-          h("span", { className: "grow tvlbl" }, c.label || h("span", { className: "cap" }, "(actions)")),
-          h("button", { className: "ic", disabled: i === 0, title: "Move left", "aria-label": "Move " + (c.label || "column") + " left", onClick: function () { moveCol(cid, i - 1); } }, "←"),
-          h("button", { className: "ic", disabled: i === order.length - 1, title: "Move right", "aria-label": "Move " + (c.label || "column") + " right", onClick: function () { moveCol(cid, i + 1); } }, "→"));
-      }),
-      h("div", { className: "ph" }, "Reset"),
-      h("button", { role: "menuitem", disabled: !sized, onClick: function () { tvSet(id, { widths: null, view: null }); } }, "↔ Default widths (fit to content)"),
-      h("button", { role: "menuitem", disabled: !live.order, onClick: function () { tvSet(id, { order: null, view: null }); } }, "⇄ Default column order"),
-      h("button", { role: "menuitem", disabled: !sort, onClick: function () { tvSet(id, { sort: null, view: null }); } }, "✕ Clear the sort"),
-      h("button", { role: "menuitem", onClick: function () { tvSet(id, tvBlank()); setMenu(null); } }, "↺ Reset everything")) : null);
+    h("div", { className: "tbg" },
+      h("span", { className: "tbl-l" }, "View"),
+      h("select", {
+        className: "minisel", "aria-label": "Saved view", value: cur ? cur.name : "",
+        onChange: function (e) { var v = saved.views.filter(function (x) { return x.name === e.target.value; })[0]; if (v) applyView(v); else tvSet(id, { view: null }); }
+      }, h("option", { value: "" }, saved.views.length ? "— choose a saved view —" : "— no saved views —"),
+        saved.views.map(function (v) { return h("option", { key: v.name, value: v.name }, v.name + (saved.dflt === v.name ? " ★" : "")); })),
+      h("button", { className: "tblbtn", title: "Save the current sort, column order and widths as a view", onClick: saveView }, "＋ Save"),
+      h("button", { className: "tblbtn ic" + (isD ? " on" : ""), disabled: !cur, title: !cur ? "Choose a saved view first" : isD ? "Stop opening this view by default" : "Open this table with this view", "aria-label": isD ? "Unset default view" : "Set as default view", onClick: function () { toggleDefault(cur); } }, isD ? "★" : "☆"),
+      h("button", { className: "tblbtn ic", disabled: !cur, title: cur ? "Delete this saved view" : "Choose a saved view first", "aria-label": "Delete saved view", onClick: function () { delView(cur); } }, "🗑")),
+    h("div", { className: "tbg" },
+      h("span", { className: "tbl-l" }, "Sort"),
+      h("select", {
+        className: "minisel", "aria-label": "Sort by column", value: sort ? sort.col : "",
+        onChange: function (e) { tvSet(id, { sort: e.target.value ? { col: e.target.value, dir: sort ? sort.dir : "asc" } : null, view: null }); }
+      }, h("option", { value: "" }, "— not sorted —"),
+        cols.filter(function (c) { return c.label; }).map(function (c) { return h("option", { key: c.id, value: c.id }, c.label); })),
+      h("button", { className: "tblbtn ic" + (sort && sort.dir === "asc" ? " on" : ""), disabled: !sort, title: "A→Z / lowest first", onClick: function () { tvSet(id, { sort: { col: sort.col, dir: "asc" }, view: null }); } }, "A→Z"),
+      h("button", { className: "tblbtn ic" + (sort && sort.dir === "desc" ? " on" : ""), disabled: !sort, title: "Z→A / highest first", onClick: function () { tvSet(id, { sort: { col: sort.col, dir: "desc" }, view: null }); } }, "Z→A"),
+      h("button", { className: "tblbtn ic", disabled: !sort, title: "Clear the sort", "aria-label": "Clear the sort", onClick: function () { tvSet(id, { sort: null, view: null }); } }, "✕")),
+    h("div", { className: "tbg" },
+      h("span", { className: "tbl-l" }, "Move column"),
+      h("select", { className: "minisel", "aria-label": "Column to move", value: mv, onChange: function (e) { setMoveSel(e.target.value); } },
+        h("option", { value: "" }, "— column —"),
+        order.map(function (cid) { return h("option", { key: cid, value: cid }, byCid[cid].label || "(actions)"); })),
+      h("button", { className: "tblbtn ic", disabled: !mv || mvAt <= 0, title: "Move left", "aria-label": "Move column left", onClick: function () { moveCol(mv, mvAt - 1); } }, "←"),
+      h("button", { className: "tblbtn ic", disabled: !mv || mvAt >= order.length - 1, title: "Move right", "aria-label": "Move column right", onClick: function () { moveCol(mv, mvAt + 1); } }, "→")),
+    h("div", { className: "tbg" },
+      h("span", { className: "tbl-l" }, "Reset"),
+      h("button", { className: "tblbtn", disabled: !sized, title: "Automatic widths that fit the content", onClick: function () { tvSet(id, { widths: null, view: null }); } }, "↔ Widths"),
+      h("button", { className: "tblbtn", disabled: !live.order, title: "Original column order", onClick: function () { tvSet(id, { order: null, view: null }); } }, "⇄ Order"),
+      h("button", { className: "tblbtn", disabled: !sort && !sized && !live.order && !live.view, title: "Reset the sort, order and widths", onClick: function () { tvSet(id, tvBlank()); } }, "↺ All")));
 
   return h(React.Fragment, null, bar, table);
 }
