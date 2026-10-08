@@ -52,6 +52,7 @@ jobs:
           cp -r site/app pages-dist/app
           cp -r site/handbook pages-dist/handbook
           cp -r site/kb pages-dist/kb
+          cp -r site/baby pages-dist/baby
 
       - name: Upload pages artifact
         uses: actions/upload-pages-artifact@v3

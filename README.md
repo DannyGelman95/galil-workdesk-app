@@ -48,6 +48,10 @@ site/                     The other two products published to GitHub Pages
     index.html              The Employee Knowledge Base — onboarding, company
                            rules and training how-to's, opened from the
                            book button in the app's top bar.
+  baby/
+    index.html              Little Log — a newborn feeding, diaper and sleep
+                           tracker with amounts, timers and trend charts.
+                           Self-contained, data kept in the browser.
 archive/                  Superseded builds, kept for reference.
   GALIL-WorkDesk-v6.html
   galil-workdesk-dev-cdn-build.html
@@ -76,6 +80,28 @@ materials/                Data exports, backups and an older source reference.
   static file server.
 - Push to `main` and let the included workflow build and publish everything
   to GitHub Pages (see **Deployment** below).
+
+## Little Log (`site/baby/`)
+
+A mobile-first newborn tracker, published at `/baby/`. No build step and no
+network calls — open `site/baby/index.html` directly or add it to a phone's
+home screen.
+
+- **Feeds**: breastfeeding with a live left/right timer (and a "next side"
+  hint), bottles with amount (ml or oz) and breast milk/formula, and solids.
+- **Diapers**: wet, dirty, both or dry.
+- **Sleep**: start/stop timer or log a past stretch.
+- **Today** dashboard with time since the last feed/diaper/sleep and daily
+  totals; **History** grouped by day with filters; tap any entry to edit or
+  delete (with undo).
+- **Trends** over 7/14/30 days: averages vs. the previous period, bottle
+  volume, feeds, nursing time, diapers (wet/dirty) and sleep per day, plus a
+  24-hour daily-pattern chart.
+- **Settings**: baby name and birthday (age shown), units, light/dark theme,
+  JSON backup export/import, CSV export, sample data.
+
+Data lives in the browser's `localStorage` (key `littlelog.v1`) on that
+device only — use Export/Import backup to move it.
 
 ## The website (`site-mui/`)
 
