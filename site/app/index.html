@@ -18581,7 +18581,7 @@ var CSS = [
 ".dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}",
 
 /* ---- tables ---- */
-".tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}",
+".tbl{width:auto;max-width:100%;border-collapse:separate;border-spacing:0;font-size:13px}",
 ".tbl th{position:sticky;top:0;z-index:2;background:var(--chrome);color:var(--chrometx);text-align:left;font-weight:600;font-size:12px;padding:8px 9px;white-space:nowrap}",
 ".tbl th:first-child{border-radius:10px 0 0 0}",
 ".tbl th:last-child{border-radius:0 10px 0 0}",
@@ -18616,6 +18616,9 @@ var CSS = [
 ".tbl th .rz{position:absolute;top:0;right:0;width:7px;height:100%;cursor:col-resize;touch-action:none;z-index:3}",
 ".tbl th .rz:hover,.tbl th .rz.on{background:rgba(140,198,62,.6)}",
 ".tbl.sized td,.tbl.sized th{overflow:hidden;text-overflow:ellipsis}",
+".tbl th.c,.tbl td.c{text-align:center}",
+".tbl td.c>.row{justify-content:center}",
+".tbl td.c input{text-align:center}",
 ".tblbar{display:flex;align-items:center;gap:6px 16px;flex-wrap:wrap;padding:6px 8px;font-size:12px}",
 ".tbg{display:flex;align-items:center;gap:4px;flex-wrap:nowrap}",
 ".tbg .tbl-l{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-right:2px;white-space:nowrap}",
@@ -19199,6 +19202,17 @@ function STable(p) {
   });
   var byCid = {};
   cols.forEach(function (c) { byCid[c.id] = c; });
+  /* one alignment per column: text reads left; numbers, badges, controls and the
+     action buttons sit centred — the heading follows its column */
+  var centerSet = p.center || [];
+  cols.forEach(function (c) {
+    c.mid = !c.label || centerSet.indexOf(c.label) >= 0 || /(^|\s)(num|hrs)(\s|$)/.test(th0cls(c.th));
+  });
+  function th0cls(th) { return (th.props && th.props.className) || ""; }
+  function midCell(td, c) {
+    if (!c.mid || !td || !td.props) return td;
+    return React.cloneElement(td, { className: ((td.props.className || "") + " c").trim() });
+  }
 
   var order = cols.map(function (c) { return c.id; });
   if (live.order) {
@@ -19232,7 +19246,7 @@ function STable(p) {
       .map(function (x) { return x.r; });
   }
   var bodyRows = regular.map(function (r) {
-    return React.cloneElement(r.tr, null, seq.map(function (i) { return r.cells[i]; }));
+    return React.cloneElement(r.tr, null, seq.map(function (i) { return midCell(r.cells[i], cols[i]); }));
   }).concat(other);
 
   function setSort(cid) {
@@ -19284,7 +19298,7 @@ function STable(p) {
       if (sized) { st.width = widths[cid] ? widths[cid] : 120; st.minWidth = 0; st.maxWidth = "none"; }
       return React.cloneElement(th, {
         key: cid, style: st,
-        className: (th.props.className || "") + (c.label ? " srt" : "") + (overCol === cid && dragCol && dragCol !== cid ? " dragover" : "") + (dragCol === cid ? " dragging" : ""),
+        className: (th.props.className || "") + (c.mid ? " c" : "") + (c.label ? " srt" : "") + (overCol === cid && dragCol && dragCol !== cid ? " dragover" : "") + (dragCol === cid ? " dragging" : ""),
         title: c.label ? "Click to sort · drag to move the column · drag the right edge to resize" : "Drag to move the column · drag the right edge to resize",
         "aria-sort": srt === "asc" ? "ascending" : srt === "desc" ? "descending" : null,
         draggable: true,
@@ -20318,7 +20332,7 @@ function TimeLogTab(p) {
     h("div", { className: "panel scroll" },
       rows.length === 0
         ? h("div", { className: "empty" }, "No entries for ", MONTHS_FULL[m], " ", y, " with these filters.")
-        : h(STable, { id: "time-log", className: "tbl mid" },
+        : h(STable, { id: "time-log", center: ["Type", "Time", "Hours", "Project status"], className: "tbl mid" },
             h("thead", null, h("tr", null,
               ["Date", "Employee", "Type", "Time", "Hours", "Client", "Project", "Work order", "Task", "Project status", "Description", ""].map(function (c, i) {
                 return h("th", { key: i, className: c === "Hours" ? "hrs" : "" }, c);
@@ -20600,7 +20614,7 @@ function TasksTab(p) {
       : null,
 
     view === "list" ? h("div", { className: "panel scroll" },
-      h(STable, { id: "tasks-list", className: "tbl" },
+      h(STable, { id: "tasks-list", center: ["Status", "Priority", "Due", "Hours"], className: "tbl" },
         h("thead", null, h("tr", null, ["Task", "Project", "Work order", "Status", "Priority", "Assignees", "Due", "Hours", ""].map(function (c, i) { return h("th", { key: i, className: c === "Hours" ? "num" : "" }, c); }))),
         h("tbody", null, list.sort(function (a, b) { return String(a.dueDate || "9").localeCompare(String(b.dueDate || "9")); }).map(function (t) {
           var cons = taskConsumed(db, t.id);
@@ -20630,7 +20644,7 @@ function TasksTab(p) {
             psChip(pr.status),
             h("span", { className: "cap mono" }, num(use), " of ", num(alw), " h across ", tks.length, " tasks"),
             h(Bar, { used: use, total: alw, style: { width: 130 } })),
-          h(STable, { id: "tasks-project", className: "tbl" },
+          h(STable, { id: "tasks-project", center: ["Status", "Due", "Consumption"], className: "tbl" },
             h("thead", null, h("tr", null, ["Task", "Status", "Assignees", "Due", "Consumption"].map(function (c, i) { return h("th", { key: i }, c); }))),
             h("tbody", null, tks.map(function (t) {
               var cons = taskConsumed(db, t.id);
@@ -21425,7 +21439,7 @@ function ExpensesTab(p) {
 
     h("div", { className: "panel scroll" },
       rows.length === 0 ? h("div", { className: "empty" }, "No expenses this month.")
-        : h(STable, { id: "expenses", className: "tbl" },
+        : h(STable, { id: "expenses", center: ["Value", "Evidence", "Reimbursement"], className: "tbl" },
             h("thead", null, h("tr", null, ["Date", "Employee", "Type", "Value", "Client / project", "Work order", "Evidence", "Reimbursement", "Description", ""].map(function (c, i) { return h("th", { key: i, className: c === "Value" ? "num" : "" }, c); }))),
             h("tbody", null, rows.map(function (x) {
               var own = x.userId === user.id;
@@ -21605,7 +21619,7 @@ function ManagementTab(p) {
       })) : null,
 
     tab === "wos" ? h("div", { className: "panel scroll" },
-      h(STable, { id: "mgmt-wos", className: "tbl" },
+      h(STable, { id: "mgmt-wos", center: ["Status", "Dates", "Budget", "Consumed"], className: "tbl" },
         h("thead", null, h("tr", null, ["Code", "Title", "Client / project", "Status", "Contract ref", "Dates", "Budget", "Consumed", ""].map(function (c, i) { return h("th", { key: i, className: ["Budget", "Consumed"].indexOf(c) >= 0 ? "num" : "" }, c); }))),
         h("tbody", null, wos.map(function (w) {
           var pr = byId(db.projects, w.projectId) || {};
@@ -21619,7 +21633,7 @@ function ManagementTab(p) {
             h("td", { className: "mono", style: { fontSize: 12 } }, w.contractRef || "—"),
             h("td", { className: "mono", style: { fontSize: 12 } }, w.startDate ? il(w.startDate) : "—", " → ", w.endDate ? il(w.endDate) : "—"),
             h("td", { className: "num" }, b && b.hours ? num(b.hours) + " h" : "—"),
-            h("td", { className: "num" }, h("div", { className: "row", style: { gap: 6, justifyContent: "flex-end" } },
+            h("td", { className: "num" }, h("div", { className: "row", style: { gap: 6, flexWrap: "nowrap" } },
               b && b.hours ? h(Bar, { used: used, total: b.hours, style: { width: 76 } }) : null, num(used), " h")),
             h("td", null, can(user, "createWorkOrders") ? h(Btn, { sm: true, kind: "t", className: "tap", onClick: function () { setWoEdit(Object.assign({ budgetHours: b ? b.hours : "" }, w)); } }, "✎") : null));
         })))) : null,
@@ -22012,6 +22026,8 @@ function usageCount(db, kind, id) {
 }
 
 /* ---------- shared master-list editor ---------- */
+/* the master-list columns that hold a badge, a control or a short code, so they read centred */
+var LIST_CENTER_COLS = ["Initials", "Role", "Status", "Verified", "WO tracked", "Evidence required", "Auto-approval ceiling", "Used by"];
 function ListEditor(pp) {
   var db = pp.db, user = pp.user, kind = pp.kind, fields = pp.fields || [];
   var ns = useState({}), draft = ns[0], setDraft = ns[1];
@@ -22037,7 +22053,7 @@ function ListEditor(pp) {
           addItem(o); setDraft({}); toast("Added.", "ok");
         } }, "+ Add"))) : null,
     h("div", { style: { overflowX: "auto" } },
-      h(STable, { id: "mgmt-" + kind, className: "tbl mid" },
+      h(STable, { id: "mgmt-" + kind, center: LIST_CENTER_COLS, className: "tbl mid" },
         h("thead", null, h("tr", null, pp.cols.map(function (c, i) { return h("th", { key: i }, c); }), h("th", null, "Used by"), pp.canEdit ? h("th", null, "") : null)),
         h("tbody", null, (db[kind] || []).map(function (o) {
           return h("tr", { key: o.id },
@@ -22430,7 +22446,7 @@ function TeamsPanel(p) {
 
     myRequests.length ? h("div", { className: "panel pad col", style: { gap: 6 } },
       h("b", null, "Team requests"),
-      h("div", { style: { overflowX: "auto" } }, h(STable, { id: "team-requests", className: "tbl" },
+      h("div", { style: { overflowX: "auto" } }, h(STable, { id: "team-requests", center: ["Type", "Status"], className: "tbl" },
         h("thead", null, h("tr", null, ["Type", "Person", "From → to", "For", "Asked by", "Decided by", "Status"].map(function (c) { return h("th", { key: c }, c); }))),
         h("tbody", null, myRequests.map(function (r) {
           return h("tr", { key: r.id },
@@ -22472,7 +22488,7 @@ function TeamManage(p) {
       h("span", { className: "cap" }, "Lead ", h("b", null, t.leadUserId ? userName(db, t.leadUserId) : "—")),
       h("div", { className: "grow" }),
       h(Btn, { sm: true, onClick: p.onRequest }, "Request someone from another team")),
-    members.length ? h("div", { style: { overflowX: "auto" } }, h(STable, { id: "team-members", className: "tbl", style: { tableLayout: "fixed", minWidth: 640 } },
+    members.length ? h("div", { style: { overflowX: "auto" } }, h(STable, { id: "team-members", center: ["Role"], className: "tbl", style: { tableLayout: "fixed", minWidth: 640 } },
       h("thead", null, h("tr", null, [["Member", "34%"], ["Role", "20%"], ["Direct manager", "32%"], ["", "14%"]].map(function (c, i) { return h("th", { key: i, style: { width: c[1] } }, c[0]); }))),
       h("tbody", null, members.map(function (u) {
         var self = u.id === user.id && !all;
@@ -22483,7 +22499,7 @@ function TeamManage(p) {
             : h("select", { className: "minisel", value: u.managerId || "", "aria-label": "Direct manager of " + u.fullName, onChange: function (e) { p.setManager(u, e.target.value); } },
               h("option", { value: "" }, "— none —"),
               p.managers.filter(function (m) { return m.value !== u.id; }).map(function (m) { return h("option", { key: m.value, value: m.value }, m.label); }))),
-          h("td", { style: { textAlign: "right", verticalAlign: "middle" } }, self ? null : h(Btn, { sm: true, kind: "t", onClick: function () { p.removeMember(u, t); } }, "Remove")));
+          h("td", { style: { verticalAlign: "middle" } }, self ? null : h(Btn, { sm: true, kind: "t", onClick: function () { p.removeMember(u, t); } }, "Remove")));
       })))) : h("div", { className: "cap" }, "No members yet."),
     loans.length ? h("div", { className: "col", style: { gap: 4 } },
       h("b", null, "Temporary members"),
@@ -22594,7 +22610,7 @@ function MgmtPanel(p) {
           toast("Assignment created.", "ok");
         } }, "+ Assign"))) : null,
     h("div", { style: { overflowX: "auto" } },
-      h(STable, { id: "mgmt-assignments", className: "tbl mid" },
+      h(STable, { id: "mgmt-assignments", center: ["Allowance", "Consumed", "In approval", "Remaining"], className: "tbl mid" },
         h("thead", null, h("tr", null, ["Person", "Project", "Work order", "Allowance", "Consumed", "In approval", "Remaining", ""].map(function (c, i) { return h("th", { key: i, className: ["Allowance", "Consumed", "In approval"].indexOf(c) >= 0 ? "num" : "" }, c); }))),
         h("tbody", null, db.assignments.map(function (a) {
           var used = consumedOn(db, a.userId, a), pend = pendingOn(db, a.userId, a);
@@ -22618,7 +22634,7 @@ function MgmtPanel(p) {
             h("td", { className: "num" }, num(used)),
             h("td", { className: "num", style: { color: C.amber } }, num(pend)),
             h("td", { style: { whiteSpace: "nowrap" } }, unlimited ? h("span", { className: "cap" }, "∞")
-              : h("div", { className: "row", style: { gap: 8, flexWrap: "nowrap", justifyContent: "flex-end" } },
+              : h("div", { className: "row", style: { gap: 8, flexWrap: "nowrap" } },
                   h("span", { className: "tnum", style: { minWidth: 42, textAlign: "right" } }, num(Number(a.allowanceHours) - used), " h"),
                   h(Bar, { used: used, pending: pend, total: a.allowanceHours, style: { width: 84 } }),
                   h("span", { style: { minWidth: 54, display: "inline-flex", justifyContent: "flex-end" } },
@@ -22679,7 +22695,7 @@ function MgmtPanel(p) {
       var pendC = db.clients.filter(function (c) { return !c.isVerified; });
       var pendP = db.projects.filter(function (x) { return !x.isVerified; });
       if (!pendC.length && !pendP.length) return h("div", { className: "empty panel" }, "Nothing to verify.");
-      return h("div", { style: { overflowX: "auto" } }, h(STable, { id: "mgmt-verify", className: "tbl mid" },
+      return h("div", { style: { overflowX: "auto" } }, h(STable, { id: "mgmt-verify", center: ["Kind"], className: "tbl mid" },
         h("thead", null, h("tr", null, ["Kind", "Name", "Context", ""].map(function (c, i) { return h("th", { key: i }, c); }))),
         h("tbody", null,
           pendC.map(function (c) {
@@ -22765,7 +22781,7 @@ function AdminModal(p) {
         tab === "roles" ? h("div", { className: "col", style: { gap: 10 } },
           h("div", { className: "cap" }, "Y permitted · O own records only · T own team only · P own projects only · – denied. In the cloud build every rule below is enforced by PostgreSQL Row Level Security, not by the browser."),
           h("div", { style: { overflow: "auto" } },
-            h(STable, { id: "admin-roles", className: "tbl" },
+            h(STable, { id: "admin-roles", center: ROLE_ORDER, className: "tbl" },
               h("thead", null, h("tr", null, h("th", null, "Capability"), ROLE_ORDER.map(function (r) { return h("th", { key: r, style: { textAlign: "center" } }, r); }))),
               h("tbody", null, Object.keys(PERM).map(function (cap) {
                 return h("tr", { key: cap },
@@ -22851,7 +22867,7 @@ function AdminModal(p) {
 
         tab === "audit" ? h("div", { className: "col", style: { gap: 8 } },
           h("div", { className: "cap" }, "Append-only. Every sign-in, sign-out, role change and approval action is recorded with actor, timestamp and IP."),
-          h("div", { style: { overflowX: "auto" } }, h(STable, { id: "admin-audit", className: "tbl" },
+          h("div", { style: { overflowX: "auto" } }, h(STable, { id: "admin-audit", center: ["IP"], className: "tbl" },
             h("thead", null, h("tr", null, ["When", "Actor", "Action", "Entity", "IP"].map(function (c, i) { return h("th", { key: i }, c); }))),
             h("tbody", null, db.audit.slice(0, 400).map(function (a) {
               return h("tr", { key: a.id },
@@ -23499,7 +23515,7 @@ function MyWork(p) {
     h("div", { className: "cap", style: { textAlign: "center" } }, "Yellow time on an unassigned project is accepted, but routed to approval. A manager grants assignments under Management \u2192 Assignments & allowances."));
   return h(Modal, { title: "My assignments and allowances", size: "lg", onClose: p.onClose },
     h("div", { style: { overflowX: "auto" } },
-    h(STable, { id: "my-assignments", className: "tbl mid" },
+    h(STable, { id: "my-assignments", center: ["Allowance", "Consumed", "In approval", "Remaining"], className: "tbl mid" },
       h("thead", null, h("tr", null, ["Project", "Work order", "Allowance", "Consumed", "In approval", "Remaining", ""].map(function (c, i) { return h("th", { key: i, className: i > 1 && i < 5 ? "num" : "" }, c); }))),
       h("tbody", null, mine.map(function (a) {
         var used = consumedOn(db, user.id, a), pend = pendingOn(db, user.id, a);
@@ -23514,7 +23530,7 @@ function MyWork(p) {
           h("td", { className: "num" }, num(used)),
           h("td", { className: "num", style: { color: C.amber } }, num(pend)),
           h("td", { style: { whiteSpace: "nowrap" } }, unlimited ? h("span", { className: "cap" }, "\u2014")
-            : h("div", { className: "row", style: { gap: 8, flexWrap: "nowrap", justifyContent: "flex-end" } },
+            : h("div", { className: "row", style: { gap: 8, flexWrap: "nowrap" } },
                 h("span", { className: "tnum", style: { minWidth: 42, textAlign: "right" } }, num(Number(a.allowanceHours) - used), " h"),
                 h(Bar, { used: used, pending: pend, total: a.allowanceHours, style: { width: 92 } }),
                 h("span", { style: { minWidth: 54, display: "inline-flex", justifyContent: "flex-end" } },
