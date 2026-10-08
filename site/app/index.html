@@ -19229,7 +19229,7 @@ function STable(p) {
   var ds = useState(null), dragCol = ds[0], setDragCol = ds[1];
   var os = useState(null), overCol = os[0], setOverCol = os[1];
   var mc = useState(""), moveSel = mc[0], setMoveSel = mc[1];
-  var headRef = useRef(null), busy = useRef(0);
+  var headRef = useRef(null), busy = useRef(0), tblRef = useRef(null);
 
   useEffect(function () {
     var f = function () { force(function (n) { return n + 1; }); };
@@ -19384,7 +19384,37 @@ function STable(p) {
     tStyle.width = order.reduce(function (a, cid) { return a + (widths[cid] || 120); }, 0);
     tStyle.minWidth = 0;
   }
-  var table = h("table", { className: (p.className || "tbl") + (sized ? " sized" : ""), style: tStyle },
+  /* every table fills its panel. Columns keep the width their content needs and
+     the leftover space goes to one text column (p.grow, else the first text column),
+     so numbers and badges never float in wide empty cells. */
+  var growCol = (p.grow && byCid[p.grow] && byCid[p.grow].id) || (cols.filter(function (c) { return c.label && !c.mid; })[0] || {}).id;
+  var growAt = growCol ? order.indexOf(growCol) : -1;
+  function fill() {
+    var t = tblRef.current;
+    if (!t) return;
+    var ths = headRef.current ? headRef.current.children : [];
+    for (var i = 0; i < ths.length; i++) if (ths[i].dataset.fill) { ths[i].style.width = ""; delete ths[i].dataset.fill; }
+    t.style.width = "";
+    if (sized || growAt < 0 || !ths[growAt]) return;
+    var box = t.parentElement, cs = window.getComputedStyle(box);
+    var avail = box.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+    var natural = t.offsetWidth, slack = Math.floor(avail - natural);
+    if (slack <= 1) return;
+    var g = ths[growAt];
+    g.style.width = (g.getBoundingClientRect().width + slack) + "px";
+    g.dataset.fill = "1";
+    t.style.width = "100%";
+  }
+  React.useLayoutEffect(fill);
+  useEffect(function () {
+    var on = function () { fill(); };
+    window.addEventListener("resize", on);
+    var ro = window.ResizeObserver && tblRef.current ? new ResizeObserver(on) : null;
+    if (ro) ro.observe(tblRef.current.parentElement);
+    return function () { window.removeEventListener("resize", on); if (ro) ro.disconnect(); };
+  }, []);
+
+  var table = h("table", { ref: tblRef, className: (p.className || "tbl") + (sized ? " sized" : ""), style: tStyle },
     h("thead", thead ? thead.props : null, head),
     tbody ? React.cloneElement(tbody, null, bodyRows) : null,
     rest);
@@ -20392,7 +20422,7 @@ function TimeLogTab(p) {
     h("div", { className: "panel scroll" },
       rows.length === 0
         ? h("div", { className: "empty" }, "No entries for ", MONTHS_FULL[m], " ", y, " with these filters.")
-        : h(STable, { id: "time-log", center: ["Type", "Time", "Hours", "Project status"], className: "tbl mid" },
+        : h(STable, { id: "time-log", grow: "Description", center: ["Type", "Time", "Hours", "Project status"], className: "tbl mid" },
             h("thead", null, h("tr", null,
               ["Date", "Employee", "Type", "Time", "Hours", "Client", "Project", "Work order", "Task", "Project status", "Description", ""].map(function (c, i) {
                 return h("th", { key: i, className: c === "Hours" ? "hrs" : "" }, c);
@@ -20674,7 +20704,7 @@ function TasksTab(p) {
       : null,
 
     view === "list" ? h("div", { className: "panel scroll" },
-      h(STable, { id: "tasks-list", center: ["Status", "Priority", "Due", "Hours"], className: "tbl" },
+      h(STable, { id: "tasks-list", grow: "Task", center: ["Status", "Priority", "Due", "Hours"], className: "tbl" },
         h("thead", null, h("tr", null, ["Task", "Project", "Work order", "Status", "Priority", "Assignees", "Due", "Hours", ""].map(function (c, i) { return h("th", { key: i, className: c === "Hours" ? "num" : "" }, c); }))),
         h("tbody", null, list.sort(function (a, b) { return String(a.dueDate || "9").localeCompare(String(b.dueDate || "9")); }).map(function (t) {
           var cons = taskConsumed(db, t.id);
@@ -20704,7 +20734,7 @@ function TasksTab(p) {
             psChip(pr.status),
             h("span", { className: "cap mono" }, num(use), " of ", num(alw), " h across ", tks.length, " tasks"),
             h(Bar, { used: use, total: alw, style: { width: 130 } })),
-          h(STable, { id: "tasks-project", center: ["Status", "Due", "Consumption"], className: "tbl" },
+          h(STable, { id: "tasks-project", grow: "Task", center: ["Status", "Due", "Consumption"], className: "tbl" },
             h("thead", null, h("tr", null, ["Task", "Status", "Assignees", "Due", "Consumption"].map(function (c, i) { return h("th", { key: i }, c); }))),
             h("tbody", null, tks.map(function (t) {
               var cons = taskConsumed(db, t.id);
@@ -21499,7 +21529,7 @@ function ExpensesTab(p) {
 
     h("div", { className: "panel scroll" },
       rows.length === 0 ? h("div", { className: "empty" }, "No expenses this month.")
-        : h(STable, { id: "expenses", center: ["Value", "Evidence", "Reimbursement"], className: "tbl" },
+        : h(STable, { id: "expenses", grow: "Description", center: ["Value", "Evidence", "Reimbursement"], className: "tbl" },
             h("thead", null, h("tr", null, ["Date", "Employee", "Type", "Value", "Client / project", "Work order", "Evidence", "Reimbursement", "Description", ""].map(function (c, i) { return h("th", { key: i, className: c === "Value" ? "num" : "" }, c); }))),
             h("tbody", null, rows.map(function (x) {
               var own = x.userId === user.id;
@@ -21679,7 +21709,7 @@ function ManagementTab(p) {
       })) : null,
 
     tab === "wos" ? h("div", { className: "panel scroll" },
-      h(STable, { id: "mgmt-wos", center: ["Status", "Dates", "Budget", "Consumed"], className: "tbl" },
+      h(STable, { id: "mgmt-wos", grow: "Title", center: ["Status", "Dates", "Budget", "Consumed"], className: "tbl" },
         h("thead", null, h("tr", null, ["Code", "Title", "Client / project", "Status", "Contract ref", "Dates", "Budget", "Consumed", ""].map(function (c, i) { return h("th", { key: i, className: ["Budget", "Consumed"].indexOf(c) >= 0 ? "num" : "" }, c); }))),
         h("tbody", null, wos.map(function (w) {
           var pr = byId(db.projects, w.projectId) || {};
@@ -21706,7 +21736,7 @@ function ManagementTab(p) {
       onDelete: function (f) { p.mutate(function (d) { d.budgets = d.budgets.filter(function (x) { return x.id !== f.id; }); audit(d, user.id, "Budget deleted", "budgets", f.id, f, null); }); setEditing(null); } }) : null,
     woEdit ? h(WOEditor, { db: db, value: woEdit, nextCode: nextCode, onSave: saveWO, onClose: function () { setWoEdit(null); } }) : null,
     history ? h(Modal, { title: "Budget change history", size: "md", onClose: function () { setHistory(null); } },
-      h(STable, { id: "budget-history", className: "tbl" },
+      h(STable, { id: "budget-history", grow: "Field", className: "tbl" },
         h("thead", null, h("tr", null, ["When", "Actor", "Field", "From", "To"].map(function (c, i) { return h("th", { key: i }, c); }))),
         h("tbody", null, (history.history || []).slice().reverse().map(function (x, i) {
           return h("tr", { key: i },
@@ -22113,7 +22143,7 @@ function ListEditor(pp) {
           addItem(o); setDraft({}); toast("Added.", "ok");
         } }, "+ Add"))) : null,
     h("div", { style: { overflowX: "auto" } },
-      h(STable, { id: "mgmt-" + kind, center: LIST_CENTER_COLS, className: "tbl mid" },
+      h(STable, { id: "mgmt-" + kind, grow: pp.cols[0], center: LIST_CENTER_COLS, className: "tbl mid" },
         h("thead", null, h("tr", null, pp.cols.map(function (c, i) { return h("th", { key: i }, c); }), h("th", null, "Used by"), pp.canEdit ? h("th", null, "") : null)),
         h("tbody", null, (db[kind] || []).map(function (o) {
           return h("tr", { key: o.id },
@@ -22508,7 +22538,7 @@ function TeamsPanel(p) {
 
     myRequests.length ? h("div", { className: "panel pad col", style: { gap: 6 } },
       h("b", null, "Team requests"),
-      h("div", { style: { overflowX: "auto" } }, h(STable, { id: "team-requests", center: ["Type", "Status"], className: "tbl" },
+      h("div", { style: { overflowX: "auto" } }, h(STable, { id: "team-requests", grow: "For", center: ["Type", "Status"], className: "tbl" },
         h("thead", null, h("tr", null, ["Type", "Person", "From → to", "For", "Asked by", "Decided by", "Status"].map(function (c) { return h("th", { key: c }, c); }))),
         h("tbody", null, myRequests.map(function (r) {
           return h("tr", { key: r.id },
@@ -22550,8 +22580,8 @@ function TeamManage(p) {
       h("span", { className: "cap" }, "Lead ", h("b", null, t.leadUserId ? userName(db, t.leadUserId) : "—")),
       h("div", { className: "grow" }),
       h(Btn, { sm: true, onClick: p.onRequest }, "Request someone from another team")),
-    members.length ? h("div", { style: { overflowX: "auto" } }, h(STable, { id: "team-members", center: ["Role"], className: "tbl", style: { tableLayout: "fixed", minWidth: 640 } },
-      h("thead", null, h("tr", null, [["Member", "34%"], ["Role", "20%"], ["Direct manager", "32%"], ["", "14%"]].map(function (c, i) { return h("th", { key: i, style: { width: c[1] } }, c[0]); }))),
+    members.length ? h("div", { style: { overflowX: "auto" } }, h(STable, { id: "team-members", grow: "Member", center: ["Role"], className: "tbl" },
+      h("thead", null, h("tr", null, ["Member", "Role", "Direct manager", ""].map(function (c, i) { return h("th", { key: i }, c); }))),
       h("tbody", null, members.map(function (u) {
         var self = u.id === user.id && !all;
         return h("tr", { key: u.id },
@@ -22672,7 +22702,7 @@ function MgmtPanel(p) {
           toast("Assignment created.", "ok");
         } }, "+ Assign"))) : null,
     h("div", { style: { overflowX: "auto" } },
-      h(STable, { id: "mgmt-assignments", center: ["Allowance", "Consumed", "In approval", "Remaining"], className: "tbl mid" },
+      h(STable, { id: "mgmt-assignments", grow: "Project", center: ["Allowance", "Consumed", "In approval", "Remaining"], className: "tbl mid" },
         h("thead", null, h("tr", null, ["Person", "Project", "Work order", "Allowance", "Consumed", "In approval", "Remaining", ""].map(function (c, i) { return h("th", { key: i, className: ["Allowance", "Consumed", "In approval"].indexOf(c) >= 0 ? "num" : "" }, c); }))),
         h("tbody", null, db.assignments.map(function (a) {
           var used = consumedOn(db, a.userId, a), pend = pendingOn(db, a.userId, a);
@@ -22757,7 +22787,7 @@ function MgmtPanel(p) {
       var pendC = db.clients.filter(function (c) { return !c.isVerified; });
       var pendP = db.projects.filter(function (x) { return !x.isVerified; });
       if (!pendC.length && !pendP.length) return h("div", { className: "empty panel" }, "Nothing to verify.");
-      return h("div", { style: { overflowX: "auto" } }, h(STable, { id: "mgmt-verify", center: ["Kind"], className: "tbl mid" },
+      return h("div", { style: { overflowX: "auto" } }, h(STable, { id: "mgmt-verify", grow: "Name", center: ["Kind"], className: "tbl mid" },
         h("thead", null, h("tr", null, ["Kind", "Name", "Context", ""].map(function (c, i) { return h("th", { key: i }, c); }))),
         h("tbody", null,
           pendC.map(function (c) {
@@ -22843,7 +22873,7 @@ function AdminModal(p) {
         tab === "roles" ? h("div", { className: "col", style: { gap: 10 } },
           h("div", { className: "cap" }, "Y permitted · O own records only · T own team only · P own projects only · – denied. In the cloud build every rule below is enforced by PostgreSQL Row Level Security, not by the browser."),
           h("div", { style: { overflow: "auto" } },
-            h(STable, { id: "admin-roles", center: ROLE_ORDER, className: "tbl" },
+            h(STable, { id: "admin-roles", grow: "Capability", center: ROLE_ORDER, className: "tbl" },
               h("thead", null, h("tr", null, h("th", null, "Capability"), ROLE_ORDER.map(function (r) { return h("th", { key: r, style: { textAlign: "center" } }, r); }))),
               h("tbody", null, Object.keys(PERM).map(function (cap) {
                 return h("tr", { key: cap },
@@ -22930,7 +22960,7 @@ function AdminModal(p) {
 
         tab === "audit" ? h("div", { className: "col", style: { gap: 8 } },
           h("div", { className: "cap" }, "Append-only. Every sign-in, sign-out, role change and approval action is recorded with actor, timestamp and IP."),
-          h("div", { style: { overflowX: "auto" } }, h(STable, { id: "admin-audit", center: ["IP"], className: "tbl" },
+          h("div", { style: { overflowX: "auto" } }, h(STable, { id: "admin-audit", grow: "Action", center: ["IP"], className: "tbl" },
             h("thead", null, h("tr", null, ["When", "Actor", "Action", "Entity", "IP"].map(function (c, i) { return h("th", { key: i }, c); }))),
             h("tbody", null, db.audit.slice(0, 400).map(function (a) {
               return h("tr", { key: a.id },
@@ -23578,7 +23608,7 @@ function MyWork(p) {
     h("div", { className: "cap", style: { textAlign: "center" } }, "Yellow time on an unassigned project is accepted, but routed to approval. A manager grants assignments under Management \u2192 Assignments & allowances."));
   return h(Modal, { title: "My assignments and allowances", size: "lg", onClose: p.onClose },
     h("div", { style: { overflowX: "auto" } },
-    h(STable, { id: "my-assignments", center: ["Allowance", "Consumed", "In approval", "Remaining"], className: "tbl mid" },
+    h(STable, { id: "my-assignments", grow: "Project", center: ["Allowance", "Consumed", "In approval", "Remaining"], className: "tbl mid" },
       h("thead", null, h("tr", null, ["Project", "Work order", "Allowance", "Consumed", "In approval", "Remaining", ""].map(function (c, i) { return h("th", { key: i, className: i > 1 && i < 5 ? "num" : "" }, c); }))),
       h("tbody", null, mine.map(function (a) {
         var used = consumedOn(db, user.id, a), pend = pendingOn(db, user.id, a);
