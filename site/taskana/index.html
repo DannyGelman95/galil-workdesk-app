@@ -5,76 +5,109 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1B2A18">
 <meta name="robots" content="noindex">
-<title>GALIL Folio</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect x='6' y='4' width='26' height='32' rx='3' fill='none' stroke='%238CC63E' stroke-width='3.5'/%3E%3Cpath d='M12 14h14M12 21h14M12 28h8' stroke='%238CC63E' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<title>Taskana</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'%3E%3Cpath d='M78 34H42a10 10 0 00-10 10v152a10 10 0 0010 10h36M162 34h36a10 10 0 0110 10v152a10 10 0 01-10 10h-36' fill='none' stroke='%231F3D24' stroke-width='18' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M148 92A44 44 0 10152 148V122H122' fill='none' stroke='%238CC63E' stroke-width='20' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&family=Noto+Sans+Mono:wght@500;600&display=swap">
 <style>
+/* Layout: app shell — light rail navigation, header bar, scrolling work area.
+   Palette and type follow the GALIL brand (forest + leaf green, Noto Sans). */
 :root{
-  --bg:#FBFDF7; --panel:#FFFFFF; --panel2:#F4F8EE; --ink:#1B2A18; --muted:#5B6B57; --line:#DCE5D2;
-  --chrome:#1B2A18; --chrometx:#FFFFFF; --chromedim:#C9DDB4; --chromehover:#2B3A22;
-  --green:#8CC63E; --deep:#5C8B22; --deepfg:#FFFFFF; --hover:#EAF3DC;
-  --blue:#3B7DD8; --bluebg:#E8F1FC; --bluetx:#1E548F;
-  --amber:#F0A32C; --amberbg:#FEF6E7; --ambertx:#7A5407;
+  --font:"Noto Sans","Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;
+  --mono:"Noto Sans Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --bg:#FBFCF9; --panel:#FFFFFF; --panel2:#F4F7F0; --ink:#1F3D24; --muted:#5F6E62; --line:#DDE6D5;
+  --brand:#1F3D24; --leaf:#8CC63E; --annot:#17A3B8;
+  --side-bg:#F1F5EC; --side-tx:#1F3D24; --side-dim:#55665A; --side-hover:#E3ECDA; --side-on:#FFFFFF; --side-line:#D9E4D0;
+  --green:#8CC63E; --deep:#4E7A1C; --deepfg:#FFFFFF; --hover:#EDF4E3;
+  --blue:#2A78D6; --bluebg:#E8F1FC; --bluetx:#1E548F;
+  --amber:#EDA100; --amberbg:#FEF6E7; --ambertx:#7A5407;
   --err:#C0392B; --errbg:#FBEBE9;
-  --violet:#7A5AC8; --violetbg:#F1ECFB; --violettx:#4D3391;
+  --violet:#6250D6; --violetbg:#EFECFB; --violettx:#45379A;
+  --pink:#E87BA4; --pinkbg:#FCEDF3; --pinktx:#9C2F5A;
   --teal:#1F9A8A; --tealbg:#E4F5F2; --tealtx:#12665B;
   --grey:#8A9585; --greybg:#EEF1EB;
-  --shadow:0 1px 2px rgba(27,42,24,.06),0 4px 14px rgba(27,42,24,.06);
+  /* workflow colors (validated as an adjacent categorical set) */
+  --st-backlog:#A3ADA0; --st-todo:#2A78D6; --st-writing:#EDA100; --st-peer:#E87BA4; --st-sme:#6250D6; --st-done:#008300;
+  --s-created:#2A78D6; --s-closed:#008300;
+  --grid:#E6ECE0;
+  --shadow:0 1px 2px rgba(31,61,36,.05),0 6px 18px rgba(31,61,36,.06);
   color-scheme:light;
 }
-:root[data-theme="dark"]{
-  --bg:#12180F; --panel:#1A2216; --panel2:#20291B; --ink:#E9F2DF; --muted:#A5B49B; --line:#2E3C26;
-  --chrome:#0E140B; --chrometx:#E9F2DF; --chromedim:#9FB58A; --chromehover:#202B1A;
-  --green:#9FD154; --deep:#B6E072; --deepfg:#14260A; --hover:#243019;
-  --blue:#7FB2F0; --bluebg:#14263D; --bluetx:#9CC5F5;
-  --amber:#F5B84F; --amberbg:#2E2412; --ambertx:#F0C270;
-  --err:#F0796B; --errbg:#2E1815;
-  --violet:#B39BF0; --violetbg:#251D3A; --violettx:#C9B7F5;
-  --teal:#5FD0BF; --tealbg:#12302B; --tealtx:#8FE3D6;
-  --grey:#8C9884; --greybg:#262F21;
-  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25);
-  color-scheme:dark;
-}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#12180F; --panel:#1A2216; --panel2:#20291B; --ink:#E9F2DF; --muted:#A5B49B; --line:#2E3C26;
-  --chrome:#0E140B; --chrometx:#E9F2DF; --chromedim:#9FB58A; --chromehover:#202B1A;
-  --green:#9FD154; --deep:#B6E072; --deepfg:#14260A; --hover:#243019;
+  --bg:#0E1710; --panel:#16211A; --panel2:#1B281E; --ink:#E4EFE0; --muted:#9AAD96; --line:#2A3A2C;
+  --brand:#E4EFE0; --leaf:#9FD154; --annot:#49C2D4;
+  --side-bg:#121C14; --side-tx:#E4EFE0; --side-dim:#9AAD96; --side-hover:#1C2A1F; --side-on:#22322A; --side-line:#26352A;
+  --green:#9FD154; --deep:#B6E072; --deepfg:#14260A; --hover:#1F2D22;
   --blue:#7FB2F0; --bluebg:#14263D; --bluetx:#9CC5F5;
   --amber:#F5B84F; --amberbg:#2E2412; --ambertx:#F0C270;
   --err:#F0796B; --errbg:#2E1815;
-  --violet:#B39BF0; --violetbg:#251D3A; --violettx:#C9B7F5;
+  --violet:#9085E9; --violetbg:#231E3B; --violettx:#C2B9F5;
+  --pink:#D55181; --pinkbg:#35192A; --pinktx:#F0A3C0;
   --teal:#5FD0BF; --tealbg:#12302B; --tealtx:#8FE3D6;
-  --grey:#8C9884; --greybg:#262F21;
-  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25);
+  --grey:#8C9884; --greybg:#243026;
+  --st-backlog:#6F7C6B; --st-todo:#3987E5; --st-writing:#C98500; --st-peer:#D55181; --st-sme:#9085E9; --st-done:#008300;
+  --s-created:#3987E5; --s-closed:#2E9E2E;
+  --grid:#24322A;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.25);
   color-scheme:dark;
 }}
+:root[data-theme="dark"]{
+  --bg:#0E1710; --panel:#16211A; --panel2:#1B281E; --ink:#E4EFE0; --muted:#9AAD96; --line:#2A3A2C;
+  --brand:#E4EFE0; --leaf:#9FD154; --annot:#49C2D4;
+  --side-bg:#121C14; --side-tx:#E4EFE0; --side-dim:#9AAD96; --side-hover:#1C2A1F; --side-on:#22322A; --side-line:#26352A;
+  --green:#9FD154; --deep:#B6E072; --deepfg:#14260A; --hover:#1F2D22;
+  --blue:#7FB2F0; --bluebg:#14263D; --bluetx:#9CC5F5;
+  --amber:#F5B84F; --amberbg:#2E2412; --ambertx:#F0C270;
+  --err:#F0796B; --errbg:#2E1815;
+  --violet:#9085E9; --violetbg:#231E3B; --violettx:#C2B9F5;
+  --pink:#D55181; --pinkbg:#35192A; --pinktx:#F0A3C0;
+  --teal:#5FD0BF; --tealbg:#12302B; --tealtx:#8FE3D6;
+  --grey:#8C9884; --greybg:#243026;
+  --st-backlog:#6F7C6B; --st-todo:#3987E5; --st-writing:#C98500; --st-peer:#D55181; --st-sme:#9085E9; --st-done:#008300;
+  --s-created:#3987E5; --s-closed:#2E9E2E;
+  --grid:#24322A;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.25);
+  color-scheme:dark;
+}
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
-body{background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 var(--font)}
+:focus-visible{outline:2px solid var(--annot);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
 button,input,select,textarea{font:inherit;color:inherit}
 a{color:var(--deep)}
 #app{display:flex;height:100%}
 
 /* sidebar */
-.side{width:232px;flex:none;background:var(--chrome);color:var(--chrometx);display:flex;flex-direction:column;padding:16px 10px}
-.brand{display:flex;align-items:center;gap:10px;padding:4px 8px 18px}
-.brand b{letter-spacing:.16em;font-size:15px}
-.brand small{display:block;color:var(--chromedim);font-size:11px;letter-spacing:.04em}
-.nav button{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border:0;background:none;border-radius:8px;color:var(--chromedim);cursor:pointer;text-align:left}
-.nav button:hover{background:var(--chromehover);color:var(--chrometx)}
-.nav button.on{background:var(--chromehover);color:var(--chrometx);box-shadow:inset 3px 0 0 var(--green)}
-.nav .count{margin-left:auto;font-size:11px;background:var(--green);color:#14260A;border-radius:10px;padding:0 7px;font-weight:600}
-.side .grow{flex:1}
-.side .me{border-top:1px solid rgba(255,255,255,.1);padding:12px 8px 0;font-size:12px;color:var(--chromedim)}
-.side .me select{width:100%;margin-top:6px;background:var(--chromehover);border:1px solid rgba(255,255,255,.12);color:var(--chrometx);border-radius:6px;padding:6px}
+.side{width:240px;flex:none;background:var(--side-bg);color:var(--side-tx);display:flex;flex-direction:column;padding:16px 12px;border-right:1px solid var(--side-line);overflow-y:auto}
+.brand{display:flex;align-items:center;gap:10px;padding:2px 8px 20px}
+.brand b{font-size:19px;font-weight:700;letter-spacing:-.01em;line-height:1.1;color:var(--brand)}
+.brand small{display:block;color:var(--side-dim);font:500 10.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;margin-top:2px}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav button{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border:0;background:none;border-radius:8px;color:var(--side-dim);cursor:pointer;text-align:left;font-weight:500}
+.nav button .ic{width:18px;text-align:center;flex:none}
+.nav button:hover{background:var(--side-hover);color:var(--side-tx)}
+.nav button.on{background:var(--side-on);color:var(--side-tx);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.06),inset 3px 0 0 var(--leaf)}
+.nav .count{margin-left:auto;font:600 11px var(--mono);background:var(--leaf);color:#14260A;border-radius:10px;padding:0 7px}
+.nav-h{display:flex;align-items:center;justify-content:space-between;font:600 10.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--side-dim);padding:18px 10px 6px}
+.nav .vw{font-size:13px;padding:6px 10px}
+.nav .vw .star{color:var(--amber)}
+.nav .vw .who{margin-left:auto;font-size:10.5px;color:var(--side-dim)}
+.side .grow{flex:1;min-height:12px}
+.side .me{border-top:1px solid var(--side-line);padding:12px 6px 0;font-size:12px;color:var(--side-dim)}
+.side .me select{width:100%;margin-top:6px;background:var(--panel);border:1px solid var(--side-line);color:var(--side-tx);border-radius:7px;padding:6px}
 .side .me .row{margin-top:8px}
-.side .me button{background:none;border:1px solid rgba(255,255,255,.18);color:var(--chromedim);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px}
-.side .me button:hover{color:var(--chrometx)}
+.side .me button{background:var(--panel);border:1px solid var(--side-line);color:var(--side-dim);border-radius:7px;padding:4px 9px;cursor:pointer;font-size:12px}
+.side .me button:hover{color:var(--side-tx);border-color:var(--deep)}
+.scrim-side{display:none}
 
 /* main */
 .main{flex:1;min-width:0;display:flex;flex-direction:column;height:100%}
 .top{display:flex;align-items:center;gap:12px;padding:14px 24px;border-bottom:1px solid var(--line);background:var(--panel)}
-.top h1{font-size:19px;margin:0;font-weight:650}
+.top h1{font-size:20px;margin:0;font-weight:650;text-wrap:balance;letter-spacing:-.01em}
 .top .crumbs{color:var(--muted);font-size:12px}
+.top .crumbs a{color:var(--muted)}
+.top .crumbs a:hover{color:var(--deep)}
 .top .crumbs a{cursor:pointer;text-decoration:none}
 .top .sp{flex:1}
 .content{flex:1;overflow:auto;padding:20px 24px 40px}
@@ -97,7 +130,8 @@ a{color:var(--deep)}
 .chip.red{background:var(--errbg);color:var(--err)}
 .chip.violet{background:var(--violetbg);color:var(--violettx)}
 .chip.teal{background:var(--tealbg);color:var(--tealtx)}
-.key{font:600 12px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted)}
+.chip.pink{background:var(--pinkbg);color:var(--pinktx)}
+.key{font:600 12px var(--mono);color:var(--muted);white-space:nowrap}
 .avatar{width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;color:#fff;flex:none}
 .avatar.lg{width:36px;height:36px;font-size:13px}
 .avatar.none{background:var(--greybg)!important;color:var(--muted);border:1px dashed var(--grey)}
@@ -110,10 +144,10 @@ a{color:var(--deep)}
 .g4{grid-template-columns:repeat(4,minmax(0,1fr))}
 .g3{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
 .g2{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr)}
-.stat b{display:block;font-size:26px;line-height:1.1}
-.stat span{color:var(--muted);font-size:12px}
+.stat b{display:block;font-size:28px;line-height:1.1;font-weight:650;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.stat>span{color:var(--muted);font-size:12px}
 h2{font-size:15px;margin:0 0 10px}
-h3{font-size:13px;margin:0 0 8px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+h3{font:600 11px var(--mono);margin:0 0 8px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
 .empty{padding:28px;text-align:center;color:var(--muted)}
 .prio{display:inline-flex;align-items:center;gap:4px;font-size:12px}
 .prio i{width:8px;height:8px;border-radius:2px;display:inline-block}
@@ -202,7 +236,53 @@ table.t tr.click:hover td{background:var(--hover)}
 .checklist label{display:flex;gap:8px;align-items:flex-start;padding:4px 0;cursor:pointer}
 .checklist label.done span{text-decoration:line-through;color:var(--muted)}
 
-.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--chrome);color:var(--chrometx);padding:10px 16px;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:100;font-size:13px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:100;font-size:13px}
+/* filter toggles + saved views */
+.tog{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:5px 11px;cursor:pointer;font-size:12.5px;font-weight:550;color:var(--muted)}
+.tog.on{background:var(--hover);border-color:var(--deep);color:var(--deep)}
+.viewbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:-4px 0 14px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);font-size:13px}
+.viewbar b{font-weight:650}
+
+/* insights */
+.kpis{display:grid;gap:12px;grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:16px}
+@media (max-width:1100px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.kpi .lbl{font:600 10.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.kpi .val{font-size:30px;font-weight:650;line-height:1.15;margin-top:6px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.kpi .val small{font-size:15px;font-weight:600;color:var(--muted);margin-left:2px}
+.kpi .sub{font-size:12px;color:var(--muted);margin-top:2px}
+.kpi .delta{font-weight:600}
+.kpi .delta.up{color:var(--deep)}
+.kpi .delta.down{color:var(--err)}
+.chart-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0}
+.chart-card h2{margin-bottom:2px}
+.chart-card .cap{color:var(--muted);font-size:12px;margin-bottom:12px}
+.chart{width:100%;overflow-x:auto}
+.chart svg{display:block;overflow:visible}
+.chart text{fill:var(--muted);font:11px var(--font);font-variant-numeric:tabular-nums}
+.chart .gl{stroke:var(--grid);stroke-width:1}
+.chart .base{stroke:var(--line);stroke-width:1}
+.chart .hit{fill:transparent;cursor:default}
+.chart .bar-g:hover .mk{opacity:.82}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-bottom:8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.stack{display:flex;height:22px;border-radius:6px;overflow:hidden;gap:2px;background:var(--panel)}
+.stack span{display:block;height:100%;min-width:3px}
+.st-table{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px}
+.st-table td{padding:5px 4px;border-bottom:1px solid var(--line)}
+.st-table td.n{text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
+.hbar{display:flex;align-items:center;gap:8px}
+.hbar .trk{flex:1;height:8px;background:var(--greybg);border-radius:4px;overflow:hidden;display:flex;gap:2px}
+.hbar .trk span{display:block;height:100%}
+.hbar .trk span:last-child{border-radius:0 4px 4px 0}
+.num{font-variant-numeric:tabular-nums;text-align:right}
+.tip{position:fixed;z-index:120;pointer-events:none;background:var(--panel);color:var(--ink);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:8px;padding:7px 10px;font-size:12px;max-width:240px}
+.tip b{display:block;margin-bottom:2px}
+.tip i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}
+.seg2{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
+.seg2 button{border:0;background:none;padding:6px 11px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--muted)}
+.seg2 button.on{background:var(--deep);color:var(--deepfg)}
+
 .list-item{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--line);cursor:pointer}
 .list-item:last-child{border-bottom:0}
 .list-item:hover{background:var(--hover)}
@@ -216,8 +296,9 @@ table.t tr.click:hover td{background:var(--hover)}
   .td-side{border-radius:0 0 14px 14px}
 }
 @media (max-width:760px){
-  .side{position:fixed;inset:0 auto 0 0;z-index:40;transform:translateX(-100%);transition:transform .2s}
+  .side{position:fixed;inset:0 auto 0 0;z-index:40;transform:translateX(-100%);transition:transform .2s;box-shadow:0 0 40px rgba(0,0,0,.2)}
   .side.open{transform:none}
+  .side.open+.scrim-side{display:block;position:fixed;inset:0;z-index:39;background:rgba(10,16,8,.35)}
   .menu-btn{display:inline-flex}
   .top{padding:12px 16px}
   .content{padding:16px}
@@ -230,21 +311,21 @@ table.t tr.click:hover td{background:var(--hover)}
 <script>
 "use strict";
 /* =====================================================================
-   GALIL Folio — project & task tracking for technical-writing teams.
+   Taskana (by GALIL) — project & task tracking for technical-writing teams.
    Standalone: no network, no build step. Data lives in localStorage.
    Ids for people, clients and projects follow the WorkDesk conventions
    (u-*, c-*, p-*) so the two apps can share records later.
    ===================================================================== */
-var KEY = "galil-folio-v1";
+var KEY = "galil-taskana-v1", OLD_KEYS = ["galil-folio-v1"];
 var APP_VERSION = 1;
 
 var STATUSES = [
-  { k: "Backlog",     color: "var(--grey)",   chip: "" },
-  { k: "To Do",       color: "var(--blue)",   chip: "blue" },
-  { k: "Writing",     color: "var(--amber)",  chip: "amber" },
-  { k: "Peer Review", color: "var(--violet)", chip: "violet" },
-  { k: "SME Review",  color: "var(--teal)",   chip: "teal" },
-  { k: "Done",        color: "var(--green)",  chip: "green" }
+  { k: "Backlog",     color: "var(--st-backlog)", chip: "" },
+  { k: "To Do",       color: "var(--st-todo)",    chip: "blue" },
+  { k: "Writing",     color: "var(--st-writing)", chip: "amber" },
+  { k: "Peer Review", color: "var(--st-peer)",    chip: "pink" },
+  { k: "SME Review",  color: "var(--st-sme)",     chip: "violet" },
+  { k: "Done",        color: "var(--st-done)",    chip: "green" }
 ];
 var TYPES = ["Writing", "Editing", "Review", "Illustration", "Translation", "Localization", "SME Interview", "Publishing", "Doc Defect", "Research"];
 var TYPE_CHIP = { "Writing": "amber", "Editing": "violet", "Review": "violet", "Illustration": "teal", "Translation": "blue", "Localization": "blue", "SME Interview": "teal", "Publishing": "green", "Doc Defect": "red", "Research": "" };
@@ -304,18 +385,32 @@ function add(el, c) {
 /* ================= store ================= */
 var db, ui = {
   route: [], sideOpen: false,
-  filters: { q: "", clientId: "", projectId: "", assigneeId: "", type: "", priority: "", status: "" },
+  filters: { q: "", clientId: "", projectId: "", assigneeId: "", type: "", priority: "", status: "", overdue: "", questions: "" },
+  insights: { period: "90", clientId: "", projectId: "" },
   sort: { k: "updatedAt", dir: -1 },
   openTask: null, taskTab: "comments", composerKind: "comment", editingDesc: false, editingCommentId: null,
   modal: null
 };
 
 function emptyDB() {
-  return { app: "galil-folio", version: APP_VERSION, users: [], clients: [], projects: [], tasks: [], comments: [], activity: [], settings: { currentUserId: null, theme: null } };
+  return { app: "galil-taskana", version: APP_VERSION, users: [], clients: [], projects: [], tasks: [], comments: [], activity: [], views: [], settings: { currentUserId: null, theme: null } };
 }
 function load() {
-  try { var s = localStorage.getItem(KEY); if (s) { var o = JSON.parse(s); if (o && o.app === "galil-folio") return o; } } catch (e) {}
+  try {
+    var keys = [KEY].concat(OLD_KEYS);
+    for (var i = 0; i < keys.length; i++) {
+      var s = localStorage.getItem(keys[i]);
+      if (s) { var o = JSON.parse(s); if (o && isBackup(o)) return upgrade(o); }
+    }
+  } catch (e) {}
   return seed();
+}
+function isBackup(o) { return o && (o.app === "galil-taskana" || o.app === "galil-folio") && Array.isArray(o.tasks); }
+/* bring older saves (including the app's earlier "Folio" name) up to the current shape */
+function upgrade(o) {
+  o.app = "galil-taskana"; o.views = o.views || [];
+  o.tasks.forEach(function (t) { if (t.status === "Done" && !t.completedAt) t.completedAt = t.updatedAt; });
+  return o;
 }
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(db)); }
@@ -395,7 +490,41 @@ function seed() {
       createdAt: created, updatedAt: A(Math.max(0, -r[13] - 3), 14)
     });
   });
+  d.tasks.forEach(function (t) { t.completedAt = t.status === "Done" ? t.updatedAt : null; });
+
+  /* closed work from the last few months, so Insights has history to show */
+  var hist = {
+    "p-iai1": [["Vol 1 front matter and safety summary", "Writing"], ["Terminology list for Vol 1", "Research"], ["Peer review — chapter 1", "Review"], ["Chapter 1 — System overview", "Writing"], ["Chapter 2 — Operating modes", "Writing"], ["Figures for chapter 1", "Illustration"], ["Copy-edit chapter 1", "Editing"], ["SME interview — display console", "SME Interview"]],
+    "p-iai2": [["Training needs analysis", "Research"], ["Module 1 slides", "Writing"], ["Module 2 slides", "Writing"], ["Instructor guide — module 1", "Writing"], ["Module 1 diagrams", "Illustration"], ["Copy-edit module 2", "Editing"]],
+    "p-elb1": [["Help migration — batch 1", "Writing"], ["DITA map skeleton", "Research"], ["Fix broken images in batch 1", "Doc Defect"], ["Publish release 4.2 help", "Publishing"], ["Translate release 4.2 topics", "Translation"], ["Localize UI strings in help", "Localization"], ["Peer review — batch 1", "Review"]],
+    "p-mob1": [["SDK 4 doc plan", "Research"], ["Changelog for SDK 4.0", "Writing"], ["Code sample review", "Review"], ["Publish SDK 4.0 beta docs", "Publishing"]],
+    "p-gal1": [["Audit current templates", "Research"]]
+  };
+  var people = ["u-emp", "u-sen", "u-tl", "u-emp2", "u-ext", "u-new", "u-pm"];
+  var seq = 0;
+  Object.keys(hist).forEach(function (pid) {
+    hist[pid].forEach(function (r, j) {
+      seq++;
+      var age = 8 + ((seq * 37) % 150);              // created 8–158 days ago
+      var cycle = 3 + ((seq * 11) % 19);             // took 3–21 days
+      var doneAgo = Math.max(1, age - cycle);
+      var slack = ((seq * 7) % 9) - 3;               // due -3…+5 days around completion
+      var who = r[1] === "Illustration" ? "u-ext" : r[1] === "Publishing" ? "u-tl" : people[(seq * 3) % people.length];
+      n[pid] = (n[pid] || 0) + 1;
+      d.tasks.push({ id: "t-h" + seq, projectId: pid, num: n[pid], title: r[0], type: r[1], status: "Done", priority: ["Medium", "High", "Low", "Medium"][seq % 4],
+        assigneeId: who, reporterId: (d.projects.filter(function (p) { return p.id === pid; })[0] || {}).leadUserId || "u-pm",
+        dueDate: T(-(doneAgo + slack)), estimateHours: 4 + (seq * 5) % 30, deliverable: "", description: "", labels: [], checklist: [],
+        createdAt: A(age, 9), updatedAt: A(doneAgo, 15), completedAt: A(doneAgo, 15) });
+    });
+  });
   d.projects.forEach(function (p) { p.nextNum = (n[p.id] || 0) + 1; });
+
+  d.views = [
+    { id: "v-1", name: "My overdue work", ownerId: "u-pm", shared: true, mode: "tasks", filters: { assigneeId: "me", overdue: "1" }, sort: { k: "dueDate", dir: 1 } },
+    { id: "v-2", name: "Waiting on SME", ownerId: "u-pm", shared: true, mode: "tasks", filters: { status: "SME Review" }, sort: { k: "dueDate", dir: 1 } },
+    { id: "v-3", name: "IAI board", ownerId: "u-pm", shared: true, mode: "board", filters: { clientId: "c-iai" } },
+    { id: "v-4", name: "Unanswered questions", ownerId: "u-tl", shared: true, mode: "tasks", filters: { questions: "1" }, sort: { k: "updatedAt", dir: -1 } }
+  ];
   d.comments = [
     { id: "cm-1", taskId: "t-1", authorId: "u-emp", kind: "question", body: "@Maya Ben Ari the SRS lists five track modes but the UI only shows four — is \"Silent track\" still in scope for this release?", createdAt: A(2, 11), resolved: false },
     { id: "cm-2", taskId: "t-1", authorId: "u-pm", kind: "comment", body: "Checking with Ilan at IAI, will update by Thursday.", createdAt: A(2, 15) },
@@ -416,21 +545,23 @@ function seed() {
 function setHash(h_) { try { history.replaceState(null, "", h_); } catch (e) {} }
 function go(path) { location.hash = "#/" + path; }
 function parseRoute() { ui.route = (location.hash.replace(/^#\/?/, "") || "home").split("/").map(decodeURIComponent); }
-window.addEventListener("hashchange", function () { parseRoute(); ui.sideOpen = false; render(); });
+window.addEventListener("hashchange", function () { parseRoute(); enterRoute(); ui.sideOpen = false; render(); });
+function enterRoute() { if (ui.route[0] === "view") { var v = byId(db.views, ui.route[1]); if (v) applyView(v); } }
 
 /* ================= rendering ================= */
 var root = document.getElementById("app");
 function render() {
+  hideTip();
   if (db.settings.theme) document.documentElement.setAttribute("data-theme", db.settings.theme);
   else document.documentElement.removeAttribute("data-theme");
   var scroll = root.querySelector(".content"), st = scroll ? scroll.scrollTop : 0;
   var page = pageFor(ui.route);
-  root.replaceChildren(sidebar(), h("div", { class: "main" },
+  root.replaceChildren.apply(root, sidebar().concat([h("div", { class: "main" },
     h("div", { class: "top" },
       h("button", { class: "btn ghost menu-btn", onclick: function () { ui.sideOpen = !ui.sideOpen; render(); }, "aria-label": "Menu" }, "☰"),
       h("div", null, page.crumbs ? h("div", { class: "crumbs" }, page.crumbs) : null, h("h1", null, page.title)),
       h("div", { class: "sp" }), page.actions || null),
-    h("div", { class: "content" }, page.body)));
+    h("div", { class: "content" }, page.body))]));
   var c = root.querySelector(".content"); if (c && page.keepScroll) c.scrollTop = st;
   renderOverlay();
 }
@@ -439,31 +570,42 @@ function sidebar() {
   var r = ui.route[0], u = me();
   var mine = db.tasks.filter(function (t) { return t.assigneeId === u.id && t.status !== "Done"; }).length;
   var item = function (k, icon, label, count) {
-    return h("button", { class: r === k ? "on" : "", onclick: function () { go(k); } }, h("span", null, icon), label, count ? h("span", { class: "count" }, count) : null);
+    return h("button", { class: r === k ? "on" : "", onclick: function () { go(k); } }, h("span", { class: "ic" }, icon), label, count ? h("span", { class: "count" }, count) : null);
   };
-  return h("aside", { class: "side" + (ui.sideOpen ? " open" : "") },
-    h("div", { class: "brand" }, logo(30), h("div", null, h("b", null, "FOLIO"), h("small", null, "GALIL · Doc projects"))),
+  var views = visibleViews();
+  return [h("aside", { class: "side" + (ui.sideOpen ? " open" : "") },
+    h("div", { class: "brand" }, logo(34), h("div", null, h("b", null, "Taskana"), h("small", null, "by GALIL"))),
     h("nav", { class: "nav" },
       item("home", "⌂", "Overview"),
       item("my", "◉", "My work", mine),
       item("board", "▦", "Board"),
       item("tasks", "≡", "All tasks"),
+      item("insights", "↗", "Insights"),
       item("clients", "◧", "Clients & projects"),
       item("people", "☺", "People")),
+    h("div", { class: "nav-h" }, "Saved views", h("span", { class: "small" }, views.length || "")),
+    h("nav", { class: "nav" }, views.length ? views.map(function (v) {
+      return h("button", { class: "vw" + (r === "view" && ui.route[1] === v.id ? " on" : ""), title: v.name + (v.shared ? " · shared with everyone" : " · only you"), onclick: function () { go("view/" + v.id); } },
+        h("span", { class: "ic star" }, v.ownerId === u.id ? "★" : "☆"), h("span", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, v.name),
+        h("span", { class: "who" }, v.mode === "board" ? "▦" : "≡"));
+    }) : h("div", { class: "small", style: { padding: "2px 10px", color: "var(--side-dim)" } }, "Filter the board or task list, then choose ☆ Save view.")),
     h("div", { class: "grow" }),
     h("div", { class: "me" },
       "Working as",
-      h("select", { onchange: function (e) { db.settings.currentUserId = e.target.value; save(); render(); } },
+      h("select", { "aria-label": "Working as", onchange: function (e) { db.settings.currentUserId = e.target.value; save(); render(); } },
         db.users.filter(function (x) { return x.isActive; }).map(function (x) { return h("option", { value: x.id, selected: x.id === u.id }, x.fullName); })),
       h("div", { class: "row" },
         h("button", { onclick: function () { db.settings.theme = isDark() ? "light" : "dark"; save(); render(); } }, isDark() ? "☀ Light" : "☾ Dark"),
-        h("button", { onclick: function () { openModal({ kind: "data" }); } }, "⇅ Data"))));
+        h("button", { onclick: function () { openModal({ kind: "data" }); } }, "⇅ Data")))),
+    h("div", { class: "scrim-side", onclick: function () { ui.sideOpen = false; render(); } })];
 }
 function isDark() { return db.settings.theme ? db.settings.theme === "dark" : !!(window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches); }
+/* the GALIL mark: a "G" between square brackets */
 function logo(size) {
   var ns = "http://www.w3.org/2000/svg", s = document.createElementNS(ns, "svg");
-  s.setAttribute("viewBox", "0 0 40 40"); s.setAttribute("width", size); s.setAttribute("height", size);
-  s.innerHTML = "<rect x='6' y='4' width='26' height='32' rx='3' fill='none' stroke='#8CC63E' stroke-width='3.5'/><path d='M12 14h14M12 21h14M12 28h8' stroke='#8CC63E' stroke-width='3' stroke-linecap='round'/>";
+  s.setAttribute("viewBox", "0 0 240 240"); s.setAttribute("width", size); s.setAttribute("height", size); s.setAttribute("aria-hidden", "true");
+  s.innerHTML = "<path d='M78 34H42a10 10 0 00-10 10v152a10 10 0 0010 10h36M162 34h36a10 10 0 0110 10v152a10 10 0 01-10 10h-36' fill='none' stroke='var(--brand)' stroke-width='18' stroke-linecap='round' stroke-linejoin='round'/>" +
+    "<path d='M148 92A44 44 0 10152 148V122H122' fill='none' stroke='var(--leaf)' stroke-width='20' stroke-linecap='round' stroke-linejoin='round'/>";
   return s;
 }
 
@@ -472,6 +614,8 @@ function pageFor(r) {
     case "my": return pageMy();
     case "board": return pageBoard();
     case "tasks": return pageTasks();
+    case "insights": return pageInsights();
+    case "view": return pageView(r[1]);
     case "clients": return r[1] ? pageClient(r[1]) : pageClients();
     case "project": return pageProject(r[1]);
     case "people": return r[1] ? pagePerson(r[1]) : pagePeople();
@@ -504,7 +648,10 @@ function filteredTasks(extra) {
     if (extra && !extra(t)) return false;
     if (f.clientId && p.clientId !== f.clientId) return false;
     if (f.projectId && t.projectId !== f.projectId) return false;
-    if (f.assigneeId === "none" ? t.assigneeId : (f.assigneeId && t.assigneeId !== f.assigneeId)) return false;
+    var who = f.assigneeId === "me" ? me().id : f.assigneeId;
+    if (who === "none" ? t.assigneeId : (who && t.assigneeId !== who)) return false;
+    if (f.overdue && !isOverdue(t)) return false;
+    if (f.questions && !openQuestions(t.id).length) return false;
     if (f.type && t.type !== f.type) return false;
     if (f.priority && t.priority !== f.priority) return false;
     if (f.status && t.status !== f.status) return false;
@@ -512,6 +659,7 @@ function filteredTasks(extra) {
     return true;
   });
 }
+function clearFilters() { Object.keys(ui.filters).forEach(function (k) { ui.filters[k] = ""; }); }
 function filterBar(opts) {
   opts = opts || {};
   var f = ui.filters;
@@ -528,11 +676,282 @@ function filterBar(opts) {
   return h("div", { class: "filters" }, search,
     opts.noClient ? null : sel("clientId", "All clients", db.clients.map(function (c) { return { value: c.id, label: c.name }; })),
     opts.noProject ? null : sel("projectId", "All projects", projects.map(function (p) { return { value: p.id, label: p.key + " · " + p.name }; })),
-    opts.noAssignee ? null : sel("assigneeId", "Anyone", [{ value: "none", label: "Unassigned" }].concat(db.users.map(function (u) { return { value: u.id, label: u.fullName }; }))),
+    opts.noAssignee ? null : sel("assigneeId", "Anyone", [{ value: "me", label: "Me (whoever is working)" }, { value: "none", label: "Unassigned" }].concat(db.users.map(function (u) { return { value: u.id, label: u.fullName }; }))),
     sel("type", "All types", TYPES.map(function (t) { return { value: t, label: t }; })),
     sel("priority", "Any priority", PRIORITIES.map(function (p) { return { value: p.k, label: p.k }; })),
     opts.status ? sel("status", "Any status", STATUSES.map(function (s) { return { value: s.k, label: s.k }; })) : null,
-    active ? h("button", { class: "btn ghost sm", onclick: function () { Object.keys(f).forEach(function (k) { f[k] = ""; }); render(); } }, "✕ Clear") : null);
+    h("button", { class: "tog" + (f.overdue ? " on" : ""), "aria-pressed": f.overdue ? "true" : "false", onclick: function () { f.overdue = f.overdue ? "" : "1"; render(); } }, "⚠ Overdue"),
+    h("button", { class: "tog" + (f.questions ? " on" : ""), "aria-pressed": f.questions ? "true" : "false", onclick: function () { f.questions = f.questions ? "" : "1"; render(); } }, "? Open questions"),
+    active ? h("button", { class: "btn ghost sm", onclick: function () { clearFilters(); render(); } }, "✕ Clear") : null,
+    h("span", { style: { flex: 1 } }),
+    opts.mode ? h("button", { class: "btn sm", disabled: !active && !opts.view, title: active ? "Save these filters as a view" : "Set some filters first", onclick: function () { openModal({ kind: "view", defaults: { mode: opts.mode } }); } }, "☆ Save view") : null);
+}
+
+/* ---------- saved views ---------- */
+function visibleViews() { var u = me(); return (db.views || []).filter(function (v) { return v.ownerId === u.id || v.shared; }); }
+function currentFilters() { var o = {}; Object.keys(ui.filters).forEach(function (k) { if (ui.filters[k]) o[k] = ui.filters[k]; }); return o; }
+function applyView(v) {
+  clearFilters(); Object.keys(v.filters || {}).forEach(function (k) { if (k in ui.filters) ui.filters[k] = v.filters[k]; });
+  if (v.sort) ui.sort = { k: v.sort.k, dir: v.sort.dir };
+}
+function viewChanged(v) {
+  var a = currentFilters(), b = v.filters || {};
+  var keys = Object.keys(a).concat(Object.keys(b));
+  if (keys.some(function (k) { return (a[k] || "") !== (b[k] || ""); })) return true;
+  return v.mode === "tasks" && v.sort && (v.sort.k !== ui.sort.k || v.sort.dir !== ui.sort.dir);
+}
+function viewCrumb(v, kind) { return "Saved view · " + kind + (v.shared ? " · shared" : " · private") + (v.ownerId !== me().id ? " · by " + userName(v.ownerId) : ""); }
+function describeFilters(f) {
+  var out = [];
+  if (f.q) out.push("“" + f.q + "”");
+  if (f.clientId) out.push((byId(db.clients, f.clientId) || {}).name || "?");
+  if (f.projectId) out.push(((byId(db.projects, f.projectId) || {}).key) || "?");
+  if (f.assigneeId) out.push(f.assigneeId === "me" ? "assigned to me" : f.assigneeId === "none" ? "unassigned" : userName(f.assigneeId));
+  ["type", "priority", "status"].forEach(function (k) { if (f[k]) out.push(f[k]); });
+  if (f.overdue) out.push("overdue"); if (f.questions) out.push("open questions");
+  return out.join(" · ") || "everything";
+}
+function pageView(id) {
+  var v = byId(db.views, id);
+  if (!v) return { title: "View not found", body: h("div", { class: "card empty" }, "This saved view was deleted.") };
+  return v.mode === "board" ? pageBoard(v) : pageTasks(v);
+}
+function viewBar(v) {
+  var mine = v.ownerId === me().id, changed = viewChanged(v);
+  return h("div", { class: "viewbar" },
+    h("span", { class: "star", style: { color: "var(--amber)" } }, "★"), h("span", null, h("b", null, v.name), " — " + describeFilters(v.filters || {})),
+    changed ? h("span", { class: "chip amber" }, "Filters changed") : null,
+    h("span", { style: { flex: 1 } }),
+    changed ? h("button", { class: "btn sm", onclick: function () { applyView(v); render(); } }, "↺ Reset") : null,
+    changed && mine ? h("button", { class: "btn sm primary", onclick: function () { v.filters = currentFilters(); v.sort = { k: ui.sort.k, dir: ui.sort.dir }; save(); toast("“" + v.name + "” updated"); render(); } }, "Update view") : null,
+    mine ? h("button", { class: "btn sm", onclick: function () { openModal({ kind: "view", item: v }); } }, "✎ Edit") : null);
+}
+
+/* ---------- Insights ---------- */
+var DAY = 86400000;
+function daysBetween(a, b) { return (new Date(b) - new Date(a)) / DAY; }
+function pct(n, d) { return d ? Math.round(n / d * 100) : null; }
+function fmtPct(v) { return v == null ? "—" : v + "%"; }
+function fmt1(v) { return v == null || isNaN(v) ? "—" : (Math.round(v * 10) / 10).toString(); }
+function avg(arr) { return arr.length ? arr.reduce(function (a, b) { return a + b; }, 0) / arr.length : null; }
+function onTime(t) { return t.dueDate ? t.completedAt.slice(0, 10) <= t.dueDate : null; }
+
+function pageInsights() {
+  var I = ui.insights, P = I.period === "all" ? null : +I.period, now = Date.now();
+  var from = P ? new Date(now - P * DAY).toISOString() : "";
+  var prevFrom = P ? new Date(now - 2 * P * DAY).toISOString() : "";
+  var inP = function (iso) { return !!iso && iso >= from; };
+  var inPrev = function (iso) { return !!iso && P && iso >= prevFrom && iso < from; };
+  var scope = db.tasks.filter(function (t) {
+    var p = projectOf(t); if (!p) return false;
+    if (I.clientId && p.clientId !== I.clientId) return false;
+    if (I.projectId && t.projectId !== I.projectId) return false;
+    return true;
+  });
+  var open = scope.filter(function (t) { return t.status !== "Done"; });
+  var done = scope.filter(function (t) { return t.status === "Done"; });
+  var created = scope.filter(function (t) { return inP(t.createdAt); });
+  var closed = done.filter(function (t) { return inP(t.completedAt); });
+  var closedPrev = done.filter(function (t) { return inPrev(t.completedAt); });
+  var withDue = closed.filter(function (t) { return t.dueDate; });
+  var ontime = withDue.filter(onTime);
+  var cycle = avg(closed.map(function (t) { return daysBetween(t.createdAt, t.completedAt); }));
+  var assignedP = created.filter(function (t) { return t.assigneeId; });
+  var assignees = {}; assignedP.forEach(function (t) { assignees[t.assigneeId] = 1; });
+  var nAssignees = Object.keys(assignees).length;
+  var openAssigned = {}; open.forEach(function (t) { if (t.assigneeId) openAssigned[t.assigneeId] = (openAssigned[t.assigneeId] || 0) + 1; });
+  var overdue = open.filter(isOverdue);
+  var ids = {}; scope.forEach(function (t) { ids[t.id] = 1; });
+  var qs = db.comments.filter(function (c) { return c.kind === "question" && ids[c.taskId] && inP(c.createdAt); });
+  var answered = qs.filter(function (c) { return c.resolved; });
+  var answerHrs = avg(answered.filter(function (c) { return c.resolvedAt; }).map(function (c) { return daysBetween(c.createdAt, c.resolvedAt) * 24; }));
+  var periodLabel = P ? "last " + P + " days" : "all time";
+
+  var delta = null;
+  if (P) { var dd = closed.length - closedPrev.length; delta = h("span", { class: "delta " + (dd > 0 ? "up" : dd < 0 ? "down" : "") }, (dd > 0 ? "▲ " : dd < 0 ? "▼ " : "") + Math.abs(dd)); }
+  var kpi = function (label, val, unit, sub) { return h("div", { class: "kpi" }, h("div", { class: "lbl" }, label), h("div", { class: "val" }, val, unit ? h("small", null, unit) : null), h("div", { class: "sub" }, sub)); };
+  var closeRate = pct(closed.length, created.length);
+
+  var set = function (k) { return function (e) { I[k] = e.target.value; if (k === "clientId") I.projectId = ""; render(); }; };
+  var controls = h("div", { class: "filters" },
+    h("div", { class: "seg2", role: "group", "aria-label": "Period" }, [["30", "30 days"], ["90", "90 days"], ["180", "6 months"], ["all", "All time"]].map(function (o) {
+      return h("button", { class: I.period === o[0] ? "on" : "", onclick: function () { I.period = o[0]; render(); } }, o[1]);
+    })),
+    h("select", { "aria-label": "Client", onchange: set("clientId") }, h("option", { value: "" }, "All clients"), db.clients.map(function (c) { return h("option", { value: c.id, selected: I.clientId === c.id }, c.name); })),
+    h("select", { "aria-label": "Project", onchange: set("projectId") }, h("option", { value: "" }, "All projects"),
+      db.projects.filter(function (p) { return !I.clientId || p.clientId === I.clientId; }).map(function (p) { return h("option", { value: p.id, selected: I.projectId === p.id }, p.key + " · " + p.name); })));
+
+  return {
+    title: "Insights", crumbs: "Delivery metrics · " + periodLabel,
+    body: [controls,
+      h("div", { class: "kpis" },
+        kpi("Closed", closed.length, null, P ? h("span", null, delta, " vs previous " + P + " days") : "tasks completed"),
+        kpi("Closing rate", closeRate == null ? "—" : closeRate, closeRate == null ? null : "%", closed.length + " closed / " + created.length + " opened" + (closeRate != null ? (closeRate >= 100 ? " · backlog shrinking" : " · backlog growing") : "")),
+        kpi("Completion", fmtPct(pct(done.length, scope.length)), null, done.length + " of " + scope.length + " tasks done overall"),
+        kpi("On-time delivery", ontime.length && withDue.length ? pct(ontime.length, withDue.length) : "—", withDue.length ? "%" : null, ontime.length + " of " + withDue.length + " closed by their due date"),
+        kpi("Avg cycle time", fmt1(cycle), cycle == null ? null : " days", "from created to done"),
+        kpi("Tasks per person", fmt1(nAssignees ? assignedP.length / nAssignees : null), null, "assigned on average to " + nAssignees + " people · " + fmt1(avg(Object.keys(openAssigned).map(function (k) { return openAssigned[k]; }))) + " open each now"),
+        kpi("Overdue now", overdue.length, null, fmtPct(pct(overdue.length, open.length)) + " of " + open.length + " open tasks"),
+        kpi("Questions answered", qs.length ? pct(answered.length, qs.length) : "—", qs.length ? "%" : null, answered.length + " of " + qs.length + " asked" + (answerHrs != null ? " · ~" + fmt1(answerHrs) + " h to answer" : ""))),
+      h("div", { class: "grid g2", style: { marginBottom: "16px" } },
+        h("div", { class: "chart-card" }, h("h2", null, "Opened vs closed per week"), h("div", { class: "cap" }, "When the closed bar is taller, the team is getting through the backlog."),
+          h("div", { class: "legend" }, h("span", null, h("i", { style: { background: "var(--s-created)" } }), "Opened"), h("span", null, h("i", { style: { background: "var(--s-closed)" } }), "Closed")),
+          h("div", { class: "chart" }, throughputChart(scope, P))),
+        h("div", { class: "chart-card" }, h("h2", null, "Where the work is"), h("div", { class: "cap" }, "Every task in scope by workflow stage, right now."), statusBreakdown(scope))),
+      h("div", { class: "chart-card", style: { marginBottom: "16px" } }, h("h2", null, "People"), h("div", { class: "cap" }, "Assigned = tasks opened in the period and given to the person. Rates use tasks closed in the period."),
+        peopleTable(scope, inP)),
+      h("div", { class: "grid g2" },
+        h("div", { class: "chart-card" }, h("h2", null, "Projects"), h("div", { class: "cap" }, "Share of each project's tasks that are done."), projectBars(scope)),
+        h("div", { class: "chart-card" }, h("h2", null, "Closed by task type"), h("div", { class: "cap" }, "Tasks closed in the period, with their average cycle time."), typeBars(closed)))
+    ]
+  };
+}
+
+/* svg helpers */
+var SVGNS = "http://www.w3.org/2000/svg";
+function sv(tag, attrs, kids) {
+  var el = document.createElementNS(SVGNS, tag);
+  for (var k in attrs) if (attrs[k] != null) el.setAttribute(k, attrs[k]);
+  (kids || []).forEach(function (c) { if (c) el.appendChild(typeof c === "string" ? document.createTextNode(c) : c); });
+  return el;
+}
+/* bar rising from the baseline with 4px-rounded data end */
+function barPath(x, y, w, hgt) {
+  if (hgt <= 0) return "";
+  var r = Math.min(4, w / 2, hgt);
+  return "M" + x + "," + (y + hgt) + "V" + (y + r) + "Q" + x + "," + y + " " + (x + r) + "," + y + "H" + (x + w - r) + "Q" + (x + w) + "," + y + " " + (x + w) + "," + (y + r) + "V" + (y + hgt) + "Z";
+}
+function niceMax(v) { if (v <= 4) return 4; var p = Math.pow(10, Math.floor(Math.log10(v))), m = v / p; return (m <= 2 ? 2 : m <= 5 ? 5 : 10) * p; }
+
+var tipEl = null;
+function showTip(e, html) {
+  if (!tipEl) { tipEl = h("div", { class: "tip", role: "tooltip" }); document.body.appendChild(tipEl); }
+  tipEl.replaceChildren(html); tipEl.hidden = false;
+  var x = e.clientX + 14, y = e.clientY + 14, r = tipEl.getBoundingClientRect();
+  if (x + r.width > innerWidth - 8) x = e.clientX - r.width - 14;
+  if (y + r.height > innerHeight - 8) y = e.clientY - r.height - 14;
+  tipEl.style.left = x + "px"; tipEl.style.top = y + "px";
+}
+function hideTip() { if (tipEl) tipEl.hidden = true; }
+function tipRows(title, rows) {
+  return h("div", null, h("b", null, title), rows.map(function (r) { return h("div", null, h("i", { style: { background: r[0] } }), r[1] + ": ", h("b", { style: { display: "inline" } }, r[2])); }));
+}
+
+function weekStart(d) { var x = new Date(d); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; }
+function throughputChart(scope, P) {
+  var nW = P ? Math.max(4, Math.ceil(P / 7)) : 26;
+  if (!P) { var first = scope.reduce(function (m, t) { return t.createdAt < m ? t.createdAt : m; }, nowISO()); nW = Math.min(26, Math.max(4, Math.ceil(daysBetween(weekStart(first), new Date()) / 7) + 1)); }
+  nW = Math.min(nW, 26);
+  var start = weekStart(new Date()); start.setDate(start.getDate() - 7 * (nW - 1));
+  var weeks = [];
+  for (var i = 0; i < nW; i++) { var ws = new Date(start); ws.setDate(ws.getDate() + 7 * i); weeks.push({ s: ws, o: 0, c: 0 }); }
+  var idx = function (iso) { var k = Math.floor(daysBetween(start, iso) / 7); return k >= 0 && k < nW ? k : -1; };
+  scope.forEach(function (t) { var a = idx(t.createdAt); if (a >= 0) weeks[a].o++; if (t.completedAt) { var b = idx(t.completedAt); if (b >= 0) weeks[b].c++; } });
+  var max = niceMax(Math.max(1, Math.max.apply(null, weeks.map(function (w) { return Math.max(w.o, w.c); }))));
+  var W = 640, H = 220, L = 30, R = 8, T = 10, B = 26, iw = W - L - R, ih = H - T - B, band = iw / nW, bw = Math.max(3, Math.min(16, (band - 8) / 2));
+  var y = function (v) { return T + ih - v / max * ih; };
+  var g = [];
+  var steps = max <= 4 ? max : max % 4 === 0 ? 4 : 5;
+  for (var k = 0; k <= steps; k++) { var v = max / steps * k, yy = y(v); g.push(sv("line", { class: k ? "gl" : "base", x1: L, x2: W - R, y1: yy, y2: yy })); g.push(sv("text", { x: L - 6, y: yy + 4, "text-anchor": "end" }, [String(Math.round(v))])); }
+  var every = nW > 14 ? 3 : nW > 8 ? 2 : 1;
+  weeks.forEach(function (w, i) {
+    var cx = L + band * i + band / 2;
+    var label = w.s.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+    var grp = sv("g", { class: "bar-g" }, [
+      sv("path", { class: "mk", d: barPath(cx - bw - 1, y(w.o), bw, ih + T - y(w.o)), fill: "var(--s-created)" }),
+      sv("path", { class: "mk", d: barPath(cx + 1, y(w.c), bw, ih + T - y(w.c)), fill: "var(--s-closed)" }),
+      sv("rect", { class: "hit", x: L + band * i, y: T, width: band, height: ih })
+    ]);
+    grp.addEventListener("mousemove", function (e) { showTip(e, tipRows("Week of " + label, [["var(--s-created)", "Opened", w.o], ["var(--s-closed)", "Closed", w.c]])); });
+    grp.addEventListener("mouseleave", hideTip);
+    g.push(grp);
+    if (i % every === 0) g.push(sv("text", { x: cx, y: H - 8, "text-anchor": "middle" }, [label]));
+  });
+  return sv("svg", { viewBox: "0 0 " + W + " " + H, width: "100%", style: "min-width:520px", role: "img", "aria-label": "Tasks opened and closed per week" }, g);
+}
+
+function statusBreakdown(scope) {
+  var total = scope.length;
+  var rows = STATUSES.map(function (s) { return { s: s, n: scope.filter(function (t) { return t.status === s.k; }).length }; });
+  return h("div", null,
+    h("div", { class: "stack", role: "img", "aria-label": rows.map(function (r) { return r.s.k + " " + r.n; }).join(", ") }, rows.filter(function (r) { return r.n; }).map(function (r) {
+      var el = h("span", { style: { width: (r.n / total * 100) + "%", background: r.s.color } });
+      el.addEventListener("mousemove", function (e) { showTip(e, tipRows(r.s.k, [[r.s.color, "Tasks", r.n + " (" + pct(r.n, total) + "%)"]])); });
+      el.addEventListener("mouseleave", hideTip);
+      return el;
+    })),
+    h("table", { class: "st-table" }, h("tbody", null, rows.map(function (r) {
+      return h("tr", null, h("td", null, h("span", { class: "legend", style: { margin: 0 } }, h("span", null, h("i", { style: { background: r.s.color } }), r.s.k))),
+        h("td", { class: "n" }, r.n), h("td", { class: "n", style: { width: "60px" } }, total ? pct(r.n, total) + "%" : "—"));
+    }))));
+}
+
+function peopleTable(scope, inP) {
+  var rows = db.users.map(function (u) {
+    var mine = scope.filter(function (t) { return t.assigneeId === u.id; });
+    var open = mine.filter(function (t) { return t.status !== "Done"; });
+    var closed = mine.filter(function (t) { return t.status === "Done" && inP(t.completedAt); });
+    var withDue = closed.filter(function (t) { return t.dueDate; });
+    return { u: u, assigned: mine.filter(function (t) { return inP(t.createdAt); }).length, open: open.length, closed: closed.length,
+      rate: pct(closed.length, closed.length + open.length), ontime: pct(withDue.filter(onTime).length, withDue.length),
+      cycle: avg(closed.map(function (t) { return daysBetween(t.createdAt, t.completedAt); })), overdue: open.filter(isOverdue).length };
+  }).filter(function (r) { return r.assigned || r.open || r.closed; }).sort(function (a, b) { return (b.open + b.closed) - (a.open + a.closed); });
+  if (!rows.length) return h("div", { class: "empty" }, "No assigned tasks in this scope.");
+  var max = Math.max.apply(null, rows.map(function (r) { return r.open + r.closed; }));
+  var avgAssigned = avg(rows.map(function (r) { return r.assigned; }));
+  return h("div", null,
+    h("div", { class: "legend" }, h("span", null, h("i", { style: { background: "var(--s-created)" } }), "Open now"), h("span", null, h("i", { style: { background: "var(--s-closed)" } }), "Closed in period"),
+      h("span", null, "Team average: " + fmt1(avgAssigned) + " tasks assigned per person · ▲ well above average")),
+    h("div", { class: "tbl-wrap" }, h("table", { class: "t" },
+      h("thead", null, h("tr", null, ["Person", "Workload", "Assigned", "Open", "Closed", "Completion", "On time", "Avg cycle", "Overdue"].map(function (x, i) { return h("th", { class: i > 1 ? "num" : "", style: { cursor: "default" } }, x); }))),
+      h("tbody", null, rows.map(function (r) {
+        var trk = h("div", { class: "trk", style: { width: Math.max(8, (r.open + r.closed) / max * 100) + "%" } },
+          r.open ? h("span", { style: { flex: r.open, background: "var(--s-created)" } }) : null, r.closed ? h("span", { style: { flex: r.closed, background: "var(--s-closed)" } }) : null);
+        trk.addEventListener("mousemove", function (e) { showTip(e, tipRows(r.u.fullName, [["var(--s-created)", "Open now", r.open], ["var(--s-closed)", "Closed in period", r.closed]])); });
+        trk.addEventListener("mouseleave", hideTip);
+        return h("tr", { class: "click", onclick: function () { go("people/" + r.u.id); } },
+          h("td", null, h("span", { class: "row", style: { flexWrap: "nowrap" } }, avatar(r.u.id), h("span", null, r.u.fullName, h("div", { class: "muted small" }, r.u.jobTitle)))),
+          h("td", { style: { minWidth: "140px", width: "24%" } }, h("div", { class: "hbar" }, h("div", { style: { flex: 1, display: "flex" } }, trk))),
+          h("td", { class: "num" }, r.assigned + (avgAssigned && r.assigned > avgAssigned * 1.5 ? " ▲" : "")),
+          h("td", { class: "num" }, r.open), h("td", { class: "num" }, r.closed),
+          h("td", { class: "num" }, fmtPct(r.rate)), h("td", { class: "num" }, fmtPct(r.ontime)),
+          h("td", { class: "num" }, r.cycle == null ? "—" : fmt1(r.cycle) + " d"),
+          h("td", { class: "num" + (r.overdue ? " overdue" : "") }, r.overdue));
+      })))));
+}
+
+function projectBars(scope) {
+  var ps = db.projects.map(function (p) {
+    var ts = scope.filter(function (t) { return t.projectId === p.id; });
+    var d = ts.filter(function (t) { return t.status === "Done"; }).length;
+    return { p: p, n: ts.length, d: d, r: pct(d, ts.length) };
+  }).filter(function (x) { return x.n; }).sort(function (a, b) { return b.r - a.r; });
+  if (!ps.length) return h("div", { class: "empty" }, "No projects in this scope.");
+  return h("div", { style: { display: "grid", gap: "10px" } }, ps.map(function (x) {
+    var trk = h("div", { class: "trk" }, h("span", { style: { width: x.r + "%", background: "var(--s-closed)", borderRadius: "0 4px 4px 0" } }));
+    trk.addEventListener("mousemove", function (e) { showTip(e, tipRows(x.p.name, [["var(--s-closed)", "Done", x.d + " of " + x.n]])); });
+    trk.addEventListener("mouseleave", hideTip);
+    return h("div", { style: { cursor: "pointer" }, onclick: function () { go("project/" + x.p.id); } },
+      h("div", { class: "row small", style: { justifyContent: "space-between", flexWrap: "nowrap" } }, h("span", { style: { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, h("span", { class: "key" }, x.p.key), " " + x.p.name),
+        h("span", { class: "num" }, h("b", null, x.r + "%"), h("span", { class: "muted" }, " · " + (x.n - x.d) + " open"))),
+      h("div", { class: "hbar", style: { marginTop: "4px" } }, trk));
+  }));
+}
+
+function typeBars(closed) {
+  var rows = TYPES.map(function (ty) {
+    var ts = closed.filter(function (t) { return t.type === ty; });
+    return { ty: ty, n: ts.length, c: avg(ts.map(function (t) { return daysBetween(t.createdAt, t.completedAt); })) };
+  }).filter(function (r) { return r.n; }).sort(function (a, b) { return b.n - a.n; });
+  if (!rows.length) return h("div", { class: "empty" }, "Nothing closed in this period.");
+  var max = rows[0].n;
+  return h("div", { style: { display: "grid", gap: "9px" } }, rows.map(function (r) {
+    var trk = h("div", { class: "trk", style: { background: "none" } }, h("span", { style: { width: (r.n / max * 100) + "%", background: "var(--s-closed)", borderRadius: "0 4px 4px 0" } }));
+    trk.addEventListener("mousemove", function (e) { showTip(e, tipRows(r.ty, [["var(--s-closed)", "Closed", r.n], ["transparent", "Avg cycle", fmt1(r.c) + " days"]])); });
+    trk.addEventListener("mouseleave", hideTip);
+    return h("div", { style: { display: "grid", gridTemplateColumns: "110px 1fr 92px", alignItems: "center", gap: "10px" }, class: "small" },
+      h("span", null, r.ty), h("div", { class: "hbar" }, trk), h("span", { class: "num muted" }, h("b", { style: { color: "var(--ink)" } }, r.n), " · " + fmt1(r.c) + " d"));
+  }));
 }
 
 /* ---------- Overview ---------- */
@@ -622,12 +1041,12 @@ function pageMy() {
 
 /* ---------- Board ---------- */
 var dragId = null;
-function pageBoard() {
+function pageBoard(view) {
   var ts = filteredTasks();
   var pr = { Critical: 0, High: 1, Medium: 2, Low: 3 };
   return {
-    title: "Board", crumbs: "All projects", keepScroll: true, actions: newTaskBtn({ projectId: ui.filters.projectId }),
-    body: [filterBar(), h("div", { class: "board" }, STATUSES.map(function (s) {
+    title: view ? view.name : "Board", crumbs: view ? viewCrumb(view, "Board") : "All projects", keepScroll: true, actions: newTaskBtn({ projectId: ui.filters.projectId }),
+    body: [view ? viewBar(view) : null, filterBar({ mode: "board", view: view }), h("div", { class: "board" }, STATUSES.map(function (s) {
       var col = ts.filter(function (t) { return t.status === s.k; }).sort(function (a, b) { return (pr[a.priority] - pr[b.priority]) || ((a.dueDate || "9") < (b.dueDate || "9") ? -1 : 1); });
       var colEl = h("div", { class: "col",
         ondragover: function (e) { e.preventDefault(); colEl.classList.add("drop"); },
@@ -660,7 +1079,7 @@ function card(t) {
 }
 
 /* ---------- Task list ---------- */
-function pageTasks() {
+function pageTasks(view) {
   var ts = filteredTasks(), s = ui.sort;
   var cols = [
     ["key", "Key", function (t) { return taskKey(t); }],
@@ -676,8 +1095,8 @@ function pageTasks() {
   var getter = (cols.filter(function (c) { return c[0] === s.k; })[0] || cols[8])[2];
   ts.sort(function (a, b) { var x = getter(a), y = getter(b); return (x < y ? -1 : x > y ? 1 : 0) * s.dir; });
   return {
-    title: "All tasks", crumbs: ts.length + " task" + (ts.length === 1 ? "" : "s"), actions: newTaskBtn({ projectId: ui.filters.projectId }),
-    body: [filterBar({ status: true }), ts.length ? h("div", { class: "tbl-wrap" }, h("table", { class: "t" },
+    title: view ? view.name : "All tasks", crumbs: (view ? viewCrumb(view, "List") + " · " : "") + ts.length + " task" + (ts.length === 1 ? "" : "s"), actions: newTaskBtn({ projectId: ui.filters.projectId }),
+    body: [view ? viewBar(view) : null, filterBar({ status: true, mode: "tasks", view: view }), ts.length ? h("div", { class: "tbl-wrap" }, h("table", { class: "t" },
       h("thead", null, h("tr", null, cols.map(function (c) {
         return h("th", { onclick: function () { if (s.k === c[0]) s.dir = -s.dir; else { s.k = c[0]; s.dir = 1; } render(); } }, c[1] + (s.k === c[0] ? (s.dir > 0 ? " ▲" : " ▼") : ""));
       }))),
@@ -832,6 +1251,7 @@ function setField(t, k, v) {
   if (JSON.stringify(old) === JSON.stringify(v)) return;
   if (k === "projectId") { var np = byId(db.projects, v); t.num = np.nextNum++; }
   t[k] = v; t.updatedAt = nowISO();
+  if (k === "status") t.completedAt = v === "Done" ? (old === "Done" ? t.completedAt : nowISO()) : null;
   log(t.id, k === "description" ? "updated the description" : k === "title" ? "renamed the task to “" + v + "”" : "changed " + FIELD_LABELS[k] + " from " + fmtVal(k, old) + " to " + fmtVal(k, v));
   save();
   if (ui.openTask === t.id) setHash("#/task/" + encodeURIComponent(taskKey(t)));
@@ -1077,7 +1497,7 @@ var FORMS = {
         var p = byId(db.projects, v.projectId);
         var t = { id: uid("t"), projectId: p.id, num: p.nextNum++, title: v.title, type: v.type, priority: v.priority, status: v.status, assigneeId: v.assigneeId || null,
           reporterId: me().id, dueDate: v.dueDate || null, estimateHours: v.estimateHours === "" ? null : +v.estimateHours, deliverable: v.deliverable, description: v.description,
-          labels: v.labels.split(",").map(function (s) { return s.trim().replace(/^#/, ""); }).filter(Boolean), checklist: [], createdAt: nowISO(), updatedAt: nowISO() };
+          labels: v.labels.split(",").map(function (s) { return s.trim().replace(/^#/, ""); }).filter(Boolean), checklist: [], createdAt: nowISO(), updatedAt: nowISO(), completedAt: v.status === "Done" ? nowISO() : null };
         db.tasks.push(t); log(t.id, "created the task"); save();
         ui.modal = null; toast(taskKey(t) + " created"); render(); openTask(t);
       }
@@ -1147,6 +1567,25 @@ var FORMS = {
       } : null
     };
   },
+  view: function (m) {
+    var v = m.item;
+    return {
+      title: v ? "Edit saved view" : "Save view",
+      fields: [
+        { k: "name", label: "Name", req: true, first: true, ph: "e.g. IAI — waiting on SME", help: v ? "Shows: " + describeFilters(v.filters || {}) : "Saves the current filters: " + describeFilters(currentFilters()) },
+        { k: "mode", label: "Open as", t: "select", options: function () { return [{ value: "tasks", label: "Task list" }, { value: "board", label: "Board" }]; }, def: "tasks", half: 1 },
+        { k: "shared", label: "Who sees it", t: "select", options: function () { return [{ value: "yes", label: "Everyone" }, { value: "no", label: "Only me" }]; }, def: "no", half: 2 }
+      ],
+      validate: function (val, e) { if (db.views.some(function (x) { return x !== v && x.ownerId === me().id && x.name.toLowerCase() === val.name.toLowerCase(); })) e.name = "You already have a view with this name."; },
+      save: function (val) {
+        var shared = val.shared === "yes";
+        if (v) { v.name = val.name; v.mode = val.mode; v.shared = shared; }
+        else { v = { id: uid("v"), name: val.name, mode: val.mode, shared: shared, ownerId: me().id, filters: currentFilters(), sort: { k: ui.sort.k, dir: ui.sort.dir } }; db.views.push(v); }
+        save(); ui.modal = null; renderOverlay(); toast("View saved"); go("view/" + v.id); render();
+      },
+      remove: v ? function () { confirmBox("Delete “" + v.name + "”?", "Only the saved view is removed. The tasks stay as they are.", "Delete", function () { db.views = db.views.filter(function (x) { return x !== v; }); save(); go(v.mode === "board" ? "board" : "tasks"); }); } : null
+    };
+  },
   person: function (m) {
     var u = m.item;
     return {
@@ -1170,6 +1609,12 @@ var FORMS = {
     };
   }
 };
+var _viewForm = FORMS.view;
+FORMS.view = function (m) {
+  if (m.item && !m.values) m.values = { name: m.item.name, mode: m.item.mode, shared: m.item.shared ? "yes" : "no" };
+  if (!m.item && !m.values && m.defaults) m.values = { name: "", mode: m.defaults.mode || "tasks", shared: "no" };
+  return _viewForm(m);
+};
 /* the person form stores isActive as a boolean — feed the select its string form */
 var _personForm = FORMS.person;
 FORMS.person = function (m) {
@@ -1184,25 +1629,25 @@ function dataModal() {
     r.onload = function () {
       try {
         var o = JSON.parse(r.result);
-        if (!o || o.app !== "galil-folio" || !Array.isArray(o.tasks)) throw new Error("This is not a GALIL Folio backup.");
+        if (!isBackup(o)) throw new Error("This file is not a Taskana backup.");
         confirmBox("Replace all data?", "Everything in this browser is replaced with the backup (" + o.tasks.length + " tasks, " + (o.projects || []).length + " projects).", "Restore", function () {
-          db = Object.assign(emptyDB(), o); save(); ui.openTask = null; toast("Backup restored"); go("home"); render();
+          db = upgrade(Object.assign(emptyDB(), o)); save(); ui.openTask = null; toast("Backup restored"); go("home"); render();
         });
       } catch (err) { toast(err.message); }
     };
     r.readAsText(f);
   } });
   return shell("Data & backup", h("div", null,
-    h("p", { class: "muted", style: { marginTop: 0 } }, "Folio keeps its data in this browser only. Download a backup to move it to another browser or keep a copy."),
+    h("p", { class: "muted", style: { marginTop: 0 } }, "Taskana keeps its data in this browser only. Download a backup to move it to another browser or keep a copy."),
     h("div", { class: "row", style: { marginBottom: "16px" } },
       h("button", { class: "btn primary", onclick: function () {
-        saveFile("galil-folio-backup-" + today() + ".json", JSON.stringify(Object.assign({}, db, { exported: nowISO() }), null, 2), "application/json", "Backup");
+        saveFile("taskana-backup-" + today() + ".json", JSON.stringify(Object.assign({}, db, { exported: nowISO() }), null, 2), "application/json", "Backup");
       } }, EMBEDDED ? "⧉ Copy backup" : "⬇ Download backup"),
       h("button", { class: "btn", onclick: function () {
         var rows = [["Key", "Title", "Client", "Project", "Type", "Status", "Priority", "Assignee", "Reporter", "Due", "Estimate (h)", "Deliverable", "Labels", "Open questions", "Created", "Updated"]];
         db.tasks.forEach(function (t) { var p = projectOf(t); rows.push([taskKey(t), t.title, (clientOf(p) || {}).name, p.name, t.type, t.status, t.priority, t.assigneeId ? userName(t.assigneeId) : "", userName(t.reporterId), t.dueDate || "", t.estimateHours == null ? "" : t.estimateHours, t.deliverable || "", (t.labels || []).join(" "), openQuestions(t.id).length, t.createdAt.slice(0, 10), t.updatedAt.slice(0, 10)]); });
         var csv = "﻿" + rows.map(function (r) { return r.map(function (c) { c = String(c == null ? "" : c); return /[",\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c; }).join(","); }).join("\r\n");
-        saveFile("galil-folio-tasks-" + today() + ".csv", csv, "text/csv", "Task CSV");
+        saveFile("taskana-tasks-" + today() + ".csv", csv, "text/csv", "Task CSV");
       } }, EMBEDDED ? "⧉ Copy tasks (CSV)" : "⬇ Export tasks (CSV)")),
     h("label", { class: "l" }, "Restore from a backup"), file,
     h("hr", { style: { border: 0, borderTop: "1px solid var(--line)", margin: "18px 0" } }),
@@ -1219,7 +1664,7 @@ function toast(msg) {
 var EMBEDDED = (function () { try { return window.top !== window.self; } catch (e) { return true; } })();
 function saveFile(name, text, type, what) {
   if (EMBEDDED) {
-    if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () { toast(what + " copied to the clipboard — paste it into a file"); }, function () { toast("Couldn't copy " + what.toLowerCase() + " here — open Folio directly to download it."); });
+    if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () { toast(what + " copied to the clipboard — paste it into a file"); }, function () { toast("Couldn't copy " + what.toLowerCase() + " here — open Taskana directly to download it."); });
     return;
   }
   var a = h("a", { href: URL.createObjectURL(new Blob([text], { type: type })), download: name }); document.body.appendChild(a); a.click(); a.remove();
@@ -1232,6 +1677,7 @@ function copy(text) {
 /* ================= boot ================= */
 db = load();
 parseRoute();
+enterRoute();
 render();
 </script>
 </body>
