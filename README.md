@@ -48,6 +48,10 @@ site/                     The other two products published to GitHub Pages
     index.html              The Employee Knowledge Base — onboarding, company
                            rules and training how-to's, opened from the
                            book button in the app's top bar.
+  folio/
+    index.html              GALIL Folio — Jira-style project & task tracker for
+                           the technical-writing teams. Standalone (see
+                           "GALIL Folio" below).
 archive/                  Superseded builds, kept for reference.
   GALIL-WorkDesk-v6.html
   galil-workdesk-dev-cdn-build.html
@@ -90,6 +94,36 @@ client via a `mailto:` link (`site-mui/src/lib/useMailtoForm.js`) — there's
 no backend yet, so there's nowhere for a submission to land server-side.
 
 See `site-mui/README.md` for the app's structure and stack.
+
+## GALIL Folio (`site/folio/`)
+
+A Jira-style project and task tracker built for technical-writing teams. Like
+the WorkDesk app it is one self-contained HTML file (no build step, no network
+calls) that keeps its data in the browser's `localStorage` (key
+`galil-folio-v1`). It is standalone for now; people, client and project ids
+follow the WorkDesk conventions (`u-*`, `c-*`, `p-*`) so it can later read
+WorkDesk data.
+
+- **Clients → Projects → Tasks.** Each project has a short key (e.g. `RSOM`)
+  and tasks get keys like `RSOM-12`. Projects carry a deliverable type
+  (operator manual, online help, API reference, courseware…), lead, dates and
+  status.
+- **Tasks** can be assigned to anyone in the company, with a doc-oriented type
+  (Writing, Editing, Review, Illustration, Translation, Localization, SME
+  Interview, Publishing, Doc Defect, Research), priority, due date, estimate,
+  deliverable/section, labels and a checklist.
+- **Workflow:** Backlog → To Do → Writing → Peer Review → SME Review → Done,
+  shown as a drag-and-drop **Board**, a sortable **All tasks** list, **My
+  work**, and an **Overview** with open questions, overdue work and recent
+  activity.
+- **Comments** on every task, with `@mentions`, and **Questions** — comments
+  flagged as open until someone marks them answered (counted on cards and on
+  the Overview). Every field change is kept in the task's **History**.
+- **People** page with each person's workload; pick who you're working as at
+  the bottom of the sidebar (there's no sign-in yet).
+- **⇅ Data:** JSON backup/restore, CSV export of all tasks, reset to demo data.
+- Light/dark theme, phone layout, `c` shortcut for a new task, deep links to
+  tasks (`#/task/RSOM-1`).
 
 ## The app (`site/app/`)
 

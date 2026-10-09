@@ -42,7 +42,7 @@ jobs:
           npm run build
 
       # The published site is the Material UI build (site-mui/dist) at the
-      # root, with the WorkDesk app, Handbook and Knowledge Base — unrelated static
+      # root, with the WorkDesk app, Handbook, Knowledge Base and Folio — unrelated static
       # products that live under site/ — carried over unchanged.
       - name: Assemble the published site
         run: |
@@ -52,6 +52,7 @@ jobs:
           cp -r site/app pages-dist/app
           cp -r site/handbook pages-dist/handbook
           cp -r site/kb pages-dist/kb
+          cp -r site/folio pages-dist/folio
 
       - name: Upload pages artifact
         uses: actions/upload-pages-artifact@v3

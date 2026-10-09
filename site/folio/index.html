@@ -1,0 +1,1215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1B2A18">
+<meta name="robots" content="noindex">
+<title>GALIL Folio</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect x='6' y='4' width='26' height='32' rx='3' fill='none' stroke='%238CC63E' stroke-width='3.5'/%3E%3Cpath d='M12 14h14M12 21h14M12 28h8' stroke='%238CC63E' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#FBFDF7; --panel:#FFFFFF; --panel2:#F4F8EE; --ink:#1B2A18; --muted:#5B6B57; --line:#DCE5D2;
+  --chrome:#1B2A18; --chrometx:#FFFFFF; --chromedim:#C9DDB4; --chromehover:#2B3A22;
+  --green:#8CC63E; --deep:#5C8B22; --deepfg:#FFFFFF; --hover:#EAF3DC;
+  --blue:#3B7DD8; --bluebg:#E8F1FC; --bluetx:#1E548F;
+  --amber:#F0A32C; --amberbg:#FEF6E7; --ambertx:#7A5407;
+  --err:#C0392B; --errbg:#FBEBE9;
+  --violet:#7A5AC8; --violetbg:#F1ECFB; --violettx:#4D3391;
+  --teal:#1F9A8A; --tealbg:#E4F5F2; --tealtx:#12665B;
+  --grey:#8A9585; --greybg:#EEF1EB;
+  --shadow:0 1px 2px rgba(27,42,24,.06),0 4px 14px rgba(27,42,24,.06);
+  color-scheme:light;
+}
+:root[data-theme="dark"]{
+  --bg:#12180F; --panel:#1A2216; --panel2:#20291B; --ink:#E9F2DF; --muted:#A5B49B; --line:#2E3C26;
+  --chrome:#0E140B; --chrometx:#E9F2DF; --chromedim:#9FB58A; --chromehover:#202B1A;
+  --green:#9FD154; --deep:#B6E072; --deepfg:#14260A; --hover:#243019;
+  --blue:#7FB2F0; --bluebg:#14263D; --bluetx:#9CC5F5;
+  --amber:#F5B84F; --amberbg:#2E2412; --ambertx:#F0C270;
+  --err:#F0796B; --errbg:#2E1815;
+  --violet:#B39BF0; --violetbg:#251D3A; --violettx:#C9B7F5;
+  --teal:#5FD0BF; --tealbg:#12302B; --tealtx:#8FE3D6;
+  --grey:#8C9884; --greybg:#262F21;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--deep)}
+#app{display:flex;height:100%}
+
+/* sidebar */
+.side{width:232px;flex:none;background:var(--chrome);color:var(--chrometx);display:flex;flex-direction:column;padding:16px 10px}
+.brand{display:flex;align-items:center;gap:10px;padding:4px 8px 18px}
+.brand b{letter-spacing:.16em;font-size:15px}
+.brand small{display:block;color:var(--chromedim);font-size:11px;letter-spacing:.04em}
+.nav button{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border:0;background:none;border-radius:8px;color:var(--chromedim);cursor:pointer;text-align:left}
+.nav button:hover{background:var(--chromehover);color:var(--chrometx)}
+.nav button.on{background:var(--chromehover);color:var(--chrometx);box-shadow:inset 3px 0 0 var(--green)}
+.nav .count{margin-left:auto;font-size:11px;background:var(--green);color:#14260A;border-radius:10px;padding:0 7px;font-weight:600}
+.side .grow{flex:1}
+.side .me{border-top:1px solid rgba(255,255,255,.1);padding:12px 8px 0;font-size:12px;color:var(--chromedim)}
+.side .me select{width:100%;margin-top:6px;background:var(--chromehover);border:1px solid rgba(255,255,255,.12);color:var(--chrometx);border-radius:6px;padding:6px}
+.side .me .row{margin-top:8px}
+.side .me button{background:none;border:1px solid rgba(255,255,255,.18);color:var(--chromedim);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px}
+.side .me button:hover{color:var(--chrometx)}
+
+/* main */
+.main{flex:1;min-width:0;display:flex;flex-direction:column;height:100%}
+.top{display:flex;align-items:center;gap:12px;padding:14px 24px;border-bottom:1px solid var(--line);background:var(--panel)}
+.top h1{font-size:19px;margin:0;font-weight:650}
+.top .crumbs{color:var(--muted);font-size:12px}
+.top .crumbs a{cursor:pointer;text-decoration:none}
+.top .sp{flex:1}
+.content{flex:1;overflow:auto;padding:20px 24px 40px}
+.menu-btn{display:none}
+
+/* atoms */
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 12px;cursor:pointer;font-weight:550;white-space:nowrap}
+.btn:hover{background:var(--hover)}
+.btn.primary{background:var(--deep);border-color:var(--deep);color:var(--deepfg)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.danger{color:var(--err)}
+.btn.sm{padding:4px 9px;font-size:12px}
+.btn.ghost{border-color:transparent;background:none}
+.btn.ghost:hover{background:var(--hover)}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:1px 8px;font-size:11.5px;font-weight:600;white-space:nowrap;background:var(--greybg);color:var(--muted)}
+.chip.green{background:var(--hover);color:var(--deep)}
+.chip.blue{background:var(--bluebg);color:var(--bluetx)}
+.chip.amber{background:var(--amberbg);color:var(--ambertx)}
+.chip.red{background:var(--errbg);color:var(--err)}
+.chip.violet{background:var(--violetbg);color:var(--violettx)}
+.chip.teal{background:var(--tealbg);color:var(--tealtx)}
+.key{font:600 12px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted)}
+.avatar{width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;color:#fff;flex:none}
+.avatar.lg{width:36px;height:36px;font-size:13px}
+.avatar.none{background:var(--greybg)!important;color:var(--muted);border:1px dashed var(--grey)}
+.muted{color:var(--muted)}
+.small{font-size:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+.pad{padding:16px}
+.grid{display:grid;gap:16px}
+.grid>*{min-width:0}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+.g2{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr)}
+.stat b{display:block;font-size:26px;line-height:1.1}
+.stat span{color:var(--muted);font-size:12px}
+h2{font-size:15px;margin:0 0 10px}
+h3{font-size:13px;margin:0 0 8px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+.prio{display:inline-flex;align-items:center;gap:4px;font-size:12px}
+.prio i{width:8px;height:8px;border-radius:2px;display:inline-block}
+.overdue{color:var(--err);font-weight:600}
+input.f,select.f,textarea.f{width:100%;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 10px;outline:none}
+input.f:focus,select.f:focus,textarea.f:focus{border-color:var(--deep);box-shadow:0 0 0 3px var(--hover)}
+textarea.f{resize:vertical;min-height:80px}
+label.l{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0 0 4px}
+.field{margin-bottom:12px}
+.req{color:var(--err)}
+.err-msg{color:var(--err);font-size:12px;margin-top:3px}
+
+/* filters */
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.filters select,.filters input{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:6px 9px;max-width:200px}
+.filters input{width:200px}
+
+/* board */
+.board{display:flex;gap:12px;align-items:flex-start;min-height:60vh;overflow-x:auto;padding-bottom:12px}
+.col{flex:0 0 260px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;max-height:calc(100vh - 210px)}
+.col-h{display:flex;align-items:center;gap:8px;padding:10px 12px;font-weight:650;font-size:12.5px;text-transform:uppercase;letter-spacing:.05em}
+.col-h .dot{width:8px;height:8px;border-radius:50%}
+.col-b{padding:4px 8px 10px;overflow-y:auto;flex:1;min-height:60px;display:flex;flex-direction:column;gap:8px}
+.col.drop{outline:2px dashed var(--deep);outline-offset:-3px}
+.tcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.tcard:hover{border-color:var(--deep)}
+.tcard.dragging{opacity:.4}
+.tcard .t{font-weight:550;margin:4px 0 8px}
+.tcard .meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.tcard .meta .sp{flex:1}
+
+/* tables */
+table.t{width:100%;border-collapse:collapse;background:var(--panel)}
+table.t th{text-align:left;font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:650;padding:9px 10px;border-bottom:1px solid var(--line);cursor:pointer;user-select:none;white-space:nowrap}
+table.t td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+table.t tr.click{cursor:pointer}
+table.t tr.click:hover td{background:var(--hover)}
+.tbl-wrap{overflow:auto;border:1px solid var(--line);border-radius:12px}
+
+/* progress */
+.bar{display:flex;height:8px;border-radius:5px;overflow:hidden;background:var(--greybg)}
+.bar span{display:block;height:100%}
+
+/* modal */
+.scrim{position:fixed;inset:0;background:rgba(10,16,8,.45);display:flex;align-items:flex-start;justify-content:center;padding:5vh 16px;z-index:50;overflow:auto}
+.modal{background:var(--panel);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);width:100%;max-width:520px}
+.modal.wide{max-width:1060px}
+.modal-h{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.modal-h h2{margin:0;font-size:16px;flex:1}
+.modal-b{padding:18px}
+.modal-f{display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--line)}
+.x{border:0;background:none;font-size:20px;cursor:pointer;color:var(--muted);line-height:1;padding:4px 8px;border-radius:6px}
+.x:hover{background:var(--hover)}
+
+/* task detail */
+.td{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:0}
+.td-main{padding:18px 22px;border-right:1px solid var(--line);min-width:0}
+.td-side{padding:18px;background:var(--panel2);border-bottom-right-radius:14px}
+.td-title{font-size:20px;font-weight:650;border:1px solid transparent;border-radius:8px;padding:4px 6px;margin:0 -6px 10px;width:calc(100% + 12px);background:none}
+.td-title:hover{border-color:var(--line)}
+.td-title:focus{border-color:var(--deep);outline:none;background:var(--panel)}
+.desc{white-space:pre-wrap;word-wrap:break-word;padding:8px 10px;border-radius:8px;border:1px solid transparent;cursor:text;min-height:44px}
+.desc:hover{border-color:var(--line)}
+.prop{display:grid;grid-template-columns:96px 1fr;align-items:center;gap:8px;margin-bottom:9px;font-size:13px}
+.prop>span{color:var(--muted);font-size:12px;font-weight:600}
+.prop select,.prop input{width:100%;border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:5px 7px;font-size:13px}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:22px 0 14px}
+.tabs button{border:0;background:none;padding:8px 12px;cursor:pointer;color:var(--muted);font-weight:600;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button.on{color:var(--ink);border-bottom-color:var(--deep)}
+.comment{display:flex;gap:10px;margin-bottom:14px}
+.comment .body{flex:1;min-width:0}
+.comment .bubble{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 12px;white-space:pre-wrap;word-wrap:break-word;margin-top:4px}
+.comment.q .bubble{background:var(--amberbg);border-color:var(--amber)}
+.comment.q.resolved .bubble{background:var(--panel2);border-color:var(--line)}
+.comment .acts{display:flex;gap:4px;margin-top:4px}
+.comment .acts button{border:0;background:none;color:var(--muted);font-size:12px;cursor:pointer;padding:2px 6px;border-radius:5px}
+.comment .acts button:hover{background:var(--hover);color:var(--ink)}
+.mention{color:var(--bluetx);background:var(--bluebg);border-radius:4px;padding:0 3px;font-weight:600}
+.composer{border:1px solid var(--line);border-radius:10px;background:var(--panel);overflow:hidden}
+.composer textarea{border:0;width:100%;padding:10px 12px;min-height:70px;resize:vertical;outline:none;background:transparent}
+.composer .bar2{display:flex;align-items:center;gap:8px;padding:8px 10px;border-top:1px solid var(--line);background:var(--panel2);flex-wrap:wrap}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:var(--panel);padding:4px 10px;cursor:pointer;font-size:12px;font-weight:600;color:var(--muted)}
+.seg button.on{background:var(--deep);color:var(--deepfg)}
+.act-item{display:flex;gap:8px;font-size:12.5px;padding:6px 0;border-bottom:1px dashed var(--line)}
+.checklist label{display:flex;gap:8px;align-items:flex-start;padding:4px 0;cursor:pointer}
+.checklist label.done span{text-decoration:line-through;color:var(--muted)}
+
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--chrome);color:var(--chrometx);padding:10px 16px;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:100;font-size:13px}
+.list-item{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--line);cursor:pointer}
+.list-item:last-child{border-bottom:0}
+.list-item:hover{background:var(--hover)}
+.list-item .grow{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+@media (max-width:900px){
+  .g4{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .g2{grid-template-columns:1fr}
+  .td{grid-template-columns:1fr}
+  .td-main{border-right:0}
+  .td-side{border-radius:0 0 14px 14px}
+}
+@media (max-width:760px){
+  .side{position:fixed;inset:0 auto 0 0;z-index:40;transform:translateX(-100%);transition:transform .2s}
+  .side.open{transform:none}
+  .menu-btn{display:inline-flex}
+  .top{padding:12px 16px}
+  .content{padding:16px}
+  .filters input,.filters select{max-width:none;flex:1 1 140px}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+"use strict";
+/* =====================================================================
+   GALIL Folio — project & task tracking for technical-writing teams.
+   Standalone: no network, no build step. Data lives in localStorage.
+   Ids for people, clients and projects follow the WorkDesk conventions
+   (u-*, c-*, p-*) so the two apps can share records later.
+   ===================================================================== */
+var KEY = "galil-folio-v1";
+var APP_VERSION = 1;
+
+var STATUSES = [
+  { k: "Backlog",     color: "var(--grey)",   chip: "" },
+  { k: "To Do",       color: "var(--blue)",   chip: "blue" },
+  { k: "Writing",     color: "var(--amber)",  chip: "amber" },
+  { k: "Peer Review", color: "var(--violet)", chip: "violet" },
+  { k: "SME Review",  color: "var(--teal)",   chip: "teal" },
+  { k: "Done",        color: "var(--green)",  chip: "green" }
+];
+var TYPES = ["Writing", "Editing", "Review", "Illustration", "Translation", "Localization", "SME Interview", "Publishing", "Doc Defect", "Research"];
+var TYPE_CHIP = { "Writing": "amber", "Editing": "violet", "Review": "violet", "Illustration": "teal", "Translation": "blue", "Localization": "blue", "SME Interview": "teal", "Publishing": "green", "Doc Defect": "red", "Research": "" };
+var PRIORITIES = [
+  { k: "Critical", color: "var(--err)" },
+  { k: "High",     color: "var(--amber)" },
+  { k: "Medium",   color: "var(--blue)" },
+  { k: "Low",      color: "var(--grey)" }
+];
+var DOC_TYPES = ["User Manual", "Operator Manual", "Maintenance Manual", "Online Help", "API Reference", "Release Notes", "Training Courseware", "Quick Start Guide", "Knowledge Base", "Proposal", "Other"];
+var PROJECT_STATUSES = ["Active", "On Hold", "Completed", "Archived"];
+var AVATAR_COLORS = ["#5C8B22", "#3B7DD8", "#C0392B", "#7A5AC8", "#1F9A8A", "#D9822B", "#8E5B3E", "#2F6F4F", "#B03A7A", "#4A5A9A"];
+
+/* ================= utilities ================= */
+function uid(p) { return p + "-" + Math.random().toString(36).slice(2, 9); }
+function nowISO() { return new Date().toISOString(); }
+function d2s(d) { var m = d.getMonth() + 1, dd = d.getDate(); return d.getFullYear() + "-" + (m < 10 ? "0" : "") + m + "-" + (dd < 10 ? "0" : "") + dd; }
+function today() { return d2s(new Date()); }
+function fmtDate(s) { if (!s) return "—"; var d = new Date(s.length === 10 ? s + "T00:00:00" : s); return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }); }
+function fmtWhen(iso) {
+  var d = new Date(iso), diff = (Date.now() - d.getTime()) / 1000;
+  if (diff < 60) return "just now";
+  if (diff < 3600) return Math.floor(diff / 60) + " min ago";
+  if (diff < 86400) return Math.floor(diff / 3600) + " h ago";
+  if (diff < 86400 * 7) return Math.floor(diff / 86400) + " d ago";
+  return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+function isOverdue(t) { return t.dueDate && t.status !== "Done" && t.dueDate < today(); }
+function initials(name) { return (name || "?").split(/\s+/).filter(Boolean).slice(0, 2).map(function (s) { return s[0].toUpperCase(); }).join(""); }
+function colorFor(id) { var h = 0; for (var i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0; return AVATAR_COLORS[h % AVATAR_COLORS.length]; }
+function byId(arr, id) { for (var i = 0; i < arr.length; i++) if (arr[i].id === id) return arr[i]; return null; }
+function statusOf(k) { for (var i = 0; i < STATUSES.length; i++) if (STATUSES[i].k === k) return STATUSES[i]; return STATUSES[0]; }
+function prioOf(k) { for (var i = 0; i < PRIORITIES.length; i++) if (PRIORITIES[i].k === k) return PRIORITIES[i]; return PRIORITIES[2]; }
+
+/* tiny DOM builder: h(tag, props, ...children) — text is always set as text, never HTML */
+function h(tag, props) {
+  var el = document.createElement(tag);
+  if (props) for (var k in props) {
+    var v = props[k];
+    if (v == null || v === false) continue;
+    if (k === "class") el.className = v;
+    else if (k === "style" && typeof v === "object") Object.assign(el.style, v);
+    else if (k.slice(0, 2) === "on") el.addEventListener(k.slice(2).toLowerCase(), v);
+    else if (k === "value") el.value = v;
+    else if (k === "checked" || k === "selected" || k === "disabled") el[k] = !!v;
+    else el.setAttribute(k, v === true ? "" : v);
+  }
+  for (var i = 2; i < arguments.length; i++) add(el, arguments[i]);
+  return el;
+}
+function add(el, c) {
+  if (c == null || c === false) return;
+  if (Array.isArray(c)) { c.forEach(function (x) { add(el, x); }); return; }
+  el.appendChild(c.nodeType ? c : document.createTextNode(String(c)));
+}
+
+/* ================= store ================= */
+var db, ui = {
+  route: [], sideOpen: false,
+  filters: { q: "", clientId: "", projectId: "", assigneeId: "", type: "", priority: "", status: "" },
+  sort: { k: "updatedAt", dir: -1 },
+  openTask: null, taskTab: "comments", composerKind: "comment", editingDesc: false, editingCommentId: null,
+  modal: null
+};
+
+function emptyDB() {
+  return { app: "galil-folio", version: APP_VERSION, users: [], clients: [], projects: [], tasks: [], comments: [], activity: [], settings: { currentUserId: null, theme: "light" } };
+}
+function load() {
+  try { var s = localStorage.getItem(KEY); if (s) { var o = JSON.parse(s); if (o && o.app === "galil-folio") return o; } } catch (e) {}
+  return seed();
+}
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(db)); }
+  catch (e) { toast("Browser storage is full — the last change was not saved."); }
+}
+function me() { return byId(db.users, db.settings.currentUserId) || db.users[0]; }
+function userName(id) { var u = byId(db.users, id); return u ? u.fullName : "Unassigned"; }
+function projectOf(t) { return byId(db.projects, t.projectId); }
+function clientOf(p) { return p ? byId(db.clients, p.clientId) : null; }
+function taskKey(t) { var p = projectOf(t); return (p ? p.key : "?") + "-" + t.num; }
+function taskByKey(k) {
+  for (var i = 0; i < db.tasks.length; i++) if (taskKey(db.tasks[i]) === k) return db.tasks[i];
+  return null;
+}
+function log(taskId, text) { db.activity.push({ id: uid("a"), taskId: taskId, userId: me().id, at: nowISO(), text: text }); }
+function commentsOf(taskId) { return db.comments.filter(function (c) { return c.taskId === taskId; }).sort(function (a, b) { return a.createdAt < b.createdAt ? -1 : 1; }); }
+function openQuestions(taskId) { return db.comments.filter(function (c) { return c.taskId === taskId && c.kind === "question" && !c.resolved; }); }
+
+/* ================= seed data ================= */
+function seed() {
+  var d = emptyDB();
+  var T = function (n) { var x = new Date(); x.setDate(x.getDate() + n); return d2s(x); };
+  var A = function (daysAgo, h) { var x = new Date(); x.setDate(x.getDate() - daysAgo); x.setHours(h || 10, (daysAgo * 7) % 60); return x.toISOString(); };
+  var U = function (id, name, title, dept) {
+    return { id: id, fullName: name, email: name.toLowerCase().replace(/[^a-z]+/g, ".") + "@galiltc.co.il", jobTitle: title, department: dept, isActive: true };
+  };
+  d.users = [
+    U("u-ceo", "Dana Galil", "Founder & CEO", "Management"),
+    U("u-ops", "Ronen Shaked", "Operations Manager", "Operations"),
+    U("u-pm", "Maya Ben Ari", "Project Manager", "Delivery"),
+    U("u-tl", "Eitan Levi", "Team Lead, Docs", "Delivery"),
+    U("u-sen", "Noa Katz", "Senior Technical Writer", "Delivery"),
+    U("u-emp", "Yossi Mizrahi", "Technical Writer", "Delivery"),
+    U("u-emp2", "Tal Rosen", "Trainer", "Delivery"),
+    U("u-fin", "Orit Hadad", "Finance Controller", "Finance"),
+    U("u-ext", "Adam Peled", "Contract Illustrator", "External"),
+    U("u-new", "Shira Cohen", "Technical Writer", "Delivery")
+  ];
+  d.clients = [
+    { id: "c-iai", name: "IAI", code: "IAI", industry: "Aerospace & Defence", contactName: "Ilan Barak", contactEmail: "ilan@iai.example", notes: "Style guide: IAI-TW-SG rev F. All deliverables in S1000D-lite Word templates." },
+    { id: "c-elb", name: "Elbit Systems", code: "ELB", industry: "Defence Electronics", contactName: "Rita Gold", contactEmail: "rita@elbit.example", notes: "Help authored in DITA, published via the client's CCMS." },
+    { id: "c-mob", name: "Mobileye", code: "MOB", industry: "Automotive", contactName: "Sagi Peer", contactEmail: "sagi@mobileye.example", notes: "Developer docs in Markdown, reviewed through the client's Git." },
+    { id: "c-gal", name: "GALIL (internal)", code: "GAL", industry: "Internal", contactName: "", contactEmail: "", notes: "Internal templates, style guide and training." }
+  ];
+  d.projects = [
+    { id: "p-iai1", clientId: "c-iai", key: "RSOM", name: "Radar Suite — Operator Manual", docType: "Operator Manual", status: "Active", leadUserId: "u-pm", startDate: T(-120), dueDate: T(90), description: "Two-volume operator manual for the radar suite (Vol 1 Operation, Vol 2 Maintenance)." },
+    { id: "p-iai2", clientId: "c-iai", key: "MTP", name: "Maintenance Training Package", docType: "Training Courseware", status: "Active", leadUserId: "u-pm", startDate: T(-60), dueDate: T(120), description: "Instructor guide, student handbook and slides for the level-2 maintenance course." },
+    { id: "p-elb1", clientId: "c-elb", key: "AVH", name: "Avionics Help System", docType: "Online Help", status: "Active", leadUserId: "u-tl", startDate: T(-200), dueDate: T(30), description: "Migration of the legacy CHM help to DITA, then content refresh for release 5." },
+    { id: "p-mob1", clientId: "c-mob", key: "SDK", name: "SDK Documentation Refresh", docType: "API Reference", status: "Active", leadUserId: "u-sen", startDate: T(-40), dueDate: T(60), description: "Rewrite the getting-started guide and regenerate the API reference for SDK 4.x." },
+    { id: "p-gal1", clientId: "c-gal", key: "STY", name: "GALIL Style Guide 2027", docType: "Other", status: "On Hold", leadUserId: "u-tl", startDate: T(-20), dueDate: T(150), description: "Refresh of the house style guide and Word/FrameMaker templates." }
+  ];
+  var n = {};
+  var tasks = [
+    ["p-iai1", "Draft chapter 3 — Track modes", "Writing", "Writing", "High", "u-emp", "u-pm", T(6), 24, "Vol 1 · Ch 3", "Full draft with screenshots placed, ready for peer review.\n\nSource: SRS v2.3 §4.1–4.6 and the recorded walkthrough from 12 Sep.", ["vol1"], [["Outline approved", true], ["Screenshots captured", true], ["Draft written", false], ["Self-check against style guide", false]], -10],
+    ["p-iai1", "Illustration pass — chapter 3", "Illustration", "To Do", "Medium", "u-ext", "u-pm", T(12), 16, "Vol 1 · Ch 3", "Redraw 12 figures to the client style sheet (line weights 0.5/1 pt, callouts in Arial 8).", ["vol1", "figures"], [], -7],
+    ["p-iai1", "Maintenance procedures — outline", "Research", "Backlog", "Medium", "u-sen", "u-pm", T(20), 8, "Vol 2", "Agree the task breakdown with the client SME before writing starts.", ["vol2"], [], -3],
+    ["p-iai1", "SME interview — antenna alignment", "SME Interview", "To Do", "High", "u-sen", "u-pm", T(3), 3, "Vol 2 · Ch 5", "Book 1 h with the field engineer. Prepare questions from the alignment test report.", ["vol2", "sme"], [["Questions sent in advance", false], ["Interview recorded", false]], -2],
+    ["p-iai1", "Peer review — chapter 2", "Review", "Peer Review", "Medium", "u-tl", "u-emp", T(1), 6, "Vol 1 · Ch 2", "Review for accuracy, terminology and style-guide compliance. Use tracked changes.", ["vol1"], [], -5],
+    ["p-iai2", "Build module 4 slides", "Writing", "Writing", "Medium", "u-emp2", "u-pm", T(9), 20, "Module 4", "Slides plus facilitator notes for the hydraulics module.", ["courseware"], [], -12],
+    ["p-iai2", "Student handbook — module 3 edit", "Editing", "SME Review", "Medium", "u-sen", "u-pm", T(-2), 10, "Module 3", "Copy-edit pass done; with the client SME for technical sign-off.", ["courseware"], [], -15],
+    ["p-iai2", "Translate module 1 to Hebrew", "Translation", "Backlog", "Low", null, "u-pm", T(45), 30, "Module 1", "Send to the translation vendor once module 1 is signed off. Glossary attached in the project share.", ["he"], [], -1],
+    ["p-elb1", "Help topic migration — batch 2", "Writing", "Peer Review", "Critical", "u-emp", "u-tl", T(-1), 40, "Release 5", "Convert 80 topics to the new DITA map. Keep the old topic IDs as aliases so context-sensitive links keep working.", ["dita", "migration"], [["Topics converted", true], ["Map validated", true], ["Broken links fixed", false]], -21],
+    ["p-elb1", "Fix broken cross-references in nav topics", "Doc Defect", "To Do", "High", "u-emp", "u-tl", T(4), 4, "Release 5", "QA found 14 xrefs pointing at removed topics (see the link report in the CCMS).", ["defect"], [], -4],
+    ["p-elb1", "Publish release 5 help to staging", "Publishing", "Backlog", "Medium", "u-tl", "u-tl", T(25), 2, "Release 5", "Run the publish job and send the staging URL to Rita.", ["publish"], [], -1],
+    ["p-mob1", "API reference — endpoints A–F", "Writing", "Done", "Medium", "u-sen", "u-sen", T(-8), 30, "SDK 4.0", "Generate and hand-edit reference pages.", ["api"], [], -30],
+    ["p-mob1", "Getting-started guide rewrite", "Writing", "Writing", "High", "u-new", "u-sen", T(14), 18, "SDK 4.0", "New quick start for SDK 4: install, auth, first call, troubleshooting.", ["guide"], [["Install section", true], ["Auth section", false], ["First call sample", false], ["Troubleshooting", false]], -9],
+    ["p-mob1", "API reference — endpoints G–M", "Writing", "To Do", "Medium", "u-sen", "u-sen", T(28), 30, "SDK 4.0", "Same approach as A–F.", ["api"], [], -2],
+    ["p-gal1", "Collect style-guide change requests", "Research", "Backlog", "Low", "u-tl", "u-ceo", T(40), 6, "", "Survey the writers for pain points with the current guide.", [], [], -20]
+  ];
+  tasks.forEach(function (r, i) {
+    n[r[0]] = (n[r[0]] || 0) + 1;
+    var created = A(-r[13] , 9);
+    d.tasks.push({
+      id: "t-" + (i + 1), projectId: r[0], num: n[r[0]], title: r[1], type: r[2], status: r[3], priority: r[4],
+      assigneeId: r[5], reporterId: r[6], dueDate: r[7], estimateHours: r[8], deliverable: r[9], description: r[10],
+      labels: r[11], checklist: r[12].map(function (c) { return { id: uid("ck"), text: c[0], done: c[1] }; }),
+      createdAt: created, updatedAt: A(Math.max(0, -r[13] - 3), 14)
+    });
+  });
+  d.projects.forEach(function (p) { p.nextNum = (n[p.id] || 0) + 1; });
+  d.comments = [
+    { id: "cm-1", taskId: "t-1", authorId: "u-emp", kind: "question", body: "@Maya Ben Ari the SRS lists five track modes but the UI only shows four — is \"Silent track\" still in scope for this release?", createdAt: A(2, 11), resolved: false },
+    { id: "cm-2", taskId: "t-1", authorId: "u-pm", kind: "comment", body: "Checking with Ilan at IAI, will update by Thursday.", createdAt: A(2, 15) },
+    { id: "cm-3", taskId: "t-1", authorId: "u-emp", kind: "comment", body: "Screenshots are on the share under /RSOM/Vol1/Ch3/img (build 2.3.114).", createdAt: A(1, 10) },
+    { id: "cm-4", taskId: "t-2", authorId: "u-ext", kind: "question", body: "Do the callouts need to be in Hebrew as well, or English only?", createdAt: A(3, 9), resolved: true, resolvedBy: "u-pm", resolvedAt: A(3, 12) },
+    { id: "cm-5", taskId: "t-2", authorId: "u-pm", kind: "comment", body: "English only for this volume.", createdAt: A(3, 12) },
+    { id: "cm-6", taskId: "t-9", authorId: "u-tl", kind: "comment", body: "Batch looks good overall. 6 topics still have hard-coded product names — please switch them to the keyref.", createdAt: A(1, 16) },
+    { id: "cm-7", taskId: "t-9", authorId: "u-emp", kind: "question", body: "@Eitan Levi should the alias IDs go in the map or in each topic's prolog?", createdAt: A(0, 9), resolved: false },
+    { id: "cm-8", taskId: "t-7", authorId: "u-sen", kind: "comment", body: "Sent to the SME for sign-off. They asked for 3 working days.", createdAt: A(4, 13) },
+    { id: "cm-9", taskId: "t-13", authorId: "u-new", kind: "question", body: "Is there a sandbox API key we can use in the code samples?", createdAt: A(1, 11), resolved: false }
+  ];
+  d.activity = d.tasks.map(function (t) { return { id: uid("a"), taskId: t.id, userId: t.reporterId, at: t.createdAt, text: "created the task" }; });
+  d.settings.currentUserId = "u-pm";
+  return d;
+}
+
+/* ================= routing ================= */
+function go(path) { location.hash = "#/" + path; }
+function parseRoute() { ui.route = (location.hash.replace(/^#\/?/, "") || "home").split("/").map(decodeURIComponent); }
+window.addEventListener("hashchange", function () { parseRoute(); ui.sideOpen = false; render(); });
+
+/* ================= rendering ================= */
+var root = document.getElementById("app");
+function render() {
+  document.documentElement.setAttribute("data-theme", db.settings.theme || "light");
+  var scroll = root.querySelector(".content"), st = scroll ? scroll.scrollTop : 0;
+  var page = pageFor(ui.route);
+  root.replaceChildren(sidebar(), h("div", { class: "main" },
+    h("div", { class: "top" },
+      h("button", { class: "btn ghost menu-btn", onclick: function () { ui.sideOpen = !ui.sideOpen; render(); }, "aria-label": "Menu" }, "☰"),
+      h("div", null, page.crumbs ? h("div", { class: "crumbs" }, page.crumbs) : null, h("h1", null, page.title)),
+      h("div", { class: "sp" }), page.actions || null),
+    h("div", { class: "content" }, page.body)));
+  var c = root.querySelector(".content"); if (c && page.keepScroll) c.scrollTop = st;
+  renderOverlay();
+}
+
+function sidebar() {
+  var r = ui.route[0], u = me();
+  var mine = db.tasks.filter(function (t) { return t.assigneeId === u.id && t.status !== "Done"; }).length;
+  var item = function (k, icon, label, count) {
+    return h("button", { class: r === k ? "on" : "", onclick: function () { go(k); } }, h("span", null, icon), label, count ? h("span", { class: "count" }, count) : null);
+  };
+  return h("aside", { class: "side" + (ui.sideOpen ? " open" : "") },
+    h("div", { class: "brand" }, logo(30), h("div", null, h("b", null, "FOLIO"), h("small", null, "GALIL · Doc projects"))),
+    h("nav", { class: "nav" },
+      item("home", "⌂", "Overview"),
+      item("my", "◉", "My work", mine),
+      item("board", "▦", "Board"),
+      item("tasks", "≡", "All tasks"),
+      item("clients", "◧", "Clients & projects"),
+      item("people", "☺", "People")),
+    h("div", { class: "grow" }),
+    h("div", { class: "me" },
+      "Working as",
+      h("select", { onchange: function (e) { db.settings.currentUserId = e.target.value; save(); render(); } },
+        db.users.filter(function (x) { return x.isActive; }).map(function (x) { return h("option", { value: x.id, selected: x.id === u.id }, x.fullName); })),
+      h("div", { class: "row" },
+        h("button", { onclick: function () { db.settings.theme = db.settings.theme === "dark" ? "light" : "dark"; save(); render(); } }, db.settings.theme === "dark" ? "☀ Light" : "☾ Dark"),
+        h("button", { onclick: function () { openModal({ kind: "data" }); } }, "⇅ Data"))));
+}
+function logo(size) {
+  var ns = "http://www.w3.org/2000/svg", s = document.createElementNS(ns, "svg");
+  s.setAttribute("viewBox", "0 0 40 40"); s.setAttribute("width", size); s.setAttribute("height", size);
+  s.innerHTML = "<rect x='6' y='4' width='26' height='32' rx='3' fill='none' stroke='#8CC63E' stroke-width='3.5'/><path d='M12 14h14M12 21h14M12 28h8' stroke='#8CC63E' stroke-width='3' stroke-linecap='round'/>";
+  return s;
+}
+
+function pageFor(r) {
+  switch (r[0]) {
+    case "my": return pageMy();
+    case "board": return pageBoard();
+    case "tasks": return pageTasks();
+    case "clients": return r[1] ? pageClient(r[1]) : pageClients();
+    case "project": return pageProject(r[1]);
+    case "people": return r[1] ? pagePerson(r[1]) : pagePeople();
+    case "task": {
+      var t = taskByKey(r[1]);
+      if (t && ui.openTask !== t.id) { ui.openTask = t.id; ui.taskTab = "comments"; }
+      return pageBoard();
+    }
+    default: return pageHome();
+  }
+}
+
+/* ---------- shared bits ---------- */
+function avatar(userId, big) {
+  var u = userId && byId(db.users, userId);
+  if (!u) return h("span", { class: "avatar none" + (big ? " lg" : ""), title: "Unassigned" }, "?");
+  return h("span", { class: "avatar" + (big ? " lg" : ""), style: { background: colorFor(u.id) }, title: u.fullName }, initials(u.fullName));
+}
+function statusChip(s) { return h("span", { class: "chip " + statusOf(s).chip }, s); }
+function typeChip(t) { return h("span", { class: "chip " + (TYPE_CHIP[t] || "") }, t); }
+function prio(p) { var o = prioOf(p); return h("span", { class: "prio" }, h("i", { style: { background: o.color } }), p); }
+function due(t) { return t.dueDate ? h("span", { class: isOverdue(t) ? "overdue" : "" }, (isOverdue(t) ? "⚠ " : "") + fmtDate(t.dueDate)) : h("span", { class: "muted" }, "No due date"); }
+function newTaskBtn(defaults) { return h("button", { class: "btn primary", onclick: function () { openModal({ kind: "task", defaults: defaults || {} }); } }, "+ New task"); }
+
+function filteredTasks(extra) {
+  var f = ui.filters, q = f.q.trim().toLowerCase();
+  return db.tasks.filter(function (t) {
+    var p = projectOf(t);
+    if (!p) return false;
+    if (extra && !extra(t)) return false;
+    if (f.clientId && p.clientId !== f.clientId) return false;
+    if (f.projectId && t.projectId !== f.projectId) return false;
+    if (f.assigneeId === "none" ? t.assigneeId : (f.assigneeId && t.assigneeId !== f.assigneeId)) return false;
+    if (f.type && t.type !== f.type) return false;
+    if (f.priority && t.priority !== f.priority) return false;
+    if (f.status && t.status !== f.status) return false;
+    if (q && (taskKey(t) + " " + t.title + " " + t.description + " " + (t.deliverable || "") + " " + (t.labels || []).join(" ")).toLowerCase().indexOf(q) < 0) return false;
+    return true;
+  });
+}
+function filterBar(opts) {
+  opts = opts || {};
+  var f = ui.filters;
+  var set = function (k) { return function (e) { f[k] = e.target.value; if (k === "clientId") f.projectId = ""; render(); }; };
+  var sel = function (k, label, options) {
+    return h("select", { onchange: set(k), "aria-label": label }, h("option", { value: "" }, label), options.map(function (o) { return h("option", { value: o.value, selected: f[k] === o.value }, o.label); }));
+  };
+  var projects = db.projects.filter(function (p) { return !f.clientId || p.clientId === f.clientId; });
+  var active = Object.keys(f).some(function (k) { return f[k]; });
+  var search = h("input", { type: "search", placeholder: "Search tasks…", value: f.q, oninput: function (e) {
+    f.q = e.target.value; var pos = e.target.selectionStart; render();
+    var i = root.querySelector(".filters input"); if (i) { i.focus(); i.setSelectionRange(pos, pos); }
+  } });
+  return h("div", { class: "filters" }, search,
+    opts.noClient ? null : sel("clientId", "All clients", db.clients.map(function (c) { return { value: c.id, label: c.name }; })),
+    opts.noProject ? null : sel("projectId", "All projects", projects.map(function (p) { return { value: p.id, label: p.key + " · " + p.name }; })),
+    opts.noAssignee ? null : sel("assigneeId", "Anyone", [{ value: "none", label: "Unassigned" }].concat(db.users.map(function (u) { return { value: u.id, label: u.fullName }; }))),
+    sel("type", "All types", TYPES.map(function (t) { return { value: t, label: t }; })),
+    sel("priority", "Any priority", PRIORITIES.map(function (p) { return { value: p.k, label: p.k }; })),
+    opts.status ? sel("status", "Any status", STATUSES.map(function (s) { return { value: s.k, label: s.k }; })) : null,
+    active ? h("button", { class: "btn ghost sm", onclick: function () { Object.keys(f).forEach(function (k) { f[k] = ""; }); render(); } }, "✕ Clear") : null);
+}
+
+/* ---------- Overview ---------- */
+function pageHome() {
+  var u = me(), open = db.tasks.filter(function (t) { return t.status !== "Done"; });
+  var overdue = open.filter(isOverdue);
+  var qs = db.comments.filter(function (c) { return c.kind === "question" && !c.resolved && byId(db.tasks, c.taskId); });
+  var inReview = open.filter(function (t) { return t.status === "Peer Review" || t.status === "SME Review"; });
+  var stat = function (n, label, onclick, cls) { return h("div", { class: "card pad stat", style: { cursor: onclick ? "pointer" : "" }, onclick: onclick }, h("b", { class: cls || null }, n), h("span", null, label)); };
+  var mine = open.filter(function (t) { return t.assigneeId === u.id; }).sort(function (a, b) { return (a.dueDate || "9") < (b.dueDate || "9") ? -1 : 1; });
+  var mentions = qs.filter(function (c) { return c.body.indexOf("@" + u.fullName) >= 0 || (byId(db.tasks, c.taskId) || {}).assigneeId === u.id && c.authorId !== u.id || (byId(db.tasks, c.taskId) || {}).reporterId === u.id && c.authorId !== u.id; });
+  var recent = db.activity.concat(db.comments.map(function (c) { return { taskId: c.taskId, userId: c.authorId, at: c.createdAt, text: c.kind === "question" ? "asked a question" : "commented" }; }))
+    .filter(function (a) { return byId(db.tasks, a.taskId); }).sort(function (a, b) { return a.at < b.at ? 1 : -1; }).slice(0, 12);
+
+  return {
+    title: "Good " + (new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening") + ", " + u.fullName.split(" ")[0],
+    crumbs: "Overview", actions: newTaskBtn(),
+    body: [
+      h("div", { class: "grid g4", style: { marginBottom: "16px" } },
+        stat(open.length, "Open tasks", function () { go("tasks"); }),
+        stat(db.projects.filter(function (p) { return p.status === "Active"; }).length, "Active projects", function () { go("clients"); }),
+        stat(inReview.length, "In review (peer + SME)", function () { go("board"); }),
+        stat(overdue.length, "Overdue", function () { ui.filters.status = ""; ui.sort = { k: "dueDate", dir: 1 }; go("tasks"); }, overdue.length ? "overdue" : "")),
+      h("div", { class: "grid g2" },
+        h("div", { class: "grid", style: { alignContent: "start" } },
+          h("div", { class: "card pad" }, h("h2", null, "My open tasks"),
+            mine.length ? mine.slice(0, 8).map(taskRow) : h("div", { class: "empty" }, "Nothing assigned to you. 🎉")),
+          h("div", { class: "card pad" }, h("h2", null, "Projects"),
+            db.projects.filter(function (p) { return p.status === "Active"; }).map(projectRow))),
+        h("div", { class: "grid", style: { alignContent: "start" } },
+          h("div", { class: "card pad" }, h("h2", null, "Open questions ", h("span", { class: "chip amber" }, qs.length)),
+            qs.length ? qs.slice().sort(function (a, b) { return a.createdAt < b.createdAt ? 1 : -1; }).slice(0, 8).map(function (c) {
+              var t = byId(db.tasks, c.taskId);
+              return h("div", { class: "list-item", onclick: function () { openTask(t); } }, avatar(c.authorId),
+                h("div", { class: "grow" }, h("div", { class: "small" }, h("span", { class: "key" }, taskKey(t)), " · ", userName(c.authorId), mentions.indexOf(c) >= 0 ? h("span", { class: "chip blue", style: { marginLeft: "6px" } }, "for you") : null),
+                  h("div", { style: { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, c.body)));
+            }) : h("div", { class: "empty" }, "No open questions.")),
+          h("div", { class: "card pad" }, h("h2", null, "Recent activity"),
+            recent.map(function (a) {
+              var t = byId(db.tasks, a.taskId);
+              return h("div", { class: "act-item", style: { cursor: "pointer" }, onclick: function () { openTask(t); } }, avatar(a.userId),
+                h("div", null, h("b", null, userName(a.userId)), " ", a.text, " · ", h("span", { class: "key" }, taskKey(t)), h("div", { class: "muted small" }, fmtWhen(a.at))));
+            }))))
+    ]
+  };
+}
+function taskRow(t) {
+  return h("div", { class: "list-item", onclick: function () { openTask(t); } },
+    h("span", { class: "key", style: { minWidth: "62px" } }, taskKey(t)),
+    h("div", { class: "grow" }, t.title), statusChip(t.status), h("span", { class: "small" }, due(t)));
+}
+function projectRow(p) {
+  var ts = db.tasks.filter(function (t) { return t.projectId === p.id; });
+  var c = clientOf(p);
+  return h("div", { class: "list-item", onclick: function () { go("project/" + p.id); } },
+    h("span", { class: "chip green" }, p.key),
+    h("div", { class: "grow" }, h("div", null, p.name), h("div", { class: "muted small" }, (c ? c.name : "") + " · " + p.docType)),
+    h("div", { style: { width: "120px" } }, progress(ts), h("div", { class: "muted small", style: { textAlign: "right" } }, ts.filter(function (t) { return t.status === "Done"; }).length + "/" + ts.length + " done")));
+}
+function progress(ts) {
+  var bar = h("div", { class: "bar", title: STATUSES.map(function (s) { return s.k + ": " + ts.filter(function (t) { return t.status === s.k; }).length; }).join("\n") });
+  if (!ts.length) return bar;
+  STATUSES.forEach(function (s) {
+    var n = ts.filter(function (t) { return t.status === s.k; }).length;
+    if (n) bar.appendChild(h("span", { style: { width: (n / ts.length * 100) + "%", background: s.color } }));
+  });
+  return bar;
+}
+
+/* ---------- My work ---------- */
+function pageMy() {
+  var u = me();
+  var mine = db.tasks.filter(function (t) { return t.assigneeId === u.id && t.status !== "Done"; });
+  var reported = db.tasks.filter(function (t) { return t.reporterId === u.id && t.assigneeId !== u.id && t.status !== "Done"; });
+  var groups = STATUSES.filter(function (s) { return s.k !== "Done"; }).map(function (s) { return { s: s, ts: mine.filter(function (t) { return t.status === s.k; }) }; }).filter(function (g) { return g.ts.length; });
+  return {
+    title: "My work", crumbs: u.fullName + " · " + u.jobTitle, actions: newTaskBtn({ assigneeId: u.id }),
+    body: h("div", { class: "grid g2" },
+      h("div", { class: "card pad" }, h("h2", null, "Assigned to me"),
+        groups.length ? groups.map(function (g) { return [h("h3", { style: { marginTop: "12px" } }, g.s.k + " (" + g.ts.length + ")"), g.ts.map(taskRow)]; }) : h("div", { class: "empty" }, "Nothing assigned to you.")),
+      h("div", { class: "card pad", style: { alignSelf: "start" } }, h("h2", null, "Reported by me"),
+        reported.length ? reported.map(function (t) {
+          return h("div", { class: "list-item", onclick: function () { openTask(t); } }, h("span", { class: "key" }, taskKey(t)), h("div", { class: "grow" }, t.title), avatar(t.assigneeId));
+        }) : h("div", { class: "empty" }, "No open tasks you reported for others.")))
+  };
+}
+
+/* ---------- Board ---------- */
+var dragId = null;
+function pageBoard() {
+  var ts = filteredTasks();
+  var pr = { Critical: 0, High: 1, Medium: 2, Low: 3 };
+  return {
+    title: "Board", crumbs: "All projects", keepScroll: true, actions: newTaskBtn({ projectId: ui.filters.projectId }),
+    body: [filterBar(), h("div", { class: "board" }, STATUSES.map(function (s) {
+      var col = ts.filter(function (t) { return t.status === s.k; }).sort(function (a, b) { return (pr[a.priority] - pr[b.priority]) || ((a.dueDate || "9") < (b.dueDate || "9") ? -1 : 1); });
+      var colEl = h("div", { class: "col",
+        ondragover: function (e) { e.preventDefault(); colEl.classList.add("drop"); },
+        ondragleave: function () { colEl.classList.remove("drop"); },
+        ondrop: function (e) { e.preventDefault(); colEl.classList.remove("drop"); var t = byId(db.tasks, dragId); if (t && t.status !== s.k) setField(t, "status", s.k); } },
+        h("div", { class: "col-h" }, h("span", { class: "dot", style: { background: s.color } }), s.k, h("span", { class: "muted" }, col.length),
+          h("span", { style: { flex: 1 } }), h("button", { class: "btn ghost sm", title: "Add a task to " + s.k, onclick: function () { openModal({ kind: "task", defaults: { status: s.k, projectId: ui.filters.projectId } }); } }, "+")),
+        h("div", { class: "col-b" }, col.map(card)));
+      return colEl;
+    }))]
+  };
+}
+function card(t) {
+  var p = projectOf(t), nC = db.comments.filter(function (c) { return c.taskId === t.id; }).length, nQ = openQuestions(t.id).length;
+  var ck = t.checklist || [], ckDone = ck.filter(function (c) { return c.done; }).length;
+  var el = h("div", { class: "tcard", draggable: "true",
+    ondragstart: function (e) { dragId = t.id; el.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", t.id); },
+    ondragend: function () { el.classList.remove("dragging"); },
+    onclick: function () { openTask(t); } },
+    h("div", { class: "row", style: { justifyContent: "space-between" } }, h("span", { class: "key" }, taskKey(t)), typeChip(t.type)),
+    h("div", { class: "t" }, t.title),
+    h("div", { class: "muted small", style: { marginBottom: "6px" } }, p.name + (t.deliverable ? " · " + t.deliverable : "")),
+    h("div", { class: "meta" }, prio(t.priority),
+      t.dueDate ? h("span", { class: isOverdue(t) ? "overdue" : "" }, "◷ " + fmtDate(t.dueDate).replace(/,? \d{4}$/, "")) : null,
+      ck.length ? h("span", { title: "Checklist" }, "☑ " + ckDone + "/" + ck.length) : null,
+      nC ? h("span", { title: "Comments" }, "💬 " + nC) : null,
+      nQ ? h("span", { class: "chip amber", title: "Open questions" }, "? " + nQ) : null,
+      h("span", { class: "sp" }), avatar(t.assigneeId)));
+  return el;
+}
+
+/* ---------- Task list ---------- */
+function pageTasks() {
+  var ts = filteredTasks(), s = ui.sort;
+  var cols = [
+    ["key", "Key", function (t) { return taskKey(t); }],
+    ["title", "Title", function (t) { return t.title.toLowerCase(); }],
+    ["project", "Project", function (t) { return projectOf(t).name; }],
+    ["type", "Type", function (t) { return t.type; }],
+    ["status", "Status", function (t) { return STATUSES.indexOf(statusOf(t.status)); }],
+    ["priority", "Priority", function (t) { return PRIORITIES.indexOf(prioOf(t.priority)); }],
+    ["assignee", "Assignee", function (t) { return t.assigneeId ? userName(t.assigneeId) : "~"; }],
+    ["dueDate", "Due", function (t) { return t.dueDate || "9999"; }],
+    ["updatedAt", "Updated", function (t) { return t.updatedAt; }]
+  ];
+  var getter = (cols.filter(function (c) { return c[0] === s.k; })[0] || cols[8])[2];
+  ts.sort(function (a, b) { var x = getter(a), y = getter(b); return (x < y ? -1 : x > y ? 1 : 0) * s.dir; });
+  return {
+    title: "All tasks", crumbs: ts.length + " task" + (ts.length === 1 ? "" : "s"), actions: newTaskBtn({ projectId: ui.filters.projectId }),
+    body: [filterBar({ status: true }), ts.length ? h("div", { class: "tbl-wrap" }, h("table", { class: "t" },
+      h("thead", null, h("tr", null, cols.map(function (c) {
+        return h("th", { onclick: function () { if (s.k === c[0]) s.dir = -s.dir; else { s.k = c[0]; s.dir = 1; } render(); } }, c[1] + (s.k === c[0] ? (s.dir > 0 ? " ▲" : " ▼") : ""));
+      }))),
+      h("tbody", null, ts.map(function (t) {
+        var nQ = openQuestions(t.id).length;
+        return h("tr", { class: "click", onclick: function () { openTask(t); } },
+          h("td", null, h("span", { class: "key" }, taskKey(t))),
+          h("td", null, t.title, nQ ? h("span", { class: "chip amber", style: { marginLeft: "6px" } }, "? " + nQ) : null),
+          h("td", { class: "small" }, projectOf(t).name, h("div", { class: "muted" }, (clientOf(projectOf(t)) || {}).name)),
+          h("td", null, typeChip(t.type)), h("td", null, statusChip(t.status)), h("td", null, prio(t.priority)),
+          h("td", null, h("span", { class: "row", style: { flexWrap: "nowrap" } }, avatar(t.assigneeId), h("span", { class: "small" }, userName(t.assigneeId)))),
+          h("td", { class: "small" }, due(t)), h("td", { class: "small muted" }, fmtWhen(t.updatedAt)));
+      })))) : h("div", { class: "card empty" }, "No tasks match these filters.")]
+  };
+}
+
+/* ---------- Clients ---------- */
+function pageClients() {
+  return {
+    title: "Clients & projects", crumbs: db.clients.length + " clients · " + db.projects.length + " projects",
+    actions: h("div", { class: "row" }, h("button", { class: "btn", onclick: function () { openModal({ kind: "project", defaults: {} }); } }, "+ Project"), h("button", { class: "btn primary", onclick: function () { openModal({ kind: "client" }); } }, "+ Client")),
+    body: db.clients.length ? h("div", { class: "grid g3" }, db.clients.map(function (c) {
+      var ps = db.projects.filter(function (p) { return p.clientId === c.id; });
+      var ts = db.tasks.filter(function (t) { return ps.some(function (p) { return p.id === t.projectId; }); });
+      return h("div", { class: "card pad", style: { cursor: "pointer" }, onclick: function () { go("clients/" + c.id); } },
+        h("div", { class: "row", style: { marginBottom: "8px" } }, h("span", { class: "avatar lg", style: { background: colorFor(c.id), borderRadius: "10px" } }, c.code.slice(0, 3)),
+          h("div", { style: { flex: 1 } }, h("b", null, c.name), h("div", { class: "muted small" }, c.industry || "—"))),
+        h("div", { class: "small muted", style: { marginBottom: "10px" } }, ps.length + " project" + (ps.length === 1 ? "" : "s") + " · " + ts.filter(function (t) { return t.status !== "Done"; }).length + " open tasks"),
+        progress(ts),
+        h("div", { style: { marginTop: "10px" } }, ps.map(function (p) {
+          return h("div", { class: "row small", style: { padding: "3px 0" } }, h("span", { class: "key" }, p.key), h("span", { style: { flex: 1 } }, p.name), h("span", { class: "chip" + (p.status === "Active" ? " green" : "") }, p.status));
+        })));
+    })) : h("div", { class: "card empty" }, "No clients yet. Add your first client to get started.")
+  };
+}
+function pageClient(id) {
+  var c = byId(db.clients, id);
+  if (!c) return { title: "Client not found", body: h("div", { class: "card empty" }, "This client no longer exists.") };
+  var ps = db.projects.filter(function (p) { return p.clientId === c.id; });
+  return {
+    title: c.name, crumbs: h("span", null, h("a", { onclick: function () { go("clients"); } }, "Clients"), " / " + c.code),
+    actions: h("div", { class: "row" },
+      h("button", { class: "btn", onclick: function () { openModal({ kind: "client", item: c }); } }, "✎ Edit"),
+      h("button", { class: "btn primary", onclick: function () { openModal({ kind: "project", defaults: { clientId: c.id } }); } }, "+ Project")),
+    body: h("div", { class: "grid g2" },
+      h("div", { class: "card pad", style: { alignSelf: "start" } }, h("h2", null, "Projects"),
+        ps.length ? ps.map(projectRow) : h("div", { class: "empty" }, "No projects for this client yet.")),
+      h("div", { class: "card pad", style: { alignSelf: "start" } }, h("h2", null, "Client details"),
+        kv("Code", c.code), kv("Industry", c.industry), kv("Contact", c.contactName), kv("Email", c.contactEmail ? h("a", { href: "mailto:" + c.contactEmail }, c.contactEmail) : ""),
+        h("h3", { style: { marginTop: "14px" } }, "Notes & style requirements"), h("div", { style: { whiteSpace: "pre-wrap" } }, c.notes || h("span", { class: "muted" }, "—"))))
+  };
+}
+function kv(k, v) { return h("div", { class: "prop" }, h("span", null, k), h("div", null, v || h("span", { class: "muted" }, "—"))); }
+
+/* ---------- Project ---------- */
+function pageProject(id) {
+  var p = byId(db.projects, id);
+  if (!p) return { title: "Project not found", body: h("div", { class: "card empty" }, "This project no longer exists.") };
+  var c = clientOf(p), ts = db.tasks.filter(function (t) { return t.projectId === p.id; });
+  var est = ts.reduce(function (s, t) { return s + (+t.estimateHours || 0); }, 0);
+  var people = {}; ts.forEach(function (t) { if (t.assigneeId) people[t.assigneeId] = (people[t.assigneeId] || 0) + (t.status !== "Done" ? 1 : 0); });
+  var openTs = ts.filter(function (t) { return t.status !== "Done"; });
+  return {
+    title: p.name, crumbs: h("span", null, h("a", { onclick: function () { go("clients"); } }, "Clients"), " / ", h("a", { onclick: function () { go("clients/" + c.id); } }, c.name), " / " + p.key),
+    actions: h("div", { class: "row" },
+      h("button", { class: "btn", onclick: function () { Object.keys(ui.filters).forEach(function (k) { ui.filters[k] = ""; }); ui.filters.projectId = p.id; go("board"); } }, "▦ Board"),
+      h("button", { class: "btn", onclick: function () { openModal({ kind: "project", item: p }); } }, "✎ Edit"),
+      newTaskBtn({ projectId: p.id })),
+    body: [
+      h("div", { class: "grid g4", style: { marginBottom: "16px" } },
+        h("div", { class: "card pad stat" }, h("b", null, openTs.length), h("span", null, "Open tasks")),
+        h("div", { class: "card pad stat" }, h("b", null, ts.filter(function (t) { return t.status === "Done"; }).length), h("span", null, "Done")),
+        h("div", { class: "card pad stat" }, h("b", null, est + " h"), h("span", null, "Estimated effort")),
+        h("div", { class: "card pad stat" }, h("b", { class: p.dueDate && p.dueDate < today() && p.status === "Active" ? "overdue" : "" }, fmtDate(p.dueDate)), h("span", null, "Delivery date"))),
+      h("div", { class: "grid g2" },
+        h("div", { class: "card pad", style: { alignSelf: "start" } }, h("h2", null, "Tasks"),
+          h("div", { style: { marginBottom: "12px" } }, progress(ts)),
+          STATUSES.map(function (s) {
+            var g = ts.filter(function (t) { return t.status === s.k; });
+            return g.length ? [h("h3", { style: { marginTop: "12px" } }, s.k + " (" + g.length + ")"), g.map(function (t) {
+              return h("div", { class: "list-item", onclick: function () { openTask(t); } }, h("span", { class: "key", style: { minWidth: "62px" } }, taskKey(t)), h("div", { class: "grow" }, t.title), typeChip(t.type), avatar(t.assigneeId));
+            })] : null;
+          }), ts.length ? null : h("div", { class: "empty" }, "No tasks yet.")),
+        h("div", { class: "grid", style: { alignContent: "start" } },
+          h("div", { class: "card pad" }, h("h2", null, "Details"),
+            kv("Client", c.name), kv("Key", p.key), kv("Document", p.docType), kv("Status", h("span", { class: "chip" + (p.status === "Active" ? " green" : "") }, p.status)),
+            kv("Lead", p.leadUserId ? h("span", { class: "row" }, avatar(p.leadUserId), userName(p.leadUserId)) : ""), kv("Start", fmtDate(p.startDate)), kv("Delivery", fmtDate(p.dueDate)),
+            p.description ? h("div", { style: { whiteSpace: "pre-wrap", marginTop: "10px" } }, p.description) : null),
+          h("div", { class: "card pad" }, h("h2", null, "Team on this project"),
+            Object.keys(people).length ? Object.keys(people).map(function (uid_) {
+              return h("div", { class: "list-item", onclick: function () { go("people/" + uid_); } }, avatar(uid_), h("div", { class: "grow" }, userName(uid_)), h("span", { class: "muted small" }, people[uid_] + " open"));
+            }) : h("div", { class: "empty" }, "Nobody assigned yet."))))
+    ]
+  };
+}
+
+/* ---------- People ---------- */
+function pagePeople() {
+  return {
+    title: "People", crumbs: "Anyone in the company can be assigned a task",
+    actions: h("button", { class: "btn primary", onclick: function () { openModal({ kind: "person" }); } }, "+ Person"),
+    body: h("div", { class: "tbl-wrap" }, h("table", { class: "t" },
+      h("thead", null, h("tr", null, ["Name", "Title", "Department", "Open", "In review", "Overdue", "Done"].map(function (x) { return h("th", { style: { cursor: "default" } }, x); }))),
+      h("tbody", null, db.users.map(function (u) {
+        var ts = db.tasks.filter(function (t) { return t.assigneeId === u.id; });
+        var open = ts.filter(function (t) { return t.status !== "Done"; });
+        var od = open.filter(isOverdue).length;
+        return h("tr", { class: "click", onclick: function () { go("people/" + u.id); }, style: { opacity: u.isActive ? 1 : .55 } },
+          h("td", null, h("span", { class: "row", style: { flexWrap: "nowrap" } }, avatar(u.id), h("span", null, u.fullName, u.isActive ? null : h("span", { class: "chip", style: { marginLeft: "6px" } }, "Inactive"), h("div", { class: "muted small" }, u.email)))),
+          h("td", null, u.jobTitle), h("td", null, u.department), h("td", null, open.length),
+          h("td", null, open.filter(function (t) { return /Review/.test(t.status); }).length),
+          h("td", { class: od ? "overdue" : "" }, od), h("td", null, ts.length - open.length));
+      }))))
+  };
+}
+function pagePerson(id) {
+  var u = byId(db.users, id);
+  if (!u) return { title: "Person not found", body: h("div", { class: "card empty" }, "This person no longer exists.") };
+  var ts = db.tasks.filter(function (t) { return t.assigneeId === u.id; });
+  return {
+    title: u.fullName, crumbs: h("span", null, h("a", { onclick: function () { go("people"); } }, "People"), " / " + u.jobTitle),
+    actions: h("div", { class: "row" }, h("button", { class: "btn", onclick: function () { openModal({ kind: "person", item: u }); } }, "✎ Edit"), newTaskBtn({ assigneeId: u.id })),
+    body: h("div", { class: "grid g2" },
+      h("div", { class: "card pad" }, h("h2", null, "Assigned tasks"),
+        STATUSES.map(function (s) {
+          var g = ts.filter(function (t) { return t.status === s.k; });
+          return g.length ? [h("h3", { style: { marginTop: "12px" } }, s.k + " (" + g.length + ")"), g.map(taskRow)] : null;
+        }), ts.length ? null : h("div", { class: "empty" }, "No tasks assigned.")),
+      h("div", { class: "card pad", style: { alignSelf: "start" } }, h("div", { class: "row", style: { marginBottom: "12px" } }, avatar(u.id, true), h("div", null, h("b", null, u.fullName), h("div", { class: "muted small" }, u.jobTitle))),
+        kv("Email", h("a", { href: "mailto:" + u.email }, u.email)), kv("Department", u.department), kv("Status", u.isActive ? "Active" : "Inactive")))
+  };
+}
+
+/* ================= task actions ================= */
+function openTask(t) { if (!t) return; ui.draft = ""; ui.openTask = t.id; ui.taskTab = "comments"; ui.editingDesc = false; ui.editingCommentId = null; history.replaceState(null, "", "#/task/" + encodeURIComponent(taskKey(t))); renderOverlay(); }
+function closeTask() {
+  ui.openTask = null;
+  if (ui.route[0] === "task") { history.replaceState(null, "", "#/board"); parseRoute(); render(); }
+  else { history.replaceState(null, "", "#/" + ui.route.join("/")); render(); }
+}
+var FIELD_LABELS = { status: "status", priority: "priority", type: "type", assigneeId: "assignee", dueDate: "due date", estimateHours: "estimate", deliverable: "deliverable", projectId: "project", title: "title", description: "description", labels: "labels" };
+function fmtVal(k, v) {
+  if (k === "assigneeId") return v ? userName(v) : "Unassigned";
+  if (k === "dueDate") return v ? fmtDate(v) : "none";
+  if (k === "projectId") { var p = byId(db.projects, v); return p ? p.key : "?"; }
+  if (k === "estimateHours") return v ? v + " h" : "none";
+  if (k === "labels") return (v || []).join(", ") || "none";
+  return v || "none";
+}
+function setField(t, k, v) {
+  var old = t[k];
+  if (JSON.stringify(old) === JSON.stringify(v)) return;
+  if (k === "projectId") { var np = byId(db.projects, v); t.num = np.nextNum++; }
+  t[k] = v; t.updatedAt = nowISO();
+  log(t.id, k === "description" ? "updated the description" : k === "title" ? "renamed the task to “" + v + "”" : "changed " + FIELD_LABELS[k] + " from " + fmtVal(k, old) + " to " + fmtVal(k, v));
+  save();
+  if (ui.openTask === t.id) history.replaceState(null, "", "#/task/" + encodeURIComponent(taskKey(t)));
+  render();
+}
+
+/* ================= overlays ================= */
+var overlay = null;
+function renderOverlay() {
+  var keep = overlay && overlay.dataset.for === (ui.modal ? "m" : ui.openTask) ? overlay.scrollTop : 0;
+  if (overlay) { overlay.remove(); overlay = null; }
+  var content = null;
+  if (ui.modal) content = modalView(ui.modal);
+  else if (ui.openTask) { var t = byId(db.tasks, ui.openTask); if (t) content = taskView(t); else ui.openTask = null; }
+  if (!content) return;
+  overlay = h("div", { class: "scrim", onmousedown: function (e) { if (e.target === overlay) { if (ui.modal) closeModal(); else closeTask(); } } }, content);
+  overlay.dataset.for = ui.modal ? "m" : ui.openTask;
+  document.body.appendChild(overlay);
+  overlay.scrollTop = keep;
+  var af = overlay.querySelector("[data-autofocus]"); if (af) af.focus();
+}
+document.addEventListener("keydown", function (e) {
+  if (e.key === "Escape") { if (ui.modal) closeModal(); else if (ui.openTask) closeTask(); }
+  if (e.key === "c" && !ui.modal && !ui.openTask && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { e.preventDefault(); openModal({ kind: "task", defaults: {} }); }
+});
+
+/* ---------- task detail ---------- */
+function taskView(t) {
+  var p = projectOf(t), c = clientOf(p), u = me();
+  var sel = function (k, options) {
+    return h("select", { onchange: function (e) { setField(t, k, e.target.value || null); } }, options.map(function (o) { return h("option", { value: o.value, selected: (t[k] || "") === o.value }, o.label); }));
+  };
+  var title = h("input", { class: "td-title", value: t.title, "aria-label": "Title",
+    onkeydown: function (e) { if (e.key === "Enter") e.target.blur(); },
+    onblur: function (e) { var v = e.target.value.trim(); if (v && v !== t.title) setField(t, "title", v); else e.target.value = t.title; } });
+
+  var desc = ui.editingDesc
+    ? h("div", null, h("textarea", { class: "f", id: "desc-ed", rows: 8, "data-autofocus": true }, t.description || ""),
+        h("div", { class: "row", style: { marginTop: "6px" } },
+          h("button", { class: "btn primary sm", onclick: function () { ui.editingDesc = false; setField(t, "description", document.getElementById("desc-ed").value); renderOverlay(); } }, "Save"),
+          h("button", { class: "btn sm", onclick: function () { ui.editingDesc = false; renderOverlay(); } }, "Cancel")))
+    : h("div", { class: "desc", title: "Click to edit", onclick: function () { ui.editingDesc = true; renderOverlay(); } }, t.description ? richText(t.description) : h("span", { class: "muted" }, "Add a description — scope, sources, style notes…"));
+
+  var ck = t.checklist || [];
+  var checklist = h("div", { class: "checklist" },
+    ck.map(function (it) {
+      return h("label", { class: it.done ? "done" : "" },
+        h("input", { type: "checkbox", checked: it.done, onchange: function () { it.done = !it.done; t.updatedAt = nowISO(); log(t.id, (it.done ? "checked" : "unchecked") + " “" + it.text + "”"); save(); render(); } }),
+        h("span", { style: { flex: 1 } }, it.text),
+        h("button", { class: "x", style: { fontSize: "14px", padding: "0 6px" }, title: "Remove", onclick: function (e) { e.preventDefault(); t.checklist = ck.filter(function (x) { return x !== it; }); save(); render(); } }, "×"));
+    }),
+    h("form", { class: "row", style: { marginTop: "6px" }, onsubmit: function (e) {
+      e.preventDefault(); var i = e.target.querySelector("input"), v = i.value.trim(); if (!v) return;
+      t.checklist = ck.concat([{ id: uid("ck"), text: v, done: false }]); t.updatedAt = nowISO(); save(); render();
+      var ni = overlay && overlay.querySelector(".checklist form input"); if (ni) ni.focus();
+    } }, h("input", { class: "f", placeholder: "Add a checklist item…", style: { flex: 1 } }), h("button", { class: "btn sm" }, "Add")));
+
+  var comments = commentsOf(t.id), qCount = openQuestions(t.id).length;
+  var acts = db.activity.filter(function (a) { return a.taskId === t.id; }).sort(function (a, b) { return a.at < b.at ? 1 : -1; });
+
+  var tabBody;
+  if (ui.taskTab === "comments") tabBody = h("div", null, comments.length ? comments.map(function (cm) { return commentView(t, cm); }) : h("div", { class: "muted small", style: { marginBottom: "12px" } }, "No comments yet. Ask a question, share a source, or add notes for the reviewer."), composer(t));
+  else tabBody = h("div", null, acts.map(function (a) { return h("div", { class: "act-item" }, avatar(a.userId), h("div", null, h("b", null, userName(a.userId)), " " + a.text, h("div", { class: "muted small" }, fmtWhen(a.at)))); }));
+
+  return h("div", { class: "modal wide", role: "dialog", "aria-label": taskKey(t) },
+    h("div", { class: "modal-h" },
+      h("span", { class: "key" }, taskKey(t)), h("span", { class: "muted small" }, c.name + " / " + p.name),
+      h("h2", null, ""),
+      h("button", { class: "btn ghost sm", title: "Copy link", onclick: function () { copy(location.href.split("#")[0] + "#/task/" + encodeURIComponent(taskKey(t))); } }, "🔗 Link"),
+      h("button", { class: "btn ghost sm danger", onclick: function () {
+        confirmBox("Delete " + taskKey(t) + "?", "The task, its comments and history are removed for good.", "Delete", function () {
+          db.tasks = db.tasks.filter(function (x) { return x !== t; });
+          db.comments = db.comments.filter(function (x) { return x.taskId !== t.id; });
+          db.activity = db.activity.filter(function (x) { return x.taskId !== t.id; });
+          save(); toast(taskKey(t) + " deleted"); closeTask();
+        });
+      } }, "🗑 Delete"),
+      h("button", { class: "x", onclick: closeTask, "aria-label": "Close" }, "×")),
+    h("div", { class: "td" },
+      h("div", { class: "td-main" },
+        title,
+        h("div", { class: "row", style: { marginBottom: "14px" } }, statusChip(t.status), typeChip(t.type), prio(t.priority), (t.labels || []).map(function (l) { return h("span", { class: "chip" }, "#" + l); })),
+        h("h3", null, "Description"), desc,
+        h("h3", { style: { marginTop: "18px" } }, "Checklist " + (ck.length ? "(" + ck.filter(function (x) { return x.done; }).length + "/" + ck.length + ")" : "")), checklist,
+        h("div", { class: "tabs" },
+          h("button", { class: ui.taskTab === "comments" ? "on" : "", onclick: function () { ui.taskTab = "comments"; renderOverlay(); } }, "Comments (" + comments.length + ")", qCount ? h("span", { class: "chip amber", style: { marginLeft: "6px" } }, qCount + " open ?") : null),
+          h("button", { class: ui.taskTab === "activity" ? "on" : "", onclick: function () { ui.taskTab = "activity"; renderOverlay(); } }, "History")),
+        tabBody),
+      h("div", { class: "td-side" },
+        h("div", { class: "prop" }, h("span", null, "Status"), sel("status", STATUSES.map(function (s) { return { value: s.k, label: s.k }; }))),
+        h("div", { class: "prop" }, h("span", null, "Assignee"), sel("assigneeId", [{ value: "", label: "Unassigned" }].concat(db.users.filter(function (x) { return x.isActive || x.id === t.assigneeId; }).map(function (x) { return { value: x.id, label: x.fullName }; })))),
+        t.assigneeId !== u.id ? h("div", { style: { margin: "-4px 0 10px 104px" } }, h("a", { href: "#", class: "small", onclick: function (e) { e.preventDefault(); setField(t, "assigneeId", u.id); } }, "Assign to me")) : null,
+        h("div", { class: "prop" }, h("span", null, "Type"), sel("type", TYPES.map(function (x) { return { value: x, label: x }; }))),
+        h("div", { class: "prop" }, h("span", null, "Priority"), sel("priority", PRIORITIES.map(function (x) { return { value: x.k, label: x.k }; }))),
+        h("div", { class: "prop" }, h("span", null, "Due date"), h("input", { type: "date", value: t.dueDate || "", onchange: function (e) { setField(t, "dueDate", e.target.value || null); } })),
+        h("div", { class: "prop" }, h("span", null, "Estimate (h)"), h("input", { type: "number", min: 0, step: 0.5, value: t.estimateHours == null ? "" : t.estimateHours, onchange: function (e) { setField(t, "estimateHours", e.target.value === "" ? null : +e.target.value); } })),
+        h("div", { class: "prop" }, h("span", null, "Deliverable"), h("input", { value: t.deliverable || "", placeholder: "e.g. Vol 1 · Ch 3", onchange: function (e) { setField(t, "deliverable", e.target.value.trim()); } })),
+        h("div", { class: "prop" }, h("span", null, "Labels"), h("input", { value: (t.labels || []).join(", "), placeholder: "comma, separated", onchange: function (e) { setField(t, "labels", e.target.value.split(",").map(function (s) { return s.trim().replace(/^#/, ""); }).filter(Boolean)); } })),
+        h("div", { class: "prop" }, h("span", null, "Project"), sel("projectId", db.projects.map(function (x) { return { value: x.id, label: x.key + " · " + x.name }; }))),
+        h("div", { class: "prop" }, h("span", null, "Reporter"), h("span", { class: "row" }, avatar(t.reporterId), userName(t.reporterId))),
+        h("hr", { style: { border: 0, borderTop: "1px solid var(--line)", margin: "14px 0" } }),
+        h("div", { class: "muted small" }, "Created " + fmtWhen(t.createdAt)), h("div", { class: "muted small" }, "Updated " + fmtWhen(t.updatedAt)))));
+}
+
+function richText(text) {
+  var names = db.users.map(function (u) { return u.fullName; }).sort(function (a, b) { return b.length - a.length; });
+  var frag = document.createDocumentFragment();
+  if (!names.length) { frag.appendChild(document.createTextNode(text)); return frag; }
+  var re = new RegExp("@(" + names.map(function (n) { return n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }).join("|") + ")", "g");
+  var last = 0, m;
+  while ((m = re.exec(text))) {
+    if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+    frag.appendChild(h("span", { class: "mention" }, m[0]));
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+  return frag;
+}
+
+function commentView(t, cm) {
+  var u = me(), mine = cm.authorId === u.id, isQ = cm.kind === "question";
+  var editing = ui.editingCommentId === cm.id;
+  return h("div", { class: "comment" + (isQ ? " q" : "") + (cm.resolved ? " resolved" : "") },
+    avatar(cm.authorId),
+    h("div", { class: "body" },
+      h("div", { class: "row small" }, h("b", null, userName(cm.authorId)), h("span", { class: "muted" }, fmtWhen(cm.createdAt) + (cm.editedAt ? " · edited" : "")),
+        isQ ? h("span", { class: "chip " + (cm.resolved ? "green" : "amber") }, cm.resolved ? "✓ Answered" : "? Question") : null),
+      editing
+        ? h("div", null, h("textarea", { class: "f", id: "cm-ed", "data-autofocus": true, style: { marginTop: "4px" } }, cm.body),
+            h("div", { class: "row", style: { marginTop: "6px" } },
+              h("button", { class: "btn primary sm", onclick: function () { var v = document.getElementById("cm-ed").value.trim(); if (v) { cm.body = v; cm.editedAt = nowISO(); save(); } ui.editingCommentId = null; render(); } }, "Save"),
+              h("button", { class: "btn sm", onclick: function () { ui.editingCommentId = null; renderOverlay(); } }, "Cancel")))
+        : h("div", { class: "bubble" }, richText(cm.body)),
+      cm.resolved && cm.resolvedBy ? h("div", { class: "muted small", style: { marginTop: "3px" } }, "Marked answered by " + userName(cm.resolvedBy) + " · " + fmtWhen(cm.resolvedAt)) : null,
+      editing ? null : h("div", { class: "acts" },
+        h("button", { onclick: function () { ui.composerKind = "comment"; var ta = overlay.querySelector(".composer textarea"); ta.value = ui.draft = "@" + userName(cm.authorId) + " "; ta.focus(); } }, "Reply"),
+        isQ ? h("button", { onclick: function () {
+          cm.resolved = !cm.resolved; cm.resolvedBy = cm.resolved ? u.id : null; cm.resolvedAt = cm.resolved ? nowISO() : null;
+          log(t.id, cm.resolved ? "marked a question answered" : "reopened a question"); save(); render();
+        } }, cm.resolved ? "Reopen" : "✓ Mark answered") : null,
+        mine ? h("button", { onclick: function () { ui.editingCommentId = cm.id; renderOverlay(); } }, "Edit") : null,
+        mine ? h("button", { onclick: function () { confirmBox("Delete this comment?", "", "Delete", function () { db.comments = db.comments.filter(function (x) { return x !== cm; }); save(); render(); }); } }, "Delete") : null)));
+}
+
+function composer(t) {
+  var u = me();
+  var ta = h("textarea", { placeholder: ui.composerKind === "question" ? "Ask a question — mention someone with @ so they see it…" : "Add a comment, a source link, review notes… (Ctrl+Enter to post)",
+    onkeydown: function (e) { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) post(); },
+    oninput: function () { ui.draft = ta.value; mentionHint(); } }, ui.draft || "");
+  var hint = h("div", { class: "row small", style: { padding: "0 10px 6px" } });
+  function mentionHint() {
+    hint.replaceChildren();
+    var m = /@([\w ]{0,20})$/.exec(ta.value.slice(0, ta.selectionStart));
+    if (!m) return;
+    var q = m[1].toLowerCase();
+    db.users.filter(function (x) { return x.isActive && x.fullName.toLowerCase().indexOf(q) === 0; }).slice(0, 6).forEach(function (x) {
+      hint.appendChild(h("button", { class: "btn sm", onmousedown: function (e) {
+        e.preventDefault();
+        var pos = ta.selectionStart, before = ta.value.slice(0, pos).replace(/@([\w ]{0,20})$/, "@" + x.fullName + " ");
+        ta.value = ui.draft = before + ta.value.slice(pos); ta.focus(); ta.setSelectionRange(before.length, before.length); hint.replaceChildren();
+      } }, avatar(x.id), x.fullName));
+    });
+  }
+  function post() {
+    var v = ta.value.trim(); if (!v) return;
+    db.comments.push({ id: uid("cm"), taskId: t.id, authorId: u.id, kind: ui.composerKind, body: v, createdAt: nowISO(), resolved: false });
+    t.updatedAt = nowISO(); ui.draft = ""; save(); ui.composerKind = "comment"; render();
+  }
+  return h("div", { class: "composer" }, ta, hint,
+    h("div", { class: "bar2" }, avatar(u.id), h("span", { class: "small muted" }, "as " + u.fullName),
+      h("span", { style: { flex: 1 } }),
+      h("div", { class: "seg" },
+        h("button", { class: ui.composerKind === "comment" ? "on" : "", onclick: function () { ui.composerKind = "comment"; renderOverlay(); overlay.querySelector(".composer textarea").focus(); } }, "💬 Comment"),
+        h("button", { class: ui.composerKind === "question" ? "on" : "", onclick: function () { ui.composerKind = "question"; renderOverlay(); overlay.querySelector(".composer textarea").focus(); } }, "? Question")),
+      h("button", { class: "btn primary sm", onclick: post }, ui.composerKind === "question" ? "Ask" : "Post")));
+}
+
+/* ---------- modals (forms) ---------- */
+function openModal(m) { ui.modal = m; renderOverlay(); }
+function closeModal() { ui.modal = null; renderOverlay(); }
+function confirmBox(title, text, okLabel, onOk) { openModal({ kind: "confirm", title: title, text: text, okLabel: okLabel, onOk: onOk }); }
+
+function modalView(m) {
+  if (m.kind === "confirm") return shell(m.title, h("div", null, m.text || ""), [
+    h("button", { class: "btn", onclick: closeModal }, "Cancel"),
+    h("button", { class: "btn primary", "data-autofocus": true, style: { background: "var(--err)", borderColor: "var(--err)", color: "#fff" }, onclick: function () { var f = m.onOk; ui.modal = null; renderOverlay(); f(); } }, m.okLabel || "OK")]);
+  if (m.kind === "data") return dataModal();
+  var spec = FORMS[m.kind](m), vals = {}, errs = m.errs || {};
+  var fields = spec.fields.map(function (f) {
+    var v = m.values ? m.values[f.k] : (m.item ? m.item[f.k] : (m.defaults && m.defaults[f.k] != null && m.defaults[f.k] !== "" ? m.defaults[f.k] : f.def));
+    if (f.k === "labels" && Array.isArray(v)) v = v.join(", ");
+    var input;
+    if (f.t === "select") input = h("select", { class: "f", name: f.k }, (f.blank ? [h("option", { value: "" }, f.blank)] : []).concat(f.options().map(function (o) { return h("option", { value: o.value, selected: (v || "") === o.value }, o.label); })));
+    else if (f.t === "textarea") input = h("textarea", { class: "f", name: f.k, rows: 4, placeholder: f.ph || "" }, v || "");
+    else input = h("input", { class: "f", name: f.k, type: f.t || "text", value: v == null ? "" : v, placeholder: f.ph || "", maxlength: f.max || null, style: f.k === "key" || f.k === "code" ? { textTransform: "uppercase" } : null });
+    if (f.first) input.setAttribute("data-autofocus", "");
+    vals[f.k] = input;
+    return h("div", { class: "field", style: f.half ? { display: "inline-block", width: "calc(50% - 6px)", marginRight: f.half === 1 ? "12px" : 0, verticalAlign: "top" } : null },
+      h("label", { class: "l" }, f.label, f.req ? h("span", { class: "req" }, " *") : null), input,
+      errs[f.k] ? h("div", { class: "err-msg" }, errs[f.k]) : f.help ? h("div", { class: "muted small", style: { marginTop: "3px" } }, f.help) : null);
+  });
+  var submit = function (e) {
+    if (e) e.preventDefault();
+    var out = {};
+    Object.keys(vals).forEach(function (k) { out[k] = vals[k].value.trim(); });
+    var e2 = {};
+    spec.fields.forEach(function (f) { if (f.req && !out[f.k]) e2[f.k] = "Required"; });
+    if (spec.validate) spec.validate(out, e2);
+    if (Object.keys(e2).length) { m.values = out; m.errs = e2; renderOverlay(); return; }
+    spec.save(out);
+  };
+  var foot = [];
+  if (m.item && spec.remove) foot.push(h("button", { type: "button", class: "btn danger", style: { marginRight: "auto" }, onclick: spec.remove }, "Delete"));
+  foot.push(h("button", { type: "button", class: "btn", onclick: closeModal }, "Cancel"), h("button", { class: "btn primary", type: "submit" }, m.item ? "Save" : "Create"));
+  return h("form", { class: "modal", onsubmit: submit, novalidate: true },
+    h("div", { class: "modal-h" }, h("h2", null, spec.title), h("button", { type: "button", class: "x", onclick: closeModal }, "×")),
+    h("div", { class: "modal-b" }, fields), h("div", { class: "modal-f" }, foot));
+}
+function shell(title, body, foot) {
+  return h("div", { class: "modal" }, h("div", { class: "modal-h" }, h("h2", null, title), h("button", { class: "x", onclick: closeModal }, "×")), h("div", { class: "modal-b" }, body), foot ? h("div", { class: "modal-f" }, foot) : null);
+}
+var userOpts = function () { return db.users.filter(function (u) { return u.isActive; }).map(function (u) { return { value: u.id, label: u.fullName + " — " + u.jobTitle }; }); };
+var opts = function (arr) { return function () { return arr.map(function (x) { return { value: x.k || x, label: x.k || x }; }); }; };
+
+var FORMS = {
+  task: function (m) {
+    return {
+      title: "New task",
+      fields: [
+        { k: "projectId", label: "Project", req: true, t: "select", blank: "Select a project…", options: function () { return db.projects.filter(function (p) { return p.status !== "Archived"; }).map(function (p) { return { value: p.id, label: (clientOf(p) || {}).name + " · " + p.key + " · " + p.name }; }); } },
+        { k: "title", label: "Title", req: true, first: true, ph: "e.g. Draft chapter 4 — Calibration" },
+        { k: "type", label: "Type", t: "select", options: opts(TYPES), def: "Writing", half: 1 },
+        { k: "priority", label: "Priority", t: "select", options: opts(PRIORITIES), def: "Medium", half: 2 },
+        { k: "assigneeId", label: "Assignee", t: "select", blank: "Unassigned", options: userOpts, half: 1 },
+        { k: "status", label: "Status", t: "select", options: opts(STATUSES), def: "To Do", half: 2 },
+        { k: "dueDate", label: "Due date", t: "date", half: 1 },
+        { k: "estimateHours", label: "Estimate (hours)", t: "number", half: 2 },
+        { k: "deliverable", label: "Deliverable / section", ph: "e.g. Vol 1 · Ch 4, Module 2, Release 5" },
+        { k: "labels", label: "Labels", ph: "comma, separated" },
+        { k: "description", label: "Description", t: "textarea", ph: "Scope, source material, style notes, acceptance criteria…" }
+      ],
+      save: function (v) {
+        var p = byId(db.projects, v.projectId);
+        var t = { id: uid("t"), projectId: p.id, num: p.nextNum++, title: v.title, type: v.type, priority: v.priority, status: v.status, assigneeId: v.assigneeId || null,
+          reporterId: me().id, dueDate: v.dueDate || null, estimateHours: v.estimateHours === "" ? null : +v.estimateHours, deliverable: v.deliverable, description: v.description,
+          labels: v.labels.split(",").map(function (s) { return s.trim().replace(/^#/, ""); }).filter(Boolean), checklist: [], createdAt: nowISO(), updatedAt: nowISO() };
+        db.tasks.push(t); log(t.id, "created the task"); save();
+        ui.modal = null; toast(taskKey(t) + " created"); render(); openTask(t);
+      }
+    };
+  },
+  client: function (m) {
+    var c = m.item;
+    return {
+      title: c ? "Edit client" : "New client",
+      fields: [
+        { k: "name", label: "Client name", req: true, first: true },
+        { k: "code", label: "Short code", req: true, max: 5, ph: "e.g. IAI", half: 1 },
+        { k: "industry", label: "Industry", half: 2 },
+        { k: "contactName", label: "Contact person", half: 1 },
+        { k: "contactEmail", label: "Contact email", t: "email", half: 2 },
+        { k: "notes", label: "Notes & style requirements", t: "textarea", ph: "Style guide, templates, authoring tool, review process…" }
+      ],
+      validate: function (v, e) { v.code = v.code.toUpperCase(); if (db.clients.some(function (x) { return x.code === v.code && x !== c; })) e.code = "Another client already uses this code."; },
+      save: function (v) {
+        if (c) Object.assign(c, v); else { c = Object.assign({ id: uid("c") }, v); db.clients.push(c); }
+        save(); ui.modal = null; renderOverlay(); go("clients/" + c.id); render();
+      },
+      remove: c ? function () {
+        var n = db.projects.filter(function (p) { return p.clientId === c.id; }).length;
+        if (n) { toast("Move or delete this client's " + n + " project(s) first."); return; }
+        confirmBox("Delete " + c.name + "?", "", "Delete", function () { db.clients = db.clients.filter(function (x) { return x !== c; }); save(); go("clients"); });
+      } : null
+    };
+  },
+  project: function (m) {
+    var p = m.item;
+    return {
+      title: p ? "Edit project" : "New project",
+      fields: [
+        { k: "clientId", label: "Client", req: true, t: "select", blank: "Select a client…", options: function () { return db.clients.map(function (c) { return { value: c.id, label: c.name }; }); } },
+        { k: "name", label: "Project name", req: true, first: true, ph: "e.g. Radar Suite — Operator Manual" },
+        { k: "key", label: "Project key", req: true, max: 6, ph: "e.g. RSOM", help: "Prefix for task keys (RSOM-12). Letters and digits.", half: 1 },
+        { k: "docType", label: "Deliverable type", t: "select", options: opts(DOC_TYPES), def: "User Manual", half: 2 },
+        { k: "status", label: "Status", t: "select", options: opts(PROJECT_STATUSES), def: "Active", half: 1 },
+        { k: "leadUserId", label: "Project lead", t: "select", blank: "—", options: userOpts, half: 2 },
+        { k: "startDate", label: "Start date", t: "date", half: 1 },
+        { k: "dueDate", label: "Delivery date", t: "date", half: 2 },
+        { k: "description", label: "Description", t: "textarea" }
+      ],
+      validate: function (v, e) {
+        v.key = v.key.toUpperCase();
+        if (v.key && !/^[A-Z][A-Z0-9]{1,5}$/.test(v.key)) e.key = "2–6 letters/digits, starting with a letter.";
+        else if (db.projects.some(function (x) { return x.key === v.key && x !== p; })) e.key = "Another project already uses this key.";
+        if (v.startDate && v.dueDate && v.dueDate < v.startDate) e.dueDate = "Delivery is before the start date.";
+      },
+      save: function (v) {
+        v.leadUserId = v.leadUserId || null;
+        if (p) Object.assign(p, v); else { p = Object.assign({ id: uid("p"), nextNum: 1 }, v); db.projects.push(p); }
+        save(); ui.modal = null; renderOverlay(); go("project/" + p.id); render();
+      },
+      remove: p ? function () {
+        var n = db.tasks.filter(function (t) { return t.projectId === p.id; }).length;
+        confirmBox("Delete " + p.name + "?", n ? "Its " + n + " task(s) and their comments are deleted too." : "", "Delete", function () {
+          var ids = db.tasks.filter(function (t) { return t.projectId === p.id; }).map(function (t) { return t.id; });
+          db.tasks = db.tasks.filter(function (t) { return t.projectId !== p.id; });
+          db.comments = db.comments.filter(function (c) { return ids.indexOf(c.taskId) < 0; });
+          db.activity = db.activity.filter(function (a) { return ids.indexOf(a.taskId) < 0; });
+          db.projects = db.projects.filter(function (x) { return x !== p; });
+          if (ui.filters.projectId === p.id) ui.filters.projectId = "";
+          save(); go("clients/" + p.clientId);
+        });
+      } : null
+    };
+  },
+  person: function (m) {
+    var u = m.item;
+    return {
+      title: u ? "Edit person" : "Add a person",
+      fields: [
+        { k: "fullName", label: "Full name", req: true, first: true },
+        { k: "email", label: "Email", req: true, t: "email", ph: "name@galiltc.co.il" },
+        { k: "jobTitle", label: "Job title", req: true, half: 1, ph: "e.g. Technical Writer" },
+        { k: "department", label: "Department", half: 2, ph: "e.g. Delivery" },
+        { k: "isActive", label: "Status", t: "select", options: function () { return [{ value: "yes", label: "Active" }, { value: "no", label: "Inactive (can't be assigned new tasks)" }]; }, def: "yes" }
+      ],
+      validate: function (v, e) {
+        if (v.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.email)) e.email = "Not a valid email address.";
+        else if (db.users.some(function (x) { return x.email.toLowerCase() === v.email.toLowerCase() && x !== u; })) e.email = "Someone already has this email.";
+      },
+      save: function (v) {
+        v.isActive = v.isActive !== "no";
+        if (u) Object.assign(u, v); else { u = Object.assign({ id: uid("u") }, v); db.users.push(u); }
+        save(); ui.modal = null; renderOverlay(); go("people/" + u.id); render();
+      }
+    };
+  }
+};
+/* the person form stores isActive as a boolean — feed the select its string form */
+var _personForm = FORMS.person;
+FORMS.person = function (m) {
+  if (m.item && !m.values) m.values = Object.assign({}, m.item, { isActive: m.item.isActive ? "yes" : "no" });
+  return _personForm(m);
+};
+
+function dataModal() {
+  var file = h("input", { type: "file", accept: "application/json,.json", onchange: function (e) {
+    var f = e.target.files[0]; if (!f) return;
+    var r = new FileReader();
+    r.onload = function () {
+      try {
+        var o = JSON.parse(r.result);
+        if (!o || o.app !== "galil-folio" || !Array.isArray(o.tasks)) throw new Error("This is not a GALIL Folio backup.");
+        confirmBox("Replace all data?", "Everything in this browser is replaced with the backup (" + o.tasks.length + " tasks, " + (o.projects || []).length + " projects).", "Restore", function () {
+          db = Object.assign(emptyDB(), o); save(); ui.openTask = null; toast("Backup restored"); go("home"); render();
+        });
+      } catch (err) { toast(err.message); }
+    };
+    r.readAsText(f);
+  } });
+  return shell("Data & backup", h("div", null,
+    h("p", { class: "muted", style: { marginTop: 0 } }, "Folio keeps its data in this browser only. Download a backup to move it to another browser or keep a copy."),
+    h("div", { class: "row", style: { marginBottom: "16px" } },
+      h("button", { class: "btn primary", onclick: function () {
+        var blob = new Blob([JSON.stringify(Object.assign({}, db, { exported: nowISO() }), null, 2)], { type: "application/json" });
+        var a = h("a", { href: URL.createObjectURL(blob), download: "galil-folio-backup-" + today() + ".json" }); document.body.appendChild(a); a.click(); a.remove();
+      } }, "⬇ Download backup"),
+      h("button", { class: "btn", onclick: function () {
+        var rows = [["Key", "Title", "Client", "Project", "Type", "Status", "Priority", "Assignee", "Reporter", "Due", "Estimate (h)", "Deliverable", "Labels", "Open questions", "Created", "Updated"]];
+        db.tasks.forEach(function (t) { var p = projectOf(t); rows.push([taskKey(t), t.title, (clientOf(p) || {}).name, p.name, t.type, t.status, t.priority, t.assigneeId ? userName(t.assigneeId) : "", userName(t.reporterId), t.dueDate || "", t.estimateHours == null ? "" : t.estimateHours, t.deliverable || "", (t.labels || []).join(" "), openQuestions(t.id).length, t.createdAt.slice(0, 10), t.updatedAt.slice(0, 10)]); });
+        var csv = "﻿" + rows.map(function (r) { return r.map(function (c) { c = String(c == null ? "" : c); return /[",\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c; }).join(","); }).join("\r\n");
+        var a = h("a", { href: URL.createObjectURL(new Blob([csv], { type: "text/csv" })), download: "galil-folio-tasks-" + today() + ".csv" }); document.body.appendChild(a); a.click(); a.remove();
+      } }, "⬇ Export tasks (CSV)")),
+    h("label", { class: "l" }, "Restore from a backup"), file,
+    h("hr", { style: { border: 0, borderTop: "1px solid var(--line)", margin: "18px 0" } }),
+    h("button", { class: "btn danger", onclick: function () { confirmBox("Reset to the demo data?", "All your clients, projects, tasks and comments in this browser are replaced with the sample data.", "Reset", function () { db = seed(); save(); ui.openTask = null; go("home"); render(); }); } }, "↺ Reset to demo data")), null);
+}
+
+/* ---------- misc ---------- */
+var toastTimer;
+function toast(msg) {
+  var old = document.querySelector(".toast"); if (old) old.remove();
+  var el = h("div", { class: "toast", role: "status" }, msg); document.body.appendChild(el);
+  clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.remove(); }, 2600);
+}
+function copy(text) {
+  if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () { toast("Link copied"); }, function () { toast(text); });
+  else toast(text);
+}
+
+/* ================= boot ================= */
+db = load();
+parseRoute();
+render();
+</script>
+</body>
+</html>
