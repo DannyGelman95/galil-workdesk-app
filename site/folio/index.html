@@ -34,6 +34,19 @@
   --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25);
   color-scheme:dark;
 }
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#12180F; --panel:#1A2216; --panel2:#20291B; --ink:#E9F2DF; --muted:#A5B49B; --line:#2E3C26;
+  --chrome:#0E140B; --chrometx:#E9F2DF; --chromedim:#9FB58A; --chromehover:#202B1A;
+  --green:#9FD154; --deep:#B6E072; --deepfg:#14260A; --hover:#243019;
+  --blue:#7FB2F0; --bluebg:#14263D; --bluetx:#9CC5F5;
+  --amber:#F5B84F; --amberbg:#2E2412; --ambertx:#F0C270;
+  --err:#F0796B; --errbg:#2E1815;
+  --violet:#B39BF0; --violetbg:#251D3A; --violettx:#C9B7F5;
+  --teal:#5FD0BF; --tealbg:#12302B; --tealtx:#8FE3D6;
+  --grey:#8C9884; --greybg:#262F21;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25);
+  color-scheme:dark;
+}}
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
 body{background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
@@ -298,7 +311,7 @@ var db, ui = {
 };
 
 function emptyDB() {
-  return { app: "galil-folio", version: APP_VERSION, users: [], clients: [], projects: [], tasks: [], comments: [], activity: [], settings: { currentUserId: null, theme: "light" } };
+  return { app: "galil-folio", version: APP_VERSION, users: [], clients: [], projects: [], tasks: [], comments: [], activity: [], settings: { currentUserId: null, theme: null } };
 }
 function load() {
   try { var s = localStorage.getItem(KEY); if (s) { var o = JSON.parse(s); if (o && o.app === "galil-folio") return o; } } catch (e) {}
@@ -400,6 +413,7 @@ function seed() {
 }
 
 /* ================= routing ================= */
+function setHash(h_) { try { history.replaceState(null, "", h_); } catch (e) {} }
 function go(path) { location.hash = "#/" + path; }
 function parseRoute() { ui.route = (location.hash.replace(/^#\/?/, "") || "home").split("/").map(decodeURIComponent); }
 window.addEventListener("hashchange", function () { parseRoute(); ui.sideOpen = false; render(); });
@@ -407,7 +421,8 @@ window.addEventListener("hashchange", function () { parseRoute(); ui.sideOpen = 
 /* ================= rendering ================= */
 var root = document.getElementById("app");
 function render() {
-  document.documentElement.setAttribute("data-theme", db.settings.theme || "light");
+  if (db.settings.theme) document.documentElement.setAttribute("data-theme", db.settings.theme);
+  else document.documentElement.removeAttribute("data-theme");
   var scroll = root.querySelector(".content"), st = scroll ? scroll.scrollTop : 0;
   var page = pageFor(ui.route);
   root.replaceChildren(sidebar(), h("div", { class: "main" },
@@ -441,9 +456,10 @@ function sidebar() {
       h("select", { onchange: function (e) { db.settings.currentUserId = e.target.value; save(); render(); } },
         db.users.filter(function (x) { return x.isActive; }).map(function (x) { return h("option", { value: x.id, selected: x.id === u.id }, x.fullName); })),
       h("div", { class: "row" },
-        h("button", { onclick: function () { db.settings.theme = db.settings.theme === "dark" ? "light" : "dark"; save(); render(); } }, db.settings.theme === "dark" ? "☀ Light" : "☾ Dark"),
+        h("button", { onclick: function () { db.settings.theme = isDark() ? "light" : "dark"; save(); render(); } }, isDark() ? "☀ Light" : "☾ Dark"),
         h("button", { onclick: function () { openModal({ kind: "data" }); } }, "⇅ Data"))));
 }
+function isDark() { return db.settings.theme ? db.settings.theme === "dark" : !!(window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches); }
 function logo(size) {
   var ns = "http://www.w3.org/2000/svg", s = document.createElementNS(ns, "svg");
   s.setAttribute("viewBox", "0 0 40 40"); s.setAttribute("width", size); s.setAttribute("height", size);
@@ -796,11 +812,11 @@ function pagePerson(id) {
 }
 
 /* ================= task actions ================= */
-function openTask(t) { if (!t) return; ui.draft = ""; ui.openTask = t.id; ui.taskTab = "comments"; ui.editingDesc = false; ui.editingCommentId = null; history.replaceState(null, "", "#/task/" + encodeURIComponent(taskKey(t))); renderOverlay(); }
+function openTask(t) { if (!t) return; ui.draft = ""; ui.openTask = t.id; ui.taskTab = "comments"; ui.editingDesc = false; ui.editingCommentId = null; setHash("#/task/" + encodeURIComponent(taskKey(t))); renderOverlay(); }
 function closeTask() {
   ui.openTask = null;
-  if (ui.route[0] === "task") { history.replaceState(null, "", "#/board"); parseRoute(); render(); }
-  else { history.replaceState(null, "", "#/" + ui.route.join("/")); render(); }
+  if (ui.route[0] === "task") { setHash("#/board"); parseRoute(); render(); }
+  else { setHash("#/" + ui.route.join("/")); render(); }
 }
 var FIELD_LABELS = { status: "status", priority: "priority", type: "type", assigneeId: "assignee", dueDate: "due date", estimateHours: "estimate", deliverable: "deliverable", projectId: "project", title: "title", description: "description", labels: "labels" };
 function fmtVal(k, v) {
@@ -818,7 +834,7 @@ function setField(t, k, v) {
   t[k] = v; t.updatedAt = nowISO();
   log(t.id, k === "description" ? "updated the description" : k === "title" ? "renamed the task to “" + v + "”" : "changed " + FIELD_LABELS[k] + " from " + fmtVal(k, old) + " to " + fmtVal(k, v));
   save();
-  if (ui.openTask === t.id) history.replaceState(null, "", "#/task/" + encodeURIComponent(taskKey(t)));
+  if (ui.openTask === t.id) setHash("#/task/" + encodeURIComponent(taskKey(t)));
   render();
 }
 
@@ -1180,15 +1196,14 @@ function dataModal() {
     h("p", { class: "muted", style: { marginTop: 0 } }, "Folio keeps its data in this browser only. Download a backup to move it to another browser or keep a copy."),
     h("div", { class: "row", style: { marginBottom: "16px" } },
       h("button", { class: "btn primary", onclick: function () {
-        var blob = new Blob([JSON.stringify(Object.assign({}, db, { exported: nowISO() }), null, 2)], { type: "application/json" });
-        var a = h("a", { href: URL.createObjectURL(blob), download: "galil-folio-backup-" + today() + ".json" }); document.body.appendChild(a); a.click(); a.remove();
-      } }, "⬇ Download backup"),
+        saveFile("galil-folio-backup-" + today() + ".json", JSON.stringify(Object.assign({}, db, { exported: nowISO() }), null, 2), "application/json", "Backup");
+      } }, EMBEDDED ? "⧉ Copy backup" : "⬇ Download backup"),
       h("button", { class: "btn", onclick: function () {
         var rows = [["Key", "Title", "Client", "Project", "Type", "Status", "Priority", "Assignee", "Reporter", "Due", "Estimate (h)", "Deliverable", "Labels", "Open questions", "Created", "Updated"]];
         db.tasks.forEach(function (t) { var p = projectOf(t); rows.push([taskKey(t), t.title, (clientOf(p) || {}).name, p.name, t.type, t.status, t.priority, t.assigneeId ? userName(t.assigneeId) : "", userName(t.reporterId), t.dueDate || "", t.estimateHours == null ? "" : t.estimateHours, t.deliverable || "", (t.labels || []).join(" "), openQuestions(t.id).length, t.createdAt.slice(0, 10), t.updatedAt.slice(0, 10)]); });
         var csv = "﻿" + rows.map(function (r) { return r.map(function (c) { c = String(c == null ? "" : c); return /[",\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c; }).join(","); }).join("\r\n");
-        var a = h("a", { href: URL.createObjectURL(new Blob([csv], { type: "text/csv" })), download: "galil-folio-tasks-" + today() + ".csv" }); document.body.appendChild(a); a.click(); a.remove();
-      } }, "⬇ Export tasks (CSV)")),
+        saveFile("galil-folio-tasks-" + today() + ".csv", csv, "text/csv", "Task CSV");
+      } }, EMBEDDED ? "⧉ Copy tasks (CSV)" : "⬇ Export tasks (CSV)")),
     h("label", { class: "l" }, "Restore from a backup"), file,
     h("hr", { style: { border: 0, borderTop: "1px solid var(--line)", margin: "18px 0" } }),
     h("button", { class: "btn danger", onclick: function () { confirmBox("Reset to the demo data?", "All your clients, projects, tasks and comments in this browser are replaced with the sample data.", "Reset", function () { db = seed(); save(); ui.openTask = null; go("home"); render(); }); } }, "↺ Reset to demo data")), null);
@@ -1200,6 +1215,14 @@ function toast(msg) {
   var old = document.querySelector(".toast"); if (old) old.remove();
   var el = h("div", { class: "toast", role: "status" }, msg); document.body.appendChild(el);
   clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.remove(); }, 2600);
+}
+var EMBEDDED = (function () { try { return window.top !== window.self; } catch (e) { return true; } })();
+function saveFile(name, text, type, what) {
+  if (EMBEDDED) {
+    if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () { toast(what + " copied to the clipboard — paste it into a file"); }, function () { toast("Couldn't copy " + what.toLowerCase() + " here — open Folio directly to download it."); });
+    return;
+  }
+  var a = h("a", { href: URL.createObjectURL(new Blob([text], { type: type })), download: name }); document.body.appendChild(a); a.click(); a.remove();
 }
 function copy(text) {
   if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () { toast("Link copied"); }, function () { toast(text); });
