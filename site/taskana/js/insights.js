@@ -61,7 +61,7 @@ function pageInsights() {
   var closeRate = pct(closed.length, created.length);
 
   var set = function (k) { return function (e) { I[k] = e.target.value; if (k === "clientId") I.projectId = ""; render(); }; };
-  var controls = h("div", { class: "filters", style: { display: "flex" } },
+  var controls = h("div", { class: "filters ins-controls" },
     h("div", { class: "seg2", role: "group", "aria-label": tr("Period") }, [["30", tr("30 days")], ["90", tr("90 days")], ["180", tr("6 months")], ["all", tr("All time")]].map(function (o) {
       return h("button", { class: I.period === o[0] ? "on" : "", "aria-pressed": I.period === o[0] ? "true" : "false", onclick: function () { I.period = o[0]; render(); } }, o[1]);
     })),
@@ -182,7 +182,7 @@ function statusBreakdown(scope) {
     })),
     h("table", { class: "st-table" }, h("tbody", null, rows.map(function (r) {
       return h("tr", null, h("td", null, h("span", { class: "legend", style: { margin: 0 } }, h("span", null, h("i", { style: { background: r.s.color } }), tr(r.s.k)))),
-        h("td", { class: "n" }, r.n), h("td", { class: "n", style: { width: "60px" } }, total ? pct(r.n, total) + "%" : "—"));
+        h("td", { class: "n" }, r.n), h("td", { class: "n" }, total ? pct(r.n, total) + "%" : "—"));
     }))));
 }
 

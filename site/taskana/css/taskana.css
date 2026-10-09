@@ -1,8 +1,8 @@
 /* Layout: app shell — light rail navigation, header bar, scrolling work area.
    Palette and type follow the GALIL brand (forest + leaf green, Noto Sans). */
 :root{
-  --font:"Noto Sans","Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;
-  --mono:"Noto Sans Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --font:"Noto Sans","Noto Sans Hebrew","Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;
+  --mono:"Noto Sans Mono","Noto Sans Hebrew",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   --bg:#FBFCF9; --panel:#FFFFFF; --panel2:#F4F7F0; --ink:#1F3D24; --muted:#5F6E62; --line:#DDE6D5;
   --brand:#1F3D24; --leaf:#8CC63E; --annot:#0E7F91;
   --side-bg:#F1F5EC; --side-tx:#1F3D24; --side-dim:#55665A; --side-hover:#E3ECDA; --side-on:#FFFFFF; --side-line:#D9E4D0;
@@ -103,8 +103,8 @@ a{color:var(--deep)}
 .side .grow{flex:1;min-height:12px}
 .side .me{border-top:1px solid var(--side-line);padding:12px 6px 0;font-size:12px;color:var(--side-dim)}
 .side .me select{width:100%;margin-top:6px;background:var(--panel);border:1px solid var(--side-line);color:var(--side-tx);border-radius:7px;padding:6px}
-.side .me .row{margin-top:8px;gap:6px}
-.side .me button{display:inline-flex;align-items:center;gap:4px;background:var(--panel);border:1px solid var(--side-line);color:var(--side-dim);border-radius:7px;padding:4px 8px;cursor:pointer;font-size:12px}
+.side .me .row{margin-top:8px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.side .me button{display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;min-width:0;overflow:hidden;background:var(--panel);border:1px solid var(--side-line);color:var(--side-dim);border-radius:7px;padding:4px 8px;cursor:pointer;font-size:12px}
 .side .me button .ico{width:13px;height:13px}
 .side .me button:hover{color:var(--side-tx);border-color:var(--deep)}
 .scrim-side{display:none}
@@ -117,7 +117,7 @@ a{color:var(--deep)}
 .top .crumbs a{color:var(--muted);text-decoration:none}
 .top .crumbs a:hover{color:var(--deep);text-decoration:underline}
 .content{flex:1;overflow:auto;padding:20px 24px 40px}
-.menu-btn{display:none}
+.btn.menu-btn{display:none}
 
 /* atoms */
 .btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 12px;cursor:pointer;font-weight:550;white-space:nowrap;color:var(--ink);text-decoration:none}
@@ -233,7 +233,7 @@ table.t .chk{width:34px;padding-inline-end:0}
 table.t .chk input{width:16px;height:16px;cursor:pointer}
 .tbl-wrap{overflow:auto;border:1px solid var(--line);border-radius:12px}
 .num{font-variant-numeric:tabular-nums;text-align:end}
-table.t th.num,table.t td.num{text-align:end;padding-inline-end:18px}
+table.t th.num,table.t td.num{text-align:center;padding-inline:10px}
 
 /* progress */
 .bar{display:flex;height:8px;border-radius:5px;overflow:hidden;background:var(--greybg);gap:2px}
@@ -310,6 +310,7 @@ table.t th.num,table.t td.num{text-align:end;padding-inline-end:18px}
 .toast .linklike{color:var(--bg)}
 
 /* insights */
+.ins-controls{margin-bottom:18px}
 .kpis{display:grid;gap:12px;grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:16px}
 @media (max-width:1100px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;min-width:0}
@@ -337,8 +338,10 @@ table.t th.num,table.t td.num{text-align:end;padding-inline-end:18px}
 .stack{display:flex;height:22px;border-radius:6px;overflow:hidden;gap:2px;background:var(--panel)}
 .stack span{display:block;height:100%;min-width:3px}
 .st-table{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px}
-.st-table td,.st-table th{padding:5px 4px;border-bottom:1px solid var(--line);text-align:start}
-.st-table .n{text-align:end;font-variant-numeric:tabular-nums;color:var(--muted)}
+.st-table td,.st-table th{padding:6px 4px;border-bottom:1px solid var(--line);text-align:center}
+.st-table td:first-child,.st-table th:first-child{width:50%}
+.st-table .legend{justify-content:center}
+.st-table .n{text-align:center;font-variant-numeric:tabular-nums;color:var(--muted)}
 .hbar{display:flex;align-items:center;gap:8px}
 .hbar .trk{flex:1;height:8px;background:var(--greybg);border-radius:4px;overflow:hidden;display:flex;gap:2px}
 .hbar .trk span{display:block;height:100%}
@@ -374,7 +377,7 @@ table.t th.num,table.t td.num{text-align:end;padding-inline-end:18px}
   [dir=rtl] .side{transform:translateX(100%)}
   .side.open,[dir=rtl] .side.open{transform:none}
   .side.open+.scrim-side{display:block;position:fixed;inset:0;z-index:39;background:rgba(10,16,8,.35)}
-  .menu-btn{display:inline-flex}
+  .btn.menu-btn{display:inline-flex}
   .top{padding:12px 16px}
   .content{padding:16px}
   .hide-sm{display:none}
@@ -389,3 +392,12 @@ table.t th.num,table.t td.num{text-align:end;padding-inline-end:18px}
   .field.half{grid-column:1/-1}
   .typebar{grid-template-columns:90px 1fr 80px}
 }
+
+/* Hebrew: small labels use the Hebrew text face; letter-spacing and caps are Latin-only devices */
+[lang=he] h3,[lang=he] .kpi .lbl,[lang=he] .nav-h,[lang=he] table.t th,[lang=he] .col-h{font-family:var(--font);letter-spacing:0;text-transform:none}
+[lang=he] h3{font-size:12.5px;font-weight:700}
+[lang=he] .kpi .lbl{font-size:12.5px;font-weight:700}
+[lang=he] .nav-h{font-size:12px;font-weight:700}
+[lang=he] table.t th{font-size:12.5px}
+[lang=he] .col-h{font-size:13.5px}
+[lang=he] .brand small{font:600 11.5px var(--font);letter-spacing:.02em;text-transform:none}
