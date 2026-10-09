@@ -48,6 +48,10 @@ site/                     The other two products published to GitHub Pages
     index.html              The Employee Knowledge Base — onboarding, company
                            rules and training how-to's, opened from the
                            book button in the app's top bar.
+  taskana/
+    index.html              Taskana — Jira-style project & task tracker for
+                           the technical-writing teams. Standalone (see
+                           "Taskana" below).
 archive/                  Superseded builds, kept for reference.
   GALIL-WorkDesk-v6.html
   galil-workdesk-dev-cdn-build.html
@@ -90,6 +94,50 @@ client via a `mailto:` link (`site-mui/src/lib/useMailtoForm.js`) — there's
 no backend yet, so there's nowhere for a submission to land server-side.
 
 See `site-mui/README.md` for the app's structure and stack.
+
+## Taskana (`site/taskana/`)
+
+Taskana, by GALIL, is a Jira-style project and task tracker built for
+technical-writing teams. Like the WorkDesk app it is one self-contained HTML
+file with no build step. Its only network request is for the Noto Sans fonts,
+and it falls back to system fonts offline. It keeps its data in the browser's
+`localStorage` (key `galil-taskana-v1`; data saved under the app's earlier
+name, Folio, is picked up automatically). It is standalone for now; people,
+client and project ids follow the WorkDesk conventions (`u-*`, `c-*`, `p-*`)
+so it can later read WorkDesk data.
+
+- **Clients → Projects → Tasks.** Each project has a short key (e.g. `RSOM`)
+  and tasks get keys like `RSOM-12`. Projects carry a deliverable type
+  (operator manual, online help, API reference, courseware…), lead, dates and
+  status.
+- **Tasks** can be assigned to anyone in the company, with a doc-oriented type
+  (Writing, Editing, Review, Illustration, Translation, Localization, SME
+  Interview, Publishing, Doc Defect, Research), priority, due date, estimate,
+  deliverable/section, labels and a checklist.
+- **Workflow:** Backlog → To Do → Writing → Peer Review → SME Review → Done,
+  shown as a drag-and-drop **Board**, a sortable **All tasks** list, **My
+  work**, and an **Overview** with open questions, overdue work and recent
+  activity.
+- **Saved views:** filter the board or the task list (client, project,
+  assignee, including "me", type, priority, status, overdue, open questions),
+  then **☆ Save view**. A view opens as a board or a list, is private or
+  shared with everyone, and is listed in the sidebar.
+- **Insights:** closed tasks (with change against the previous period),
+  closing rate (closed ÷ opened), overall completion, on-time delivery,
+  average cycle time, average tasks per person, overdue share, and how many
+  questions get answered and how fast; plus opened-vs-closed per week, work by
+  stage, a per-person table (assigned, open, closed, completion, on time,
+  cycle time, overdue), project completion and closed work by task type.
+  Filter by period (30/90/180 days, all time), client and project.
+- **Comments** on every task, with `@mentions`, and **Questions**, which are
+  comments flagged as open until someone marks them answered. Every field
+  change is kept in the task's **History**.
+- **People** page with each person's workload; pick who you're working as at
+  the bottom of the sidebar (there's no sign-in yet).
+- **⇅ Data:** JSON backup/restore, CSV export of all tasks, reset to demo data.
+- GALIL branding, light/dark theme (follows the device until you pick one),
+  phone layout, `c` shortcut for a new task, deep links to tasks
+  (`#/task/RSOM-1`).
 
 ## The app (`site/app/`)
 
