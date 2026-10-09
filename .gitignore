@@ -1,1 +1,4 @@
 .claude/
+tests/taskana/test-results/
+tests/taskana/playwright-report/
+tests/taskana/node_modules/
