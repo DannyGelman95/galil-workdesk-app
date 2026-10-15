@@ -127,6 +127,11 @@ tests/taskana/      Playwright browser tests (npm test), run in CI by
                     .github/workflows/taskana-tests.yml.
 ```
 
+**Training video:** [`docs/training/taskana-training.mp4`](docs/training/taskana-training.mp4)
+(~5 min, captioned walkthrough). Regenerate it with
+`node docs/training/record-taskana-training.js` after `cd tests/taskana && npm ci`
+(needs ffmpeg).
+
 - **Clients → Projects → Tasks.** Projects have a short key (`RSOM`); tasks get
   keys like `RSOM-12`. Moving a task or renaming a project key keeps the old
   keys working.
