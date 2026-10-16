@@ -1,9 +1,37 @@
 /* =====================================================================
    Taskana (by GALIL) — core: constants, utilities, data store,
-   permissions, history, notifications and demo data.
+   permissions, history and notifications. (Team and demo data: seed.js;
+   sign-in: auth.js; GitHub / OneDrive files: storage.js.)
    Classic script: everything here is a global used by the other files.
    ===================================================================== */
 "use strict";
+
+/* deployment settings (config.js), optionally overridden in this browser from the sign-in screen */
+var CONFIG_KEY = "galil-taskana-config";
+var CONFIG = (function () {
+  var base = window.TASKANA_CONFIG || {}, o = null;
+  try { o = JSON.parse(localStorage.getItem(CONFIG_KEY) || "null"); } catch (e) {}
+  var c = { domain: base.domain || "@galiltc.co.il", storage: base.storage || "", entra: Object.assign({ clientId: "", tenantId: "" }, base.entra),
+    github: Object.assign({ owner: "", repo: "", branch: "taskana-data", path: "taskana" }, base.github),
+    onedrive: Object.assign({ folderLink: "", folderName: "Taskana", fileName: "taskana-data.json" }, base.onedrive), override: false };
+  if (o && typeof o === "object") {
+    if (o.storage != null) c.storage = o.storage;
+    ["entra", "github", "onedrive"].forEach(function (k) { c[k] = Object.assign(c[k], o[k] || {}); });
+    c.override = true;
+  }
+  return c;
+})();
+var DOMAIN = CONFIG.domain.toLowerCase();
+/* ENTRA: real Microsoft Entra ID sign-in (otherwise the WorkDesk-style demo sign-in).
+   STORAGE: "local" (this browser), "github" (a data file in a repository) or "onedrive" (needs Entra). */
+var ENTRA = !!CONFIG.entra.clientId;
+var STORAGE = (function () {
+  var s = CONFIG.storage || (ENTRA ? "onedrive" : "local");
+  if (s === "onedrive" && !ENTRA) s = "local";
+  if (s === "github" && !(CONFIG.github.owner && CONFIG.github.repo)) s = "local";
+  return /^(local|github|onedrive)$/.test(s) ? s : "local";
+})();
+var REMOTE = STORAGE !== "local";
 
 var KEY = "galil-taskana-v1", OLD_KEYS = ["galil-folio-v1"], BEFORE_RESTORE_KEY = "galil-taskana-before-restore";
 var WORKDESK_KEY = "galil-workdesk-v1";
@@ -30,7 +58,9 @@ var PRIORITIES = [
 ];
 var DOC_TYPES = ["User Manual", "Operator Manual", "Maintenance Manual", "Online Help", "API Reference", "Release Notes", "Training Courseware", "Quick Start Guide", "Knowledge Base", "Proposal", "Other"];
 var PROJECT_STATUSES = ["Active", "On Hold", "Completed", "Archived"];
-var ROLES = ["Admin", "Manager", "Member", "Viewer"];
+var ROLES = ["Admin", "Manager", "Member", "External", "Viewer"];
+var EMPLOYMENT = ["Employee", "Outsourced"];
+var DEPARTMENTS = ["Management", "Civil Division", "Defense Division", "Engineering", "Office & HR", "Marketing", "Finance"];
 var RECURRENCES = ["", "Weekly", "Every 2 weeks", "Monthly"];
 var LINK_TYPES = ["blocks", "is blocked by", "relates to"];
 var LINK_INVERSE = { "blocks": "is blocked by", "is blocked by": "blocks", "relates to": "relates to" };
@@ -63,7 +93,7 @@ var dataVersion = 0;          // bumped on every save; indexes rebuild lazily
 var storageOK = true;
 
 function emptyDB() {
-  return { app: "galil-taskana", version: APP_VERSION, users: [], clients: [], projects: [], tasks: [], comments: [], activity: [],
+  return { app: "galil-taskana", version: APP_VERSION, rosterVersion: 1, users: [], clients: [], projects: [], tasks: [], comments: [], activity: [],
     views: [], notifications: [], attachments: [], settings: { currentUserId: null, theme: null, lang: "en" } };
 }
 function isBackup(o) { return !!o && (o.app === "galil-taskana" || o.app === "galil-folio") && Array.isArray(o.tasks); }
@@ -74,7 +104,15 @@ function upgrade(o) {
   Object.keys(e).forEach(function (k) { if (o[k] == null) o[k] = e[k]; });
   o.settings = Object.assign({}, e.settings, o.settings || {});
   o.app = "galil-taskana"; o.version = APP_VERSION;
-  o.users.forEach(function (u) { if (!u.role) u.role = "Member"; if (u.isActive == null) u.isActive = true; });
+  o.users.forEach(function (u) {
+    if (!u.role) u.role = "Member"; if (u.isActive == null) u.isActive = true;
+    if (u.pendingActivation == null) u.pendingActivation = false; if (!u.employment) u.employment = "Employee";
+  });
+  /* once: saves from before the real roster get the GALIL team added */
+  if (!o.rosterVersion) {
+    if (typeof teamUsers === "function") teamUsers().forEach(function (t) { if (!byId(o.users, t.id) && !o.users.some(function (u) { return (u.email || "").toLowerCase() === t.email; })) o.users.push(t); });
+    o.rosterVersion = 1;
+  }
   o.tasks.forEach(function (t) {
     if (!t.aliases) t.aliases = [];
     if (!t.links) t.links = [];
@@ -129,6 +167,7 @@ function load() {
 }
 function save(quiet) {
   dataVersion++;
+  if (REMOTE) { if (Store.remote) Store.changed(); return; }   // GitHub / OneDrive (storage.js)
   try { localStorage.setItem(KEY, JSON.stringify(db)); storageOK = true; }
   catch (e) { storageOK = false; if (!quiet && typeof toast === "function") toast(tr("Browser storage is full — the last change was not saved. Remove attachments or download a backup.")); }
 }
@@ -153,14 +192,8 @@ function index() {
   db.attachments.forEach(function (a) { (idx.attachments[a.taskId] = idx.attachments[a.taskId] || []).push(a); });
   return idx;
 }
-function me() {
-  var u = byId(db.users, db.settings.currentUserId);
-  if (u && u.isActive) return u;
-  /* the chosen person was deactivated or removed: switch to someone active */
-  u = db.users.filter(function (x) { return x.isActive; })[0] || db.users[0];
-  if (u && db.settings.currentUserId !== u.id) { db.settings.currentUserId = u.id; save(true); }
-  return u;
-}
+/* the signed-in person (auth.js keeps db.settings.currentUserId in step with the session) */
+function me() { return byId(db.users, db.settings.currentUserId) || { id: "", fullName: "", role: "Viewer", isActive: false }; }
 function userName(id) { var u = byId(db.users, id); return u ? u.fullName : tr("Unassigned"); }
 function projectOf(t) { return byId(db.projects, t.projectId); }
 function clientOf(p) { return p ? byId(db.clients, p.clientId) : null; }
@@ -174,7 +207,17 @@ function attachmentsOf(taskId) { return index().attachments[taskId] || []; }
 /* ================= permissions ================= */
 function roleOf(u) { return (u || me()).role || "Member"; }
 function isManager(u) { var r = roleOf(u); return r === "Admin" || r === "Manager"; }
+/* External (outsourced finance, HR, contractors): only the tasks they work on, report or are mentioned in */
+function isExternal(u) { return roleOf(u) === "External"; }
+function canSee(t) {
+  if (!isExternal()) return true;
+  var id = me().id;
+  return t.assigneeId === id || t.reporterId === id || commentsOf(t.id).some(function (c) { return c.authorId === id || (c.mentions || []).indexOf(id) >= 0; });
+}
+function visibleTasks() { return isExternal() ? db.tasks.filter(canSee) : db.tasks; }
 var can = {
+  seeEverything: function () { return !isExternal(); },
+  exportData: function () { return !isExternal(); },
   manageClients: function () { return isManager(); },
   manageProjects: function () { return isManager(); },
   managePeople: function () { return roleOf() === "Admin"; },
@@ -302,7 +345,7 @@ function deleteTasks(ids) {
   db.comments = db.comments.filter(function (c) { return !set[c.taskId]; });
   db.activity = db.activity.filter(function (a) { return !set[a.taskId]; });
   db.notifications = db.notifications.filter(function (n) { return !set[n.taskId]; });
-  db.attachments = db.attachments.filter(function (a) { return !set[a.taskId]; });
+  db.attachments = db.attachments.filter(function (a) { if (set[a.taskId] && (a.driveItemId || a.ghPath)) deleteAttachmentFile(a); return !set[a.taskId]; });
   save();
 }
 function addLink(a, type, b) {
@@ -336,134 +379,6 @@ function cleanViews(kind, id) {
   return { changed: changed, removed: removed };
 }
 
-/* ================= seed data ================= */
-function seed() {
-  var d = emptyDB();
-  var T = function (n_) { var x = new Date(); x.setDate(x.getDate() + n_); return d2s(x); };
-  var A = function (daysAgo, hr) { var x = new Date(); x.setDate(x.getDate() - daysAgo); x.setHours(hr || 10, (daysAgo * 7) % 60, 0, 0); return x.toISOString(); };
-  var U = function (id, name, title, dept, role) {
-    return { id: id, fullName: name, email: name.toLowerCase().replace(/[^a-z]+/g, ".") + "@galiltc.co.il", jobTitle: title, department: dept, role: role, isActive: true };
-  };
-  d.users = [
-    U("u-ceo", "Dana Galil", "Founder & CEO", "Management", "Admin"),
-    U("u-ops", "Ronen Shaked", "Operations Manager", "Operations", "Admin"),
-    U("u-pm", "Maya Ben Ari", "Project Manager", "Delivery", "Manager"),
-    U("u-tl", "Eitan Levi", "Team Lead, Docs", "Delivery", "Manager"),
-    U("u-sen", "Noa Katz", "Senior Technical Writer", "Delivery", "Member"),
-    U("u-emp", "Yossi Mizrahi", "Technical Writer", "Delivery", "Member"),
-    U("u-emp2", "Tal Rosen", "Trainer", "Delivery", "Member"),
-    U("u-fin", "Orit Hadad", "Finance Controller", "Finance", "Viewer"),
-    U("u-ext", "Adam Peled", "Contract Illustrator", "External", "Member"),
-    U("u-new", "Shira Cohen", "Technical Writer", "Delivery", "Member")
-  ];
-  d.clients = [
-    { id: "c-iai", name: "IAI", code: "IAI", industry: "Aerospace & Defence", contactName: "Ilan Barak", contactEmail: "ilan@iai.example", notes: "Style guide: IAI-TW-SG rev F. All deliverables in S1000D-lite Word templates." },
-    { id: "c-elb", name: "Elbit Systems", code: "ELB", industry: "Defence Electronics", contactName: "Rita Gold", contactEmail: "rita@elbit.example", notes: "Help authored in DITA, published via the client's CCMS." },
-    { id: "c-mob", name: "Mobileye", code: "MOB", industry: "Automotive", contactName: "Sagi Peer", contactEmail: "sagi@mobileye.example", notes: "Developer docs in Markdown, reviewed through the client's Git." },
-    { id: "c-gal", name: "GALIL (internal)", code: "GAL", industry: "Internal", contactName: "", contactEmail: "", notes: "Internal templates, style guide and training." }
-  ];
-  d.projects = [
-    { id: "p-iai1", clientId: "c-iai", key: "RSOM", name: "Radar Suite — Operator Manual", docType: "Operator Manual", status: "Active", leadUserId: "u-pm", startDate: T(-120), dueDate: T(90), description: "Two-volume operator manual for the radar suite (Vol 1 Operation, Vol 2 Maintenance)." },
-    { id: "p-iai2", clientId: "c-iai", key: "MTP", name: "Maintenance Training Package", docType: "Training Courseware", status: "Active", leadUserId: "u-pm", startDate: T(-60), dueDate: T(120), description: "Instructor guide, student handbook and slides for the level-2 maintenance course." },
-    { id: "p-elb1", clientId: "c-elb", key: "AVH", name: "Avionics Help System", docType: "Online Help", status: "Active", leadUserId: "u-tl", startDate: T(-200), dueDate: T(30), description: "Migration of the legacy CHM help to DITA, then content refresh for release 5." },
-    { id: "p-mob1", clientId: "c-mob", key: "SDK", name: "SDK Documentation Refresh", docType: "API Reference", status: "Active", leadUserId: "u-sen", startDate: T(-40), dueDate: T(60), description: "Rewrite the getting-started guide and regenerate the API reference for SDK 4.x." },
-    { id: "p-gal1", clientId: "c-gal", key: "STY", name: "GALIL Style Guide 2027", docType: "Other", status: "On Hold", leadUserId: "u-tl", startDate: T(-20), dueDate: T(150), description: "Refresh of the house style guide and Word/FrameMaker templates." }
-  ];
-  var n = {};
-  var rows = [
-    ["p-iai1", "Draft chapter 3 — Track modes", "Writing", "Writing", "High", "u-emp", "u-pm", T(6), 24, "Vol 1 · Ch 3", "Full draft with screenshots placed, ready for peer review.\n\nSource: SRS v2.3 §4.1–4.6 and the recorded walkthrough from 12 Sep.", ["vol1"], [["Outline approved", true], ["Screenshots captured", true], ["Draft written", false], ["Self-check against style guide", false]], 10],
-    ["p-iai1", "Illustration pass — chapter 3", "Illustration", "To Do", "Medium", "u-ext", "u-pm", T(12), 16, "Vol 1 · Ch 3", "Redraw 12 figures to the client style sheet (line weights 0.5/1 pt, callouts in Arial 8).", ["vol1", "figures"], [], 7],
-    ["p-iai1", "Maintenance procedures — outline", "Research", "Backlog", "Medium", "u-sen", "u-pm", T(20), 8, "Vol 2", "Agree the task breakdown with the client SME before writing starts.", ["vol2"], [], 3],
-    ["p-iai1", "SME interview — antenna alignment", "SME Interview", "To Do", "High", "u-sen", "u-pm", T(3), 3, "Vol 2 · Ch 5", "Book 1 h with the field engineer. Prepare questions from the alignment test report.", ["vol2", "sme"], [["Questions sent in advance", false], ["Interview recorded", false]], 2],
-    ["p-iai1", "Peer review — chapter 2", "Review", "Peer Review", "Medium", "u-tl", "u-emp", T(1), 6, "Vol 1 · Ch 2", "Review for accuracy, terminology and style-guide compliance. Use tracked changes.", ["vol1"], [], 5],
-    ["p-iai2", "Build module 4 slides", "Writing", "Writing", "Medium", "u-emp2", "u-pm", T(9), 20, "Module 4", "Slides plus facilitator notes for the hydraulics module.", ["courseware"], [], 12],
-    ["p-iai2", "Student handbook — module 3 edit", "Editing", "SME Review", "Medium", "u-sen", "u-pm", T(-2), 10, "Module 3", "Copy-edit pass done; with the client SME for technical sign-off.", ["courseware"], [], 15],
-    ["p-iai2", "Translate module 1 to Hebrew", "Translation", "Backlog", "Low", null, "u-pm", T(45), 30, "Module 1", "Send to the translation vendor once module 1 is signed off. Glossary attached in the project share.", ["he"], [], 1],
-    ["p-elb1", "Help topic migration — batch 2", "Writing", "Peer Review", "Critical", "u-emp", "u-tl", T(-1), 40, "Release 5", "Convert 80 topics to the new DITA map. Keep the old topic IDs as aliases so context-sensitive links keep working.", ["dita", "migration"], [["Topics converted", true], ["Map validated", true], ["Broken links fixed", false]], 21],
-    ["p-elb1", "Fix broken cross-references in nav topics", "Doc Defect", "To Do", "High", "u-emp", "u-tl", T(4), 4, "Release 5", "QA found 14 xrefs pointing at removed topics (see the link report in the CCMS).", ["defect"], [], 4],
-    ["p-elb1", "Publish release 5 help to staging", "Publishing", "Backlog", "Medium", "u-tl", "u-tl", T(25), 2, "Release 5", "Run the publish job and send the staging URL to Rita.", ["publish"], [], 1],
-    ["p-mob1", "API reference — endpoints A–F", "Writing", "Done", "Medium", "u-sen", "u-sen", T(-8), 30, "SDK 4.0", "Generate and hand-edit reference pages.", ["api"], [], 30],
-    ["p-mob1", "Getting-started guide rewrite", "Writing", "Writing", "High", "u-new", "u-sen", T(14), 18, "SDK 4.0", "New quick start for SDK 4: install, auth, first call, troubleshooting.", ["guide"], [["Install section", true], ["Auth section", false], ["First call sample", false], ["Troubleshooting", false]], 9],
-    ["p-mob1", "API reference — endpoints G–M", "Writing", "To Do", "Medium", "u-sen", "u-sen", T(28), 30, "SDK 4.0", "Same approach as A–F.", ["api"], [], 2],
-    ["p-gal1", "Collect style-guide change requests", "Research", "Backlog", "Low", "u-tl", "u-ceo", T(40), 6, "", "Survey the writers for pain points with the current guide.", [], [], 20]
-  ];
-  rows.forEach(function (r, i) {
-    n[r[0]] = (n[r[0]] || 0) + 1;
-    var created = A(r[13], 9), updated = A(Math.max(0, r[13] - 3), 14);
-    d.tasks.push({
-      id: "t-" + (i + 1), projectId: r[0], num: n[r[0]], title: r[1], type: r[2], status: r[3], priority: r[4],
-      assigneeId: r[5], reporterId: r[6], startDate: null, dueDate: r[7], estimateHours: r[8], deliverable: r[9], description: r[10],
-      labels: r[11], checklist: r[12].map(function (c) { return { id: uid("ck"), text: c[0], done: c[1] }; }),
-      links: [], aliases: [], parentId: null, recurrence: "",
-      createdAt: created, updatedAt: updated, startedAt: NOT_STARTED[r[3]] ? null : A(Math.max(0, r[13] - 1), 9),
-      completedAt: r[3] === "Done" ? updated : null, completedBy: r[3] === "Done" ? r[5] : null
-    });
-  });
-  /* a sub-task, a blocker and a recurring task */
-  d.tasks[1].parentId = "t-1";
-  d.tasks[0].links = [{ type: "is blocked by", taskId: "t-4" }]; d.tasks[3].links = [{ type: "blocks", taskId: "t-1" }];
-  d.tasks[14].recurrence = "Monthly";
-
-  /* closed work from the last few months, so Insights has history to show */
-  var hist = {
-    "p-iai1": [["Vol 1 front matter and safety summary", "Writing"], ["Terminology list for Vol 1", "Research"], ["Peer review — chapter 1", "Review"], ["Chapter 1 — System overview", "Writing"], ["Chapter 2 — Operating modes", "Writing"], ["Figures for chapter 1", "Illustration"], ["Copy-edit chapter 1", "Editing"], ["SME interview — display console", "SME Interview"]],
-    "p-iai2": [["Training needs analysis", "Research"], ["Module 1 slides", "Writing"], ["Module 2 slides", "Writing"], ["Instructor guide — module 1", "Writing"], ["Module 1 diagrams", "Illustration"], ["Copy-edit module 2", "Editing"]],
-    "p-elb1": [["Help migration — batch 1", "Writing"], ["DITA map skeleton", "Research"], ["Fix broken images in batch 1", "Doc Defect"], ["Publish release 4.2 help", "Publishing"], ["Translate release 4.2 topics", "Translation"], ["Localize UI strings in help", "Localization"], ["Peer review — batch 1", "Review"]],
-    "p-mob1": [["SDK 4 doc plan", "Research"], ["Changelog for SDK 4.0", "Writing"], ["Code sample review", "Review"], ["Publish SDK 4.0 beta docs", "Publishing"]],
-    "p-gal1": [["Audit current templates", "Research"]]
-  };
-  var people = ["u-emp", "u-sen", "u-tl", "u-emp2", "u-ext", "u-new", "u-pm"];
-  var seq = 0;
-  Object.keys(hist).forEach(function (pid) {
-    hist[pid].forEach(function (r) {
-      seq++;
-      var age = 8 + ((seq * 37) % 150);          // opened 8–158 days ago
-      var wait = (seq * 5) % 6;                  // sat 0–5 days before work started
-      var cycle = 3 + ((seq * 11) % 19);         // worked 3–21 days
-      var doneAgo = Math.max(1, age - wait - cycle);
-      var slack = ((seq * 7) % 9) - 3;           // due -3…+5 days around completion
-      var due = T(-(doneAgo + slack)); if (isWeekend(due)) due = addDays(due, -2);
-      var who = r[1] === "Illustration" ? "u-ext" : r[1] === "Publishing" ? "u-tl" : people[(seq * 3) % people.length];
-      n[pid] = (n[pid] || 0) + 1;
-      d.tasks.push({ id: "t-h" + seq, projectId: pid, num: n[pid], title: r[0], type: r[1], status: "Done", priority: ["Medium", "High", "Low", "Medium"][seq % 4],
-        assigneeId: who, reporterId: (d.projects.filter(function (p) { return p.id === pid; })[0] || {}).leadUserId || "u-pm",
-        startDate: null, dueDate: due, estimateHours: 4 + (seq * 5) % 30, deliverable: "", description: "", labels: [], checklist: [], links: [], aliases: [], parentId: null, recurrence: "",
-        createdAt: A(age, 9), updatedAt: A(doneAgo, 15), startedAt: A(age - wait, 9), completedAt: A(doneAgo, 15), completedBy: who });
-    });
-  });
-  d.projects.forEach(function (p) { p.nextNum = (n[p.id] || 0) + 1; });
-
-  d.comments = [
-    { id: "cm-1", taskId: "t-1", authorId: "u-emp", kind: "question", body: "@[u-pm] the SRS lists five track modes but the UI only shows four — is \"Silent track\" still in scope for this release?", createdAt: A(2, 11), resolved: false },
-    { id: "cm-2", taskId: "t-1", authorId: "u-pm", kind: "comment", body: "Checking with Ilan at IAI, will update by Thursday.", createdAt: A(2, 15) },
-    { id: "cm-3", taskId: "t-1", authorId: "u-emp", kind: "comment", body: "Screenshots are on the share under /RSOM/Vol1/Ch3/img (build 2.3.114).", createdAt: A(1, 10) },
-    { id: "cm-4", taskId: "t-2", authorId: "u-ext", kind: "question", body: "Do the callouts need to be in Hebrew as well, or English only?", createdAt: A(3, 9), resolved: true, resolvedBy: "u-pm", resolvedAt: A(3, 12) },
-    { id: "cm-5", taskId: "t-2", authorId: "u-pm", kind: "comment", body: "English only for this volume.", createdAt: A(3, 12) },
-    { id: "cm-6", taskId: "t-9", authorId: "u-tl", kind: "comment", body: "Batch looks good overall. 6 topics still have hard-coded product names — please switch them to the keyref.", createdAt: A(1, 16) },
-    { id: "cm-7", taskId: "t-9", authorId: "u-emp", kind: "question", body: "@[u-tl] should the alias IDs go in the map or in each topic's prolog?", createdAt: A(0, 9), resolved: false },
-    { id: "cm-8", taskId: "t-7", authorId: "u-sen", kind: "comment", body: "Sent to the SME for sign-off. They asked for 3 working days.", createdAt: A(4, 13) },
-    { id: "cm-9", taskId: "t-13", authorId: "u-new", kind: "question", body: "Is there a sandbox API key we can use in the code samples?", createdAt: A(1, 11), resolved: false }
-  ];
-  d.comments.forEach(function (c) { c.mentions = mentionIds(c.body); });
-  d.attachments = [
-    { id: "at-1", taskId: "t-1", kind: "link", name: "SRS v2.3 (client portal)", url: "https://example.com/iai/srs-2.3", addedBy: "u-emp", at: A(9, 10) }
-  ];
-  d.activity = d.tasks.map(function (t) { return { id: uid("a"), taskId: t.id, userId: t.reporterId, at: t.createdAt, kind: "created", to: t.assigneeId }; });
-  d.notifications = [
-    { id: "n-1", userId: "u-pm", kind: "mention", taskId: "t-1", byId: "u-emp", at: A(2, 11), read: false },
-    { id: "n-2", userId: "u-tl", kind: "mention", taskId: "t-9", byId: "u-emp", at: A(0, 9), read: false },
-    { id: "n-3", userId: "u-sen", kind: "question", taskId: "t-13", byId: "u-new", at: A(1, 11), read: false }
-  ];
-  d.views = [
-    { id: "v-1", name: "My overdue work", ownerId: "u-pm", shared: true, mode: "tasks", filters: { assigneeId: "me", overdue: "1" }, sort: { k: "dueDate", dir: 1 } },
-    { id: "v-2", name: "Waiting on SME", ownerId: "u-pm", shared: true, mode: "tasks", filters: { status: "SME Review" }, sort: { k: "dueDate", dir: 1 } },
-    { id: "v-3", name: "IAI board", ownerId: "u-pm", shared: true, mode: "board", filters: { clientId: "c-iai" } },
-    { id: "v-4", name: "Unanswered questions", ownerId: "u-tl", shared: true, mode: "tasks", filters: { questions: "1" }, sort: { k: "updatedAt", dir: -1 } }
-  ];
-  d.settings.currentUserId = "u-pm";
-  return d;
-}
-
 /* ================= WorkDesk import =================
    Reads people, clients and projects from WorkDesk (same browser, or one of its backup files)
    and merges them by id. Tasks are untouched. */
@@ -472,7 +387,7 @@ function workdeskData(o) {
   var d = o.app === "galil-workdesk" && isObj(o.data) ? o.data : o;
   return Array.isArray(d.users) && Array.isArray(d.clients) && Array.isArray(d.projects) ? d : null;
 }
-var WD_ROLE = { CEO: "Admin", OPS: "Admin", PM: "Manager", TL: "Manager", VIEW: "Viewer", FIN: "Viewer" };
+var WD_ROLE = { CEO: "Admin", OPS: "Admin", PM: "Manager", TL: "Manager", VIEW: "Viewer", FIN: "Viewer", EXT: "External" };
 function importWorkdesk(d) {
   var stats = { users: 0, clients: 0, projects: 0 };
   d.users.forEach(function (u) {

@@ -65,7 +65,9 @@ var ICONS = {
   copy: "M8 8h12v12H8zM4 16V4h12",
   undo: "M9 14L4 9l5-5M4 9h11a5 5 0 010 10h-3",
   download: "M12 4v12M7 11l5 5 5-5M5 20h14",
-  upload: "M12 20V8M7 13l5-5 5 5M5 4h14"
+  upload: "M12 20V8M7 13l5-5 5 5M5 4h14",
+  logout: "M15 4h3a2 2 0 012 2v12a2 2 0 01-2 2h-3M10 17l-5-5 5-5M5 12h11",
+  cloud: "M7 18a5 5 0 01-.5-10A6 6 0 0118 9a4.5 4.5 0 01-1 9z"
 };
 function icon(name, label) {
   var s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -116,7 +118,7 @@ function onRouteChange(prev) {
   if (r[0] === "view") { var v = byId(db.views, r[1]); if (v && !(prev && prev[0] === "task" && ui.bg[0] === "view" && ui.bg[1] === v.id)) applyView(v); }
   if (r[0] === "task") {
     var t = taskByKey(r[1]);
-    if (!t) { ui.openTask = null; return; }
+    if (!t || !canSee(t)) { ui.openTask = null; if (prev && prev[0] !== "task") ui.bg = prev; return; }
     if (ui.openTask !== t.id) { ui.openTask = t.id; ui.taskTab = "comments"; ui.editingDesc = false; ui.editingCommentId = null; }
     if (prev && prev[0] !== "task") ui.bg = prev;
   } else {
@@ -141,6 +143,15 @@ function render() {
   document.documentElement.dir = LANG === "he" ? "rtl" : "ltr";
   if (db.settings.theme) document.documentElement.setAttribute("data-theme", db.settings.theme);
   else document.documentElement.removeAttribute("data-theme");
+  /* not signed in, waiting for activation, or the shared data still opening: a screen of its own */
+  var gate = authGate();
+  if (gate) {
+    var gf = document.activeElement && document.activeElement.id;
+    root.replaceChildren(gate);
+    if (gf && document.getElementById(gf)) document.getElementById(gf).focus({ preventScroll: true });
+    if (ui.openTask) ui.openTask = null;
+    renderOverlay(); return;
+  }
   /* keep keyboard focus (and caret) on the same control across a redraw */
   var ae = document.activeElement, fid = ae && ae.id && !(overlay && overlay.contains(ae)) ? ae.id : null, sel = null;
   if (!fid && ae === document.body && !overlay && lastTab && Date.now() - lastTab.at < 400 && lastTab.id) fid = lastTab.id;
@@ -166,7 +177,8 @@ function notFound(title, text) {
 function sidebar() {
   var r = ui.route[0] === "task" ? ui.bg[0] : ui.route[0], u = me();
   var mine = db.tasks.filter(function (t) { return t.assigneeId === u.id && t.status !== "Done"; }).length;
-  var unread = unreadCount();
+  var unread = unreadCount(), all = can.seeEverything();
+  var waiting = can.managePeople() ? db.users.filter(function (x) { return x.pendingActivation && !x.declined; }).length : 0;
   var item = function (k, ic, label, count, countLabel) {
     return h("button", { class: r === k ? "on" : "", "aria-current": r === k ? "page" : null, onclick: function () { go(k); } },
       icon(ic), h("span", { class: "lbl" }, label), count ? h("span", { class: "count", "aria-label": countLabel }, count) : null);
@@ -180,9 +192,9 @@ function sidebar() {
       item("my", "me", tr("My work"), mine, trn(mine, "{n} open task", "{n} open tasks")),
       item("board", "board", tr("Board")),
       item("tasks", "list", tr("All tasks")),
-      item("insights", "chart", tr("Insights")),
-      item("clients", "folder", tr("Clients & projects")),
-      item("people", "people", tr("People"))),
+      all ? item("insights", "chart", tr("Insights")) : null,
+      all ? item("clients", "folder", tr("Clients & projects")) : null,
+      all ? item("people", "people", tr("People"), waiting, trn(waiting, "{n} waiting for activation", "{n} waiting for activation")) : null),
     h("div", { class: "nav-h", id: "views-h" }, tr("Saved views"), h("span", { class: "small" }, views.length || "")),
     h("nav", { class: "nav", "aria-labelledby": "views-h" }, views.length ? views.map(function (v) {
       var on = (ui.route[0] === "view" || (ui.route[0] === "task" && ui.bg[0] === "view")) && (ui.route[1] === v.id || ui.bg[1] === v.id);
@@ -192,9 +204,10 @@ function sidebar() {
     }) : h("div", { class: "small hint" }, tr("Filter the board or task list, then choose Save view."))),
     h("div", { class: "grow" }),
     h("div", { class: "me" },
-      h("label", { for: "working-as" }, tr("Working as")),
-      h("select", { id: "working-as", onchange: function (e) { db.settings.currentUserId = e.target.value; save(); render(); } },
-        db.users.filter(function (x) { return x.isActive; }).map(function (x) { return h("option", { value: x.id, selected: x.id === u.id }, x.fullName + " · " + tr(x.role || "Member")); })),
+      h("div", { class: "who-am-i" }, avatar(u.id),
+        h("div", { class: "grow" }, h("b", { class: "ellipsis" }, u.fullName), h("span", { class: "ellipsis" }, tr(u.role || "Member") + (u.employment === "Outsourced" ? " · " + tr("Outsourced") : ""))),
+        h("button", { id: "sign-out", class: "out", title: tr("Sign out"), "aria-label": tr("Sign out"), onclick: signOut }, icon("logout"))),
+      syncStatus(),
       h("div", { class: "row" },
         h("button", { onclick: function () { db.settings.theme = isDark() ? "light" : "dark"; save(); render(); } }, icon(isDark() ? "sun" : "moon"), isDark() ? tr("Light") : tr("Dark")),
         h("button", { lang: LANG === "he" ? "en" : "he", onclick: function () { setLang(LANG === "he" ? "en" : "he"); } }, icon("globe"), LANG === "he" ? "English" : "עברית"),
@@ -232,7 +245,7 @@ function currentFilters() { var o = {}; Object.keys(ui.filters).forEach(function
 function activeFilterCount() { return Object.keys(currentFilters()).length; }
 function filteredTasks(extra) {
   var f = ui.filters, q = f.q.trim().toLowerCase(), meId = me().id;
-  return db.tasks.filter(function (t) {
+  return visibleTasks().filter(function (t) {
     var p = projectOf(t);
     if (!p) return false;
     if (extra && !extra(t)) return false;
@@ -265,7 +278,7 @@ function filterBar(opts) {
     h("div", { class: "filters-top" }, search,
       h("button", { class: "btn sm filters-btn", "aria-expanded": ui.filtersOpen ? "true" : "false", onclick: function () { ui.filtersOpen = !ui.filtersOpen; render(); } }, icon("filter"), n ? tr("Filters ({n})", { n: n }) : tr("Filters"))),
     h("div", { class: "filters", role: "group", "aria-label": tr("Filters") },
-      opts.noClient ? null : sel("clientId", tr("All clients"), db.clients.map(function (c) { return { value: c.id, label: c.name }; })),
+      opts.noClient || !can.seeEverything() ? null : sel("clientId", tr("All clients"), db.clients.map(function (c) { return { value: c.id, label: c.name }; })),
       opts.noProject ? null : sel("projectId", tr("All projects"), projects.map(function (p) { return { value: p.id, label: p.key + " · " + p.name }; })),
       sel("assigneeId", tr("Anyone"), [{ value: "me", label: tr("Me (whoever is working)") }, { value: "none", label: tr("Unassigned") }].concat(db.users.map(function (u) { return { value: u.id, label: u.fullName + (u.isActive ? "" : " (" + tr("inactive") + ")") }; }))),
       sel("type", tr("All types"), TYPES.map(function (ty) { return { value: ty, label: tr(ty) }; })),
