@@ -1,19 +1,30 @@
 /* =====================================================================
-   Taskana — deployment settings.
+   Taskana — deployment settings (the same for everyone who opens it).
 
-   Leave entra.clientId empty and Taskana runs as a standalone demo:
-   simulated Microsoft sign-in, email + demo password, data in this
-   browser only.
+   storage   where the shared data lives:
+     "local"     this browser only — a standalone demo
+     "github"    a data file in a GitHub repository (the testing setup);
+                 each device pastes a GitHub access token once
+     "onedrive"  the company OneDrive (needs entra.clientId)
+   entra     fill in clientId and sign-in goes through Microsoft Entra ID;
+             leave it empty for WorkDesk-style email + demo password.
 
-   Fill it in and Taskana signs people in with Microsoft Entra ID and
-   keeps its data files in the company OneDrive (see README, "Taskana →
-   Microsoft 365 setup"). An Admin can also try settings out in one
-   browser from the sign-in screen (Microsoft 365 connection…) before
-   committing them here.
+   See docs/taskana/ for the Microsoft 365 rollout guide. An Admin can try
+   other settings in one browser from the sign-in screen (Connection
+   settings…) before changing them here.
    ===================================================================== */
 var TASKANA_CONFIG = {
   /* only accounts with this ending may sign in */
   domain: "@galiltc.co.il",
+
+  storage: "github",
+
+  github: {
+    owner: "DannyGelman95",
+    repo: "galil-workdesk-app",
+    branch: "taskana-data",       // created on first use; every save is a commit on this branch
+    path: "taskana"               // folder for taskana-data.json and attachments/
+  },
 
   entra: {
     clientId: "",          // Application (client) ID of the Taskana app registration

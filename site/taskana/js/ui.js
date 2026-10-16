@@ -143,7 +143,7 @@ function render() {
   document.documentElement.dir = LANG === "he" ? "rtl" : "ltr";
   if (db.settings.theme) document.documentElement.setAttribute("data-theme", db.settings.theme);
   else document.documentElement.removeAttribute("data-theme");
-  /* not signed in, waiting for activation, or OneDrive still opening: a screen of its own */
+  /* not signed in, waiting for activation, or the shared data still opening: a screen of its own */
   var gate = authGate();
   if (gate) {
     var gf = document.activeElement && document.activeElement.id;

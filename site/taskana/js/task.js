@@ -206,12 +206,13 @@ function attachmentsSection(t, ro) {
   var addFile = function (file) {
     if (!file) return;
     if (Store.remote) {
-      /* connected: the file goes to the attachments folder on OneDrive */
-      if (file.size > MAX_ONEDRIVE_ATTACHMENT) { toast(tr("“{n}” is {s}. Files up to 50 MB can be attached — add a link to larger files instead.", { n: file.name, s: fmtBytes(file.size) })); return; }
+      /* shared storage: the file goes to the attachments folder next to the data */
+      var max = backend().maxAttachment;
+      if (file.size > max) { toast(tr("“{n}” is {s}. Files up to {m} can be attached — add a link to larger files instead.", { n: file.name, s: fmtBytes(file.size), m: fmtBytes(max) })); return; }
       var id = uid("at");
-      toast(tr("Uploading “{n}” to OneDrive…", { n: file.name }));
+      toast(tr("Uploading “{n}” to {w}…", { n: file.name, w: whereName() }));
       uploadAttachment(file, id).then(function (it) {
-        db.attachments.push({ id: id, taskId: t.id, kind: "file", name: file.name, size: file.size, type: file.type, driveId: (it.parentReference || {}).driveId, driveItemId: it.id, url: it.webUrl, addedBy: me().id, at: nowISO() });
+        db.attachments.push(Object.assign({ id: id, taskId: t.id, kind: "file", name: file.name, size: file.size, type: file.type, addedBy: me().id, at: nowISO() }, it));
         log(t.id, "attach", { field: file.name }); t.updatedAt = nowISO(); save(); toast(tr("“{n}” attached", { n: file.name })); refreshUI();
       }, function (e) { toast(tr("Couldn't upload “{n}”: {m}", { n: file.name, m: e.message })); });
       return;
@@ -231,7 +232,7 @@ function attachmentsSection(t, ro) {
       var mayRemove = !ro && (a.addedBy === me().id || isManager());
       return h("div", { class: "list-item static" }, icon(a.kind === "link" ? "link" : "clip"),
         a.kind === "link" ? h("a", { href: a.url, target: "_blank", rel: "noopener noreferrer", class: "grow ellipsis" }, a.name || a.url)
-          : a.driveItemId ? h("a", { href: a.url, target: "_blank", rel: "noopener noreferrer", class: "grow ellipsis", title: tr("Opens in OneDrive") }, a.name)
+          : a.driveItemId || a.ghPath ? h("a", { href: a.url, target: "_blank", rel: "noopener noreferrer", class: "grow ellipsis", title: tr("Opens in {w}", { w: a.ghPath ? "GitHub" : "OneDrive" }) }, a.name)
           : h("a", { href: a.data, download: a.name, class: "grow ellipsis" }, a.name),
         h("span", { class: "muted small" }, (a.kind === "file" ? fmtBytes(a.size) + " · " : "") + userName(a.addedBy)),
         mayRemove ? h("button", { class: "x sm", "aria-label": tr("Remove {n}", { n: a.name }), onclick: function () { db.attachments = db.attachments.filter(function (x) { return x !== a; }); deleteAttachmentFile(a); save(); render(); } }, icon("x")) : null);

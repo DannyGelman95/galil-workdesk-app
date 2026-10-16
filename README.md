@@ -99,15 +99,24 @@ See `site-mui/README.md` for the app's structure and stack.
 
 Taskana, by GALIL, is a Jira-style project and task tracker built for
 technical-writing teams. It is a static app with no build step: open
-`site/taskana/index.html` directly or serve the folder. It runs in one of two
-modes, set in `site/taskana/config.js`:
+`site/taskana/index.html` directly or serve the folder. Where the data lives and
+how people sign in are set in `site/taskana/config.js` (`storage`, `entra`):
 
-- **Standalone demo** (no Entra client ID, the default): sign in like WorkDesk —
+- **GitHub data file — the current testing setup** (`storage: "github"`): the shared
+  data is `taskana/taskana-data.json` on the `taskana-data` branch of this
+  repository (created on first use); every save is a commit on that branch, so its
+  history is the backup, and attachments go to `taskana/attachments/`. Each device
+  pastes a GitHub fine-grained access token once (repository access: this repo
+  only; permission *Contents: Read and write*); it stays in that browser. Sign-in is
+  the WorkDesk-style email + demo password below. The repository is public, so the
+  data file is readable by anyone — use demo data only until it moves to OneDrive.
+
+- **Standalone demo** (`storage: "local"`): sign in like WorkDesk —
   a simulated "Sign in with Microsoft" account picker, or a company email and the
   demo password `GalilTaskana1`. Only `@galiltc.co.il` addresses get in; five wrong
   passwords lock an address for 15 minutes. Data lives in the browser's
   `localStorage` (key `galil-taskana-v1`) and nothing leaves the browser.
-- **Microsoft 365** (Entra client ID filled in): "Sign in with Microsoft" and
+- **Microsoft 365** (`storage: "onedrive"`, Entra client ID filled in): "Sign in with Microsoft" and
   "Sign in with your email" both go through **Microsoft Entra ID** (MSAL, bundled in
   `js/vendor/`); the password is typed on Microsoft's page, the company MFA policy
   applies, and only `@galiltc.co.il` accounts (and, if set, the GALIL tenant) are
@@ -129,7 +138,10 @@ modes, set in `site/taskana/config.js`:
 
 **Accounts and permissions.** The team in `js/seed.js` (`TEAM`) is the real GALIL
 roster with company emails, managers and roles: Tamir Nisman, Inon Kanner and
-Danny Gelman are Admins, the client managers are Managers, writers are Members.
+Danny Gelman are Admins, the client managers are Managers, writers are Members,
+the outsourced engineers (Gil Hadar, Ofir Abutbul, Ronen Nachum) are External, and
+the company mailbox (Galil TC Office — office management, administration, HR) is a
+Member.
 Anyone else with a `@galiltc.co.il` account who signs in is added as **Pending
 activation**; an Admin lets them in from **People** and picks a role. The roles:
 Admin (everything), Manager (clients, projects, any task), Member (tasks),
@@ -148,6 +160,9 @@ The first person to open an empty OneDrive folder chooses between the team only,
 the team plus demo tasks, or a backup file, and becomes its first Admin.
 
 ### Taskana → Microsoft 365 setup
+
+The full rollout guide — every step, the issues you may hit and how to fix them —
+is in `docs/taskana/` (presentation and branded document). In short:
 
 1. **Register the app** in the Microsoft Entra admin center → App registrations →
    New registration: name *Taskana*, *Accounts in this organizational directory

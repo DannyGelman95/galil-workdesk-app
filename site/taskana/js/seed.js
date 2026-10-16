@@ -6,19 +6,17 @@
    ===================================================================== */
 "use strict";
 
-/* id, full name, company email, job title, department, Taskana role, reports to.
-   Shoshana and Paul are on the org chart but had no company account in the list yet: their
-   addresses are placeholders — fix them under People once the accounts exist. */
+/* id, full name, company email, job title, department, Taskana role, reports to, employment */
 var TEAM = [
   ["u-tamir",    "Tamir Nisman",     "tamir@galiltc.co.il",         "CEO",                                                   "Management",       "Admin",   null],
   ["u-yinon",    "Inon Kanner",      "inon.kanner@galiltc.co.il",   "Deputy CEO, Operations · Head of the Defense Division", "Management",       "Admin",   "u-tamir"],
   ["u-kfir",     "Kfir Hodara",      "kfir@galiltc.co.il",          "Client Manager",                                        "Civil Division",   "Manager", "u-yinon"],
   ["u-denis",    "Dennis Sablin",    "dennis.sablin@galiltc.co.il", "Technical Writer",                                      "Civil Division",   "Member",  "u-kfir"],
-  ["u-shoshana", "Shoshana Axel",    "shoshana.axel@galiltc.co.il", "Technical Writer",                                      "Civil Division",   "Member",  "u-kfir"],
+  ["u-shoshana", "Shoshana Axtell",  "shoshana.a@galiltc.co.il",    "Technical Writer",                                      "Civil Division",   "Member",  "u-kfir"],
   ["u-suzan",    "Suzanne Musin",    "suzanne.m@galiltc.co.il",     "Technical Writer",                                      "Civil Division",   "Member",  "u-kfir"],
   ["u-ranit",    "Ranit Schnall",    "ranit@galiltc.co.il",         "Client Manager",                                        "Civil Division",   "Manager", "u-yinon"],
   ["u-inbar",    "Inbar Azulay",     "inbar@galiltc.co.il",         "Technical Writer",                                      "Civil Division",   "Member",  "u-ranit"],
-  ["u-paul",     "Paul Schnall",     "paul.schnall@galiltc.co.il",  "Technical Writer",                                      "Civil Division",   "Member",  "u-ranit"],
+  ["u-paul",     "Paul Schnall",     "paul@galiltc.co.il",          "Technical Writer",                                      "Civil Division",   "Member",  "u-ranit"],
   ["u-jeremy",   "Jeremie De Bock",  "jeremie@galiltc.co.il",       "Technical Writer",                                      "Civil Division",   "Member",  "u-ranit"],
   ["u-reuven",   "Reuben Politi",    "reuben@galiltc.co.il",        "Client Manager",                                        "Civil Division",   "Manager", "u-yinon"],
   ["u-amy",      "Amy di Nardo",     "amy@galiltc.co.il",           "Technical Writer",                                      "Civil Division",   "Member",  "u-reuven"],
@@ -28,18 +26,16 @@ var TEAM = [
   ["u-danny",    "Danny Gelman",     "danny.gelman@galiltc.co.il",  "Defense Sector Project Manager",                        "Defense Division", "Admin",   "u-yinon"],
   ["u-eitan",    "Eitan Fisch",      "eitan.f@galiltc.co.il",       "Technical Writer",                                      "Defense Division", "Member",  "u-danny"],
   ["u-daniel",   "Daniel Barak",     "daniel.barak@galiltc.co.il",  "Technical Writer",                                      "Defense Division", "Member",  "u-danny"],
-  /* company accounts that aren't on the org chart: job title, department and role for an Admin to set */
-  ["u-gil",      "Gil Hadar",        "gil.hadar@galiltc.co.il",     "Team member",                                           "",                 "Member",  "u-tamir"],
-  ["u-ofir",     "Ofir Abutbul",     "ofir.abutbul@galiltc.co.il",  "Team member",                                           "",                 "Member",  "u-tamir"],
-  ["u-ronen",    "Ronen Nachum",     "ronen.nachum@galiltc.co.il",  "Team member",                                           "",                 "Member",  "u-tamir"],
-  ["u-amit",     "Amit Goldberger",  "amit.g@galiltc.co.il",        "Team member",                                           "",                 "Member",  "u-tamir"],
-  ["u-leah",     "Leah Zeira",       "leah.zeira@galiltc.co.il",    "Team member",                                           "",                 "Member",  "u-tamir"],
-  ["u-office",   "Galil TC Office",  "office@galiltc.co.il",        "Office (shared mailbox)",                               "Management",       "Member",  "u-tamir"]
+  /* outsourced engineers with a GALIL account, and the company's main mailbox */
+  ["u-gil",      "Gil Hadar",        "gil.hadar@galiltc.co.il",     "Engineer (outsourced)",                                 "Engineering",      "External", "u-yinon", "Outsourced"],
+  ["u-ofir",     "Ofir Abutbul",     "ofir.abutbul@galiltc.co.il",  "Engineer (outsourced)",                                 "Engineering",      "External", "u-yinon", "Outsourced"],
+  ["u-ronen",    "Ronen Nachum",     "ronen.nachum@galiltc.co.il",  "Engineer (outsourced)",                                 "Engineering",      "External", "u-yinon", "Outsourced"],
+  ["u-office",   "Galil TC Office",  "office@galiltc.co.il",        "Office management, administration & HR",                "Office & HR",      "Member",   "u-tamir"]
 ];
 function emailFor(name) { var r = TEAM.filter(function (x) { return x[1] === name; })[0]; return r ? r[2] : name.toLowerCase().replace(/[^a-z]+/g, ".").replace(/^\.|\.$/g, "") + DOMAIN; }
 function teamUsers() {
   return TEAM.map(function (r) {
-    return { id: r[0], fullName: r[1], email: r[2], jobTitle: r[3], department: r[4], role: r[5], managerId: r[6], employment: "Employee", isActive: true, pendingActivation: false };
+    return { id: r[0], fullName: r[1], email: r[2], jobTitle: r[3], department: r[4], role: r[5], managerId: r[6], employment: r[7] || "Employee", isActive: true, pendingActivation: false };
   });
 }
 
@@ -99,11 +95,11 @@ function addDemo(d) {
   ];
   /* id, client, key, name, deliverable type, status, lead, team, start (days from today), delivery, description, sections */
   var projects = [
-    ["p-iai1", "c-iai", "RSOM", "Radar Suite — Operator Manual", "Operator Manual", "Active", "u-danny", ["u-eitan", "u-daniel"], -120, 90, "Two-volume operator manual for the radar suite (Vol 1 Operation, Vol 2 Maintenance).", ["Vol 1 · Ch 4", "Vol 1 · Ch 5", "Vol 2 · Ch 1", "Vol 2 · Ch 2", "Vol 2 · Ch 6"]],
+    ["p-iai1", "c-iai", "RSOM", "Radar Suite — Operator Manual", "Operator Manual", "Active", "u-danny", ["u-eitan", "u-daniel", "u-ofir"], -120, 90, "Two-volume operator manual for the radar suite (Vol 1 Operation, Vol 2 Maintenance).", ["Vol 1 · Ch 4", "Vol 1 · Ch 5", "Vol 2 · Ch 1", "Vol 2 · Ch 2", "Vol 2 · Ch 6"]],
     ["p-iai2", "c-iai", "MTP", "Maintenance Training Package", "Training Courseware", "Active", "u-danny", ["u-eitan", "u-daniel"], -60, 120, "Instructor guide, student handbook and slides for the level-2 maintenance course.", ["Module 2", "Module 5", "Module 6", "Final exam"]],
-    ["p-elb1", "c-elb", "AVH", "Avionics Help System", "Online Help", "Active", "u-yinon", ["u-eitan", "u-daniel", "u-danny"], -200, 30, "Migration of the legacy CHM help to DITA, then content refresh for release 5.", ["Release 5 · Nav", "Release 5 · Radio", "Release 5 · Alerts"]],
+    ["p-elb1", "c-elb", "AVH", "Avionics Help System", "Online Help", "Active", "u-yinon", ["u-eitan", "u-daniel", "u-danny", "u-gil"], -200, 30, "Migration of the legacy CHM help to DITA, then content refresh for release 5.", ["Release 5 · Nav", "Release 5 · Radio", "Release 5 · Alerts"]],
     ["p-mob1", "c-mob", "SDK", "SDK Documentation Refresh", "API Reference", "Active", "u-kfir", ["u-denis", "u-shoshana", "u-suzan"], -40, 60, "Rewrite the getting-started guide and regenerate the API reference for SDK 4.x.", ["SDK 4.0", "SDK 4.1", "Samples", "Migration guide"]],
-    ["p-cmd1", "c-cmd", "IFU", "Infusion Pump — IFU & Service Manual", "User Manual", "Active", "u-ranit", ["u-inbar", "u-paul", "u-jeremy"], -90, 75, "Instructions for use (clinical staff) and the field-service manual for the IP-300 pump.", ["IFU · Setup", "IFU · Alarms", "IFU · Cleaning", "Service · Calibration", "Service · Parts"]],
+    ["p-cmd1", "c-cmd", "IFU", "Infusion Pump — IFU & Service Manual", "User Manual", "Active", "u-ranit", ["u-inbar", "u-paul", "u-jeremy", "u-ronen"], -90, 75, "Instructions for use (clinical staff) and the field-service manual for the IP-300 pump.", ["IFU · Setup", "IFU · Alarms", "IFU · Cleaning", "Service · Calibration", "Service · Parts"]],
     ["p-gws1", "c-gws", "IRC", "Irrigation Controller — User Guide", "User Manual", "Active", "u-reuven", ["u-amy"], -50, 45, "User guide and quick start for the IC-8 field controller, in three languages.", ["Quick start", "Ch 2 · Programs", "Ch 3 · Sensors", "Troubleshooting"]],
     ["p-hft1", "c-hft", "BOH", "Banking App — Online Help", "Online Help", "Active", "u-niv", ["u-pnina", "u-yossi"], -70, 55, "Context-sensitive help for the retail banking app, release 7.", ["Payments", "Cards", "Loans", "Settings"]],
     ["p-gal1", "c-gal", "STY", "GALIL Style Guide 2027", "Other", "On Hold", "u-yinon", ["u-kfir", "u-ranit", "u-danny"], -20, 150, "Refresh of the house style guide and Word/FrameMaker templates.", ["Word templates", "Terminology"]],

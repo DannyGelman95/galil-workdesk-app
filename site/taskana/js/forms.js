@@ -244,7 +244,7 @@ function tasksCSV() {
 function restoreFrom(o, label) {
   var err = validateBackup(o);
   if (err) { toast(err); return; }
-  confirmBox(tr("Replace all data?"), (Store.remote ? tr("Everyone's Taskana data on OneDrive is replaced with {l} ({t} tasks, {p} projects). You can undo this from the Data window.", { l: label, t: o.tasks.length, p: o.projects.length }) : tr("Everything in this browser is replaced with {l} ({t} tasks, {p} projects). You can undo this from the Data window.", { l: label, t: o.tasks.length, p: o.projects.length })), tr("Restore"), function () {
+  confirmBox(tr("Replace all data?"), (Store.remote ? tr("Everyone's Taskana data on {w} is replaced with {l} ({t} tasks, {p} projects). You can undo this from the Data window.", { w: whereName(), l: label, t: o.tasks.length, p: o.projects.length }) : tr("Everything in this browser is replaced with {l} ({t} tasks, {p} projects). You can undo this from the Data window.", { l: label, t: o.tasks.length, p: o.projects.length })), tr("Restore"), function () {
     try { localStorage.setItem(BEFORE_RESTORE_KEY, sharedText(db)); } catch (e) { toast(tr("There's no room to keep a copy of the current data, so the restore was cancelled. Download a backup first.")); return; }
     replaceData(upgrade(Object.assign(emptyDB(), JSON.parse(JSON.stringify(o)))));
     finish(); ui.openTask = null; clearFilters(); toast(tr("Backup restored")); go("home"); render();
@@ -254,8 +254,8 @@ function restoreFrom(o, label) {
 function replaceData(o) {
   var keep = db.settings, meId = me().id;
   COLLECTIONS.forEach(function (k) { db[k] = o[k] || []; }); db.rosterVersion = o.rosterVersion || 1; db.settings = keep;
-  if (CONNECTED && !byId(db.users, meId)) bindAccount(true);
-  if (!CONNECTED && !byId(db.users, meId)) { var t = db.users.filter(function (x) { return x.isActive && x.role === "Admin"; })[0]; if (t) { db.settings.currentUserId = t.id; writeSession({ userId: t.id, provider: "password", at: nowISO() }); } }
+  if (ENTRA && !byId(db.users, meId)) bindAccount(true);
+  if (!ENTRA && !byId(db.users, meId)) { var t = db.users.filter(function (x) { return x.isActive && x.role === "Admin"; })[0]; if (t) { db.settings.currentUserId = t.id; writeSession({ userId: t.id, provider: "password", at: nowISO() }); } }
   save();
 }
 function dataModal() {
@@ -276,16 +276,18 @@ function dataModal() {
   var keepUndo = function () { try { localStorage.setItem(BEFORE_RESTORE_KEY, sharedText(db)); } catch (e) {} };
   var where = remote
     ? h("div", { class: "where" }, icon("cloud"), h("div", { class: "grow" },
-        h("b", null, tr("OneDrive folder")), " ", f.webUrl ? h("a", { href: f.webUrl, target: "_blank", rel: "noopener noreferrer" }, f.name || CONFIG.onedrive.folderName) : (f.name || CONFIG.onedrive.folderName),
-        h("div", { class: "small muted" }, CONFIG.onedrive.fileName + " · " + fmtBytes(Store.size || sharedText(db).length) + (files.length ? " · " + trn(files.length, "{n} attached file", "{n} attached files") : "") + " · " + tr("a dated copy goes to backups/ once a day")),
-        h("div", { class: "small" }, syncStatus())))
+        h("b", null, STORAGE === "github" ? tr("GitHub repository") : tr("OneDrive folder")), " ", f.webUrl ? h("a", { href: f.webUrl, target: "_blank", rel: "noopener noreferrer" }, f.name || whereName()) : (f.name || whereName()),
+        h("div", { class: "small muted" }, CONFIG.onedrive.fileName + " · " + fmtBytes(Store.size || sharedText(db).length) + (files.length ? " · " + trn(files.length, "{n} attached file", "{n} attached files") : "") + " · " +
+          (STORAGE === "github" ? tr("every save is a commit, so the branch history is the backup") : tr("a dated copy goes to backups/ once a day"))),
+        h("div", { class: "small" }, syncStatus()),
+        STORAGE === "github" ? h("button", { class: "linklike small", onclick: function () { confirmBox(tr("Remove the GitHub token from this browser?"), tr("Taskana asks for a token again before it can open the data."), tr("Remove"), forgetGithubToken); } }, tr("Remove the GitHub token from this browser")) : null))
     : h("div", null,
-        h("p", { class: "muted", style: { marginTop: 0 } }, tr("Standalone demo: Taskana keeps its data in this browser only. Set up the Microsoft 365 connection to keep it on the company OneDrive. Download a backup to move it to another browser or keep a copy.")),
+        h("p", { class: "muted", style: { marginTop: 0 } }, tr("Standalone demo: Taskana keeps its data in this browser only. Choose a shared location under Connection settings. Download a backup to move it to another browser or keep a copy.")),
         h("div", { class: "meter-row" }, h("span", { class: "small" }, tr("Browser storage used: {u} of about {q}", { u: fmtBytes(used), q: fmtBytes(quota) }) + (files.length ? " · " + trn(files.length, "{n} attached file", "{n} attached files") : "")),
           h("div", { class: "trk meter", role: "progressbar", "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": Math.min(100, Math.round(used / quota * 100)) }, h("span", { class: "fill", style: { width: Math.min(100, used / quota * 100) + "%", background: used / quota > .8 ? "var(--err)" : "var(--s-closed)" } }))));
   return shell(tr("Data & backup"), h("div", { class: "data-modal" },
     where,
-    remote && admin && !f.shared ? h("div", { class: "note" }, tr("This folder is in your own OneDrive. Share it with the company, then put the link in config.js (onedrive.folderLink) so everyone uses the same files."), " ",
+    STORAGE === "onedrive" && admin && !f.shared ? h("div", { class: "note" }, tr("This folder is in your own OneDrive. Share it with the company, then put the link in config.js (onedrive.folderLink) so everyone uses the same files."), " ",
       h("button", { class: "btn sm", onclick: function () { shareFolder().then(function (link) { copy(link, tr("Sharing link copied — paste it into config.js")); }, function (e) { toast(e.message); }); } }, icon("link"), tr("Share folder and copy link"))) : null,
     can.exportData() ? [h("h3", null, tr("Export")),
       h("div", { class: "row wrap" },
@@ -322,10 +324,10 @@ function dataModal() {
           });
         } }, icon("trash"), tr("Remove demo data")) : null,
         h("button", { class: "btn danger", onclick: function () {
-          confirmBox(tr("Reset to the demo data?"), remote ? tr("Everything on OneDrive is replaced with the GALIL team and fresh demo data. You can undo this from the Data window.") : tr("All clients, projects, tasks and comments in this browser are replaced with the sample data. You can undo this from the Data window."), tr("Reset"), function () {
+          confirmBox(tr("Reset to the demo data?"), remote ? tr("Everything on {w} is replaced with the GALIL team and fresh demo data. You can undo this from the Data window.", { w: whereName() }) : tr("All clients, projects, tasks and comments in this browser are replaced with the sample data. You can undo this from the Data window."), tr("Reset"), function () {
             keepUndo(); replaceData(seed(true)); finish(); ui.openTask = null; clearFilters(); go("home"); render();
           });
         } }, icon("undo"), tr("Reset everything to demo data")))
     ] : h("p", { class: "small muted" }, tr("Only Admins can import, restore or change the demo data.")),
-    !remote && admin ? h("p", { class: "small", style: { marginTop: "14px" } }, h("button", { class: "linklike", onclick: function () { openModal({ kind: "connection" }); } }, tr("Microsoft 365 connection…"))) : null), null);
+    admin ? h("p", { class: "small", style: { marginTop: "14px" } }, h("button", { class: "linklike", onclick: function () { openModal({ kind: "connection" }); } }, tr("Connection settings…"))) : null), null);
 }

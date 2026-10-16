@@ -5,7 +5,10 @@ const open = async (page, route = "home", userId = "u-danny") => {
   const errors = [];
   page.on("pageerror", e => errors.push(e.message));
   /* signed in as an Admin (Danny) unless a test says otherwise */
-  await page.addInitScript(id => { localStorage.setItem("galil-taskana-session", JSON.stringify({ userId: id, provider: "password" })); }, userId);
+  await page.addInitScript(id => {
+    localStorage.setItem("galil-taskana-config", JSON.stringify({ storage: "local" }));
+    localStorage.setItem("galil-taskana-session", JSON.stringify({ userId: id, provider: "password" }));
+  }, userId);
   await page.goto(test.info().project.use.baseURL + "#/" + route);
   await expect(page.locator(".top h1")).toBeVisible();
   return errors;
@@ -175,7 +178,7 @@ test("dragging a card with the pointer moves it", async ({ page }) => {
 test("mentions notify by id and show in the inbox", async ({ page }) => {
   await open(page, "task/RSOM-2");
   await page.fill("#composer", "@Shosh");
-  await page.locator(".mention-hint button", { hasText: "Shoshana Axel" }).click();
+  await page.locator(".mention-hint button", { hasText: "Shoshana Axtell" }).click();
   await page.locator("#composer").pressSequentially("please check the figures");
   await page.getByRole("button", { name: "Post" }).click();
   const s = await store(page);
@@ -247,6 +250,7 @@ test.describe("sign-in", () => {
   const fresh = async page => {
     const errors = [];
     page.on("pageerror", e => errors.push(e.message));
+    await page.addInitScript(() => { localStorage.setItem("galil-taskana-config", JSON.stringify({ storage: "local" })); });
     await page.goto(test.info().project.use.baseURL);
     return errors;
   };
@@ -266,7 +270,7 @@ test.describe("sign-in", () => {
   test("the simulated Microsoft picker lists the real team", async ({ page }) => {
     await fresh(page);
     await page.click("#si-ms");
-    await expect(page.locator(".msacc")).toHaveCount(24);
+    await expect(page.locator(".msacc")).toHaveCount(22);
     await page.locator(".msacc", { hasText: "Amy di Nardo" }).click();
     await expect(page.locator(".who-am-i")).toContainText("Amy di Nardo");
   });
@@ -302,7 +306,7 @@ test("demo data can be removed and filled again without touching real work", asy
   await page.evaluate(() => { removeDemo(db); save(); });
   let s = await store(page);
   expect(s.tasks.map(t => t.title)).toEqual(["Real work"]);
-  expect(s.users.length).toBe(24);
+  expect(s.users.length).toBe(22);
   await page.evaluate(() => { addDemo(db); save(); });
   s = await store(page);
   expect(s.tasks.length).toBeGreaterThan(30);
@@ -342,7 +346,7 @@ test.describe("Microsoft 365", () => {
       return json(r, 404, { error: { code: "itemNotFound", message: url } });
     });
     await page.addInitScript(acc => {
-      localStorage.setItem("galil-taskana-config", JSON.stringify({ entra: { clientId: "11111111-2222-3333-4444-555555555555" }, onedrive: {} }));
+      localStorage.setItem("galil-taskana-config", JSON.stringify({ storage: "onedrive", entra: { clientId: "11111111-2222-3333-4444-555555555555" }, onedrive: {} }));
       window.TASKANA_MSAL = function () {
         this.initialize = () => Promise.resolve();
         this.handleRedirectPromise = () => Promise.resolve(null);
@@ -410,5 +414,85 @@ test.describe("Microsoft 365", () => {
     await connect(page, file(), { username: "someone@gmail.com", name: "Someone", localAccountId: "x" });
     await expect(page.locator(".banner.err")).toContainText("@galiltc.co.il");
     await expect(page.locator("#si-ms")).toBeVisible();
+  });
+});
+
+/* ---------------- GitHub data file (the testing setup), API mocked ---------------- */
+test.describe("GitHub storage", () => {
+  const fs = require("fs"), path = require("path");
+  const b64 = t => Buffer.from(t, "utf8").toString("base64"), unb64 = t => Buffer.from(t, "base64").toString("utf8");
+  async function connect(page, repo, opts = {}) {
+    const errors = [];
+    page.on("pageerror", e => errors.push(e.message));
+    const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "*", "Access-Control-Allow-Methods": "*" };
+    const json = (r, status, body) => r.fulfill({ status, headers: Object.assign({ "Content-Type": "application/json" }, cors), body: JSON.stringify(body) });
+    await page.route("https://api.github.com/**", r => {
+      const req = r.request(), u = new URL(req.url()), p = decodeURIComponent(u.pathname), m = req.method();
+      if (m === "OPTIONS") return r.fulfill({ status: 204, headers: cors });
+      if (req.headers().authorization !== "Bearer github_pat_test") return json(r, 401, { message: "Bad credentials" });
+      if (p === "/repos/o/r") return json(r, 200, { private: false, default_branch: "main", permissions: { push: opts.push !== false } });
+      if (p === "/repos/o/r/branches/taskana-data") return repo.branch ? json(r, 200, {}) : json(r, 404, { message: "Branch not found" });
+      if (p === "/repos/o/r/git/ref/heads/main") return json(r, 200, { object: { sha: "main-sha" } });
+      if (p === "/repos/o/r/git/refs" && m === "POST") { repo.branch = true; return json(r, 201, {}); }
+      if (p === "/repos/o/r/contents/taskana/taskana-data.json") {
+        if (m === "GET") return repo.text ? json(r, 200, { sha: repo.sha, size: repo.text.length, encoding: "base64", content: b64(repo.text) }) : json(r, 404, { message: "Not Found" });
+        if (m === "PUT") {
+          const body = JSON.parse(req.postData());
+          if (body.branch !== "taskana-data") return json(r, 422, { message: "wrong branch" });
+          if ((body.sha || null) !== (repo.sha || null)) return json(r, 409, { message: "does not match" });
+          repo.text = unb64(body.content); repo.sha = "s" + (++repo.n); repo.commits.push(body.message);
+          return json(r, 200, { content: { sha: repo.sha, size: repo.text.length } });
+        }
+      }
+      return json(r, 404, { message: "Not Found: " + p });
+    });
+    await page.addInitScript(tok => {
+      localStorage.setItem("galil-taskana-config", JSON.stringify({ storage: "github", github: { owner: "o", repo: "r", branch: "taskana-data", path: "taskana" } }));
+      if (tok) localStorage.setItem("galil-taskana-github-token", tok);
+    }, opts.token === undefined ? "github_pat_test" : opts.token);
+    await page.goto(test.info().project.use.baseURL);
+    return errors;
+  }
+  const empty = () => ({ text: null, sha: null, n: 0, branch: false, commits: [] });
+  const signIn = async (page, email = "danny.gelman@galiltc.co.il") => {
+    await page.fill("#si-email", email); await page.fill("#si-pw", "GalilTaskana1"); await page.click("#si-go");
+  };
+
+  test("asks for a token, makes the data branch, sets up and saves commits there", async ({ page }) => {
+    const repo = empty();
+    const errors = await connect(page, repo, { token: "" });
+    await expect(page.locator(".auth-h")).toHaveText("Connect to GitHub");
+    await page.fill("#gh-token", "github_pat_test"); await page.click("#gh-go");
+    await expect(page.locator(".auth-h")).toHaveText("Set up Taskana");
+    expect(repo.branch).toBe(true);
+    await page.getByRole("button", { name: "Start with the team and demo tasks" }).click();
+    await expect(page.locator("#si-email")).toBeVisible();
+    await expect.poll(() => repo.text && JSON.parse(repo.text).tasks.length).toBeGreaterThan(30);
+    await signIn(page);
+    await expect(page.locator(".who-am-i")).toContainText("Danny Gelman");
+    await page.evaluate(() => { createTask({ projectId: "p-iai1", title: "Saved to GitHub" }); });
+    await expect.poll(() => JSON.parse(repo.text).tasks.some(t => t.title === "Saved to GitHub"), { timeout: 10000 }).toBe(true);
+    await expect(page.locator("#sync-status")).toContainText("Saved to GitHub");
+    expect(repo.commits.every(m => m.startsWith("Taskana: data saved"))).toBe(true);
+    expect(errors).toEqual([]);
+  });
+
+  test("a save that crossed someone else's is merged", async ({ page }) => {
+    const repo = empty();
+    await connect(page, repo);
+    await page.getByRole("button", { name: "Start with the GALIL team (no tasks)" }).click();
+    await expect.poll(() => repo.sha).toBe("s1");
+    await signIn(page);
+    await expect.poll(() => repo.sha).not.toBe("s1");          // the sign-in time is saved too
+    const theirs = JSON.parse(repo.text); theirs.clients.push({ id: "c-theirs", name: "Theirs", code: "THR" });
+    repo.text = JSON.stringify(theirs); repo.sha = "other";
+    await page.evaluate(() => { db.clients.push({ id: "c-mine", name: "Mine", code: "MIN" }); save(); });
+    await expect.poll(() => JSON.parse(repo.text).clients.map(c => c.id).sort().join(), { timeout: 10000 }).toBe("c-mine,c-theirs");
+  });
+
+  test("a token without write access is turned away with a clear message", async ({ page }) => {
+    await connect(page, empty(), { push: false });
+    await expect(page.locator(".auth-h")).toHaveText("Connect to GitHub");
+    await expect(page.locator(".banner.err")).toContainText("Read and write");
   });
 });

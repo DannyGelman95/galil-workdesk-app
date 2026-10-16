@@ -16,7 +16,7 @@ document.addEventListener("keydown", function (e) {
 
 function boot() {
   root = document.getElementById("app");
-  if (!CONNECTED) {
+  if (!REMOTE) {
     db = load();
     LANG = db.settings.lang === "he" ? "he" : "en";
     authInit();
@@ -25,8 +25,10 @@ function boot() {
     render();
     return;
   }
-  /* connected: sign in with Microsoft, then open the data files on OneDrive */
+  /* shared data file: with Entra, sign in first (OneDrive needs the token); otherwise open the file, then sign in */
   db = emptyDB(); applyPrefs();
+  parseRoute(); lastRoute = ui.route.slice();
+  if (!ENTRA) { startRemote().then(function () { onRouteChange(null); render(); }); return; }
   Auth.phase = "starting"; render();
   authInit().then(function () {
     parseRoute(); lastRoute = ui.route.slice();

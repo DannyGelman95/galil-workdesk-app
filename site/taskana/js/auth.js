@@ -19,15 +19,17 @@ function domainOK(email) { email = (email || "").trim().toLowerCase(); return em
 function domainMsg() { return tr("Only addresses ending in {d} can sign in. Outsourced staff get a {d} account from an Admin.", { d: DOMAIN }); }
 function readSession() { try { var s = JSON.parse(localStorage.getItem(SESSION_KEY) || "null"); return s && s.userId ? s : null; } catch (e) { return null; } }
 function writeSession(s) { try { if (s) localStorage.setItem(SESSION_KEY, JSON.stringify(s)); else localStorage.removeItem(SESSION_KEY); } catch (e) {} }
-function signedIn() { return CONNECTED ? !!Auth.account : !!readSession(); }
+function signedIn() { return ENTRA ? !!Auth.account : !!readSession(); }
+/* once the shared data is in: match the Microsoft account, or pick up the demo session */
+function afterDataLoaded() {
+  if (ENTRA) { bindAccount(); return; }
+  var s = readSession();
+  if (s && byId(db.users, s.userId)) db.settings.currentUserId = s.userId; else if (s) writeSession(null);
+}
 
 /* ---------- start-up ---------- */
 function authInit() {
-  if (!CONNECTED) {
-    var s = readSession();
-    if (s && byId(db.users, s.userId)) db.settings.currentUserId = s.userId; else if (s) writeSession(null);
-    return Promise.resolve();
-  }
+  if (!ENTRA) { afterDataLoaded(); return Promise.resolve(); }
   var Cls = window.TASKANA_MSAL || (window.msal && window.msal.PublicClientApplication);
   if (!Cls) { Auth.error = tr("The Microsoft sign-in component didn't load. Reload the page."); return Promise.resolve(); }
   if (!/^https?:$/.test(location.protocol)) { Auth.error = tr("Microsoft sign-in needs Taskana to be opened from its web address (https://…), not from a file on disk."); return Promise.resolve(); }
@@ -122,7 +124,7 @@ function tryPassword() {
   var f = Auth.form, email = f.email.trim().toLowerCase();
   if (!email) { f.err = tr("Enter your company email address."); return render(); }
   if (!domainOK(email)) { f.err = domainMsg(); return render(); }
-  if (CONNECTED) return msLogin(email);
+  if (ENTRA) return msLogin(email);
   var lock = Auth.fails[email];
   if (lock && lock.until > Date.now()) { f.err = tr("Account locked after five failed attempts. Try again in {m} minutes.", { m: Math.ceil((lock.until - Date.now()) / 60000) }); return render(); }
   var u = db.users.filter(function (x) { return (x.email || "").toLowerCase() === email && !x.declined; })[0];
@@ -136,7 +138,7 @@ function tryPassword() {
   demoSignIn(u, "password");
 }
 function signOut() {
-  if (CONNECTED) {
+  if (ENTRA) {
     var acc = Auth.account;
     Store.stop(); Store.clearCache();
     forgetAccount(acc).then(function () { db = emptyDB(); applyPrefs(); render(); });
@@ -162,7 +164,7 @@ function signInScreen() {
     return h("div", { class: "field" }, h("label", { class: "l", for: id }, label),
       h("input", Object.assign({ class: "f", id: id, type: type, value: f[k], oninput: function (e) { f[k] = e.target.value; if (f.err) { f.err = ""; var m = document.getElementById("si-err"); if (m) m.remove(); } } }, extra || {})));
   };
-  var picker = f.mode === "ms" && !CONNECTED ? h("div", { class: "msbox" },
+  var picker = f.mode === "ms" && !ENTRA ? h("div", { class: "msbox" },
     h("b", null, "Microsoft Entra ID"), h("div", { class: "muted small" }, tr("Choose an account. Simulated in the standalone build — no Microsoft call is made.")),
     h("div", { class: "msacc-list" }, db.users.filter(function (u) { return u.isActive; }).map(function (u) {
       return h("button", { type: "button", class: "msacc", onclick: function () { demoSignIn(u, "microsoft"); } }, avatar(u.id),
@@ -172,20 +174,20 @@ function signInScreen() {
   return authShell([
     h("h1", { class: "auth-h" }, tr("Sign in")),
     Auth.error ? h("div", { class: "banner err", role: "alert" }, icon("alert"), " ", Auth.error) : null,
-    h("button", { class: "btn ms", id: "si-ms", disabled: CONNECTED && !Auth.pca, onclick: function () { if (CONNECTED) msLogin(); else { f.mode = f.mode === "ms" ? "" : "ms"; render(); } } }, msLogo(), tr("Sign in with Microsoft")),
-    h("div", { class: "muted small center" }, CONNECTED ? tr("Uses your GALIL Microsoft 365 account and the company's MFA policy.") : tr("Standalone demo: Microsoft sign-in is simulated.")),
+    h("button", { class: "btn ms", id: "si-ms", disabled: ENTRA && !Auth.pca, onclick: function () { if (ENTRA) msLogin(); else { f.mode = f.mode === "ms" ? "" : "ms"; render(); } } }, msLogo(), tr("Sign in with Microsoft")),
+    h("div", { class: "muted small center" }, ENTRA ? tr("Uses your GALIL Microsoft 365 account and the company's MFA policy.") : tr("Standalone demo: Microsoft sign-in is simulated.")),
     picker,
     h("div", { class: "or" }, h("span", null, tr("or"))),
     h("form", { novalidate: true, onsubmit: function (e) { e.preventDefault(); tryPassword(); } },
       field("si-email", tr("Company email"), "email", "email", { autocomplete: "username", placeholder: "name" + DOMAIN }),
-      CONNECTED ? h("p", { class: "muted small", style: { marginTop: "-4px" } }, tr("You'll type your password on the Microsoft sign-in page.")) : field("si-pw", tr("Password"), "password", "pw", { autocomplete: "current-password" }),
+      ENTRA ? h("p", { class: "muted small", style: { marginTop: "-4px" } }, tr("You'll type your password on the Microsoft sign-in page.")) : field("si-pw", tr("Password"), "password", "pw", { autocomplete: "current-password" }),
       f.err ? h("div", { class: "banner err", id: "si-err", role: "alert" }, icon("alert"), " ", f.err) : null,
-      h("button", { class: "btn primary wide", type: "submit", id: "si-go" }, CONNECTED ? tr("Continue") : tr("Sign in"))),
-    CONNECTED ? null : h("div", { class: "row between", style: { marginTop: "8px" } },
+      h("button", { class: "btn primary wide", type: "submit", id: "si-go" }, ENTRA ? tr("Continue") : tr("Sign in"))),
+    ENTRA ? null : h("div", { class: "row between", style: { marginTop: "8px" } },
       h("button", { class: "btn ghost sm", onclick: function () { openModal({ kind: "request" }); } }, tr("Request an account")),
       h("button", { class: "btn ghost sm", onclick: function () { toast(tr("In the standalone demo every account uses the demo password.")); } }, tr("Forgot password"))),
-    CONNECTED ? null : h("div", { class: "demo-hint small" }, h("b", null, tr("Demo accounts")), " — " + tr("password") + " ", h("span", { class: "mono sel-text" }, DEMO_PASSWORD), ". " + tr("Try {a} (Admin) or {b} (Technical Writer).", { a: emailFor("Danny Gelman"), b: emailFor("Eitan Fisch") })),
-    h("div", { class: "center", style: { marginTop: "10px" } }, h("button", { class: "linklike small", onclick: function () { openModal({ kind: "connection" }); } }, tr("Microsoft 365 connection…")))
+    ENTRA ? null : h("div", { class: "demo-hint small" }, h("b", null, tr("Demo accounts")), " — " + tr("password") + " ", h("span", { class: "mono sel-text" }, DEMO_PASSWORD), ". " + tr("Try {a} (Admin) or {b} (Technical Writer).", { a: emailFor("Danny Gelman"), b: emailFor("Eitan Fisch") })),
+    h("div", { class: "center", style: { marginTop: "10px" } }, h("button", { class: "linklike small", onclick: function () { openModal({ kind: "connection" }); } }, tr("Connection settings…")))
   ]);
 }
 function msLogo() {
@@ -213,20 +215,22 @@ function pendingScreen(u) {
       h("div", { class: "field" }, h("label", { class: "l", for: "pa-emp" }, tr("Employment")), h("select", { class: "f", id: "pa-emp" }, EMPLOYMENT.map(function (x) { return h("option", { value: x, selected: x === v.employment }, tr(x)); }))),
       h("button", { class: "btn primary", type: "submit", style: { gridColumn: "1/-1", justifySelf: "start" } }, tr("Send"))) : null,
     h("div", { class: "row", style: { marginTop: "12px" } }, h("button", { class: "btn", id: "pa-out", onclick: signOut }, tr("Sign out")),
-      CONNECTED ? h("button", { class: "btn ghost", onclick: function () { Store.pollNow(); } }, icon("undo"), tr("Check again")) : null)
+      REMOTE ? h("button", { class: "btn ghost", onclick: function () { Store.pollNow(); } }, icon("undo"), tr("Check again")) : null)
   ]);
 }
 
 function authGate() {
   if (Auth.phase === "starting") return splash(tr("Signing in…"));
-  if (!signedIn()) return signInScreen();
+  if (ENTRA && !Auth.account) return signInScreen();
   if (Store.remote) {
+    if (Store.state === "token") return tokenScreen();
     if (Store.state === "setup") return setupScreen();
-    if (!db.users.length) return Store.state === "error" ? storeErrorScreen() : splash(tr("Opening Taskana from OneDrive…"));
-    if (!byId(db.users, db.settings.currentUserId)) bindAccount();
+    if (!db.users.length) return Store.state === "error" ? storeErrorScreen() : splash(tr("Opening Taskana from {w}…", { w: whereName() }));
+    if (ENTRA && !byId(db.users, db.settings.currentUserId)) bindAccount();
   }
+  if (!ENTRA && !readSession()) return signInScreen();
   var u = byId(db.users, db.settings.currentUserId);
-  if (!u) { if (!CONNECTED) writeSession(null); return signInScreen(); }
+  if (!u) { if (!ENTRA) writeSession(null); return signInScreen(); }
   if (u.pendingActivation || !u.isActive) return pendingScreen(u);
   return null;
 }
@@ -255,25 +259,39 @@ FORMS.request = function () {
   };
 };
 function connectionModal() {
-  var c = CONFIG, here = location.origin + location.pathname;
-  var val = function (id) { return document.getElementById(id).value.trim(); };
-  return shell(tr("Microsoft 365 connection"), h("div", null,
-    h("p", { class: "muted small", style: { marginTop: 0 } }, tr("Taskana signs people in with Microsoft Entra ID and keeps its data files in a OneDrive folder once an app registration is set here or in config.js. Settings saved here apply to this browser only.")),
+  var c = CONFIG, here = location.origin + location.pathname, g = c.github;
+  var val = function (id) { var el = document.getElementById(id); return el ? el.value.trim() : ""; };
+  var inp = function (id, label, value, ph, cls, help) {
+    return h("div", { class: "field" }, h("label", { class: "l", for: id }, label), h("input", { class: "f" + (cls ? " " + cls : ""), id: id, value: value, placeholder: ph || "" }),
+      help ? h("div", { class: "muted small", style: { marginTop: "3px" } }, help) : null);
+  };
+  return shell(tr("Connection settings"), h("div", null,
+    h("p", { class: "muted small", style: { marginTop: 0 } }, tr("Where Taskana keeps its data and how people sign in. config.js sets this for everyone; settings saved here apply to this browser only, for trying things out.")),
     h("div", { class: "fields" },
-      h("div", { class: "field" }, h("label", { class: "l", for: "cx-client" }, tr("Application (client) ID")), h("input", { class: "f mono", id: "cx-client", value: c.entra.clientId, placeholder: "00000000-0000-0000-0000-000000000000" })),
-      h("div", { class: "field" }, h("label", { class: "l", for: "cx-tenant" }, tr("Directory (tenant) ID")), h("input", { class: "f mono", id: "cx-tenant", value: c.entra.tenantId, placeholder: tr("optional") })),
-      h("div", { class: "field" }, h("label", { class: "l", for: "cx-folder" }, tr("OneDrive folder link")), h("input", { class: "f", id: "cx-folder", value: c.onedrive.folderLink, placeholder: "https://galiltc-my.sharepoint.com/:f:/g/personal/…" }),
-        h("div", { class: "muted small", style: { marginTop: "3px" } }, tr("Empty: a “{f}” folder in the signed-in person's own OneDrive.", { f: c.onedrive.folderName })))),
+      h("div", { class: "field" }, h("label", { class: "l", for: "cx-storage" }, tr("Data location")),
+        h("select", { class: "f", id: "cx-storage" }, [["local", tr("This browser only (demo)")], ["github", tr("A data file in a GitHub repository")], ["onedrive", tr("A OneDrive folder (needs Microsoft Entra ID)")]].map(function (o) { return h("option", { value: o[0], selected: STORAGE === o[0] }, o[1]); }))),
+      h("h3", { style: { gridColumn: "1/-1", margin: "6px 0 4px" } }, "GitHub"),
+      inp("cx-gh-repo", tr("Repository (owner/name)"), g.owner && g.repo ? g.owner + "/" + g.repo : "", "DannyGelman95/galil-workdesk-app"),
+      inp("cx-gh-branch", tr("Branch for the data"), g.branch, "taskana-data", "mono", tr("Created automatically on first use.")),
+      inp("cx-gh-path", tr("Folder in the repository"), g.path, "taskana", "mono"),
+      h("h3", { style: { gridColumn: "1/-1", margin: "6px 0 4px" } }, "Microsoft 365"),
+      inp("cx-client", tr("Application (client) ID"), c.entra.clientId, "00000000-0000-0000-0000-000000000000", "mono", tr("Filled in: sign-in goes through Microsoft Entra ID.")),
+      inp("cx-tenant", tr("Directory (tenant) ID"), c.entra.tenantId, tr("optional"), "mono"),
+      inp("cx-folder", tr("OneDrive folder link"), c.onedrive.folderLink, "https://galiltc-my.sharepoint.com/:f:/g/personal/…", "", tr("Empty: a “{f}” folder in the signed-in person's own OneDrive.", { f: c.onedrive.folderName }))),
     h("p", { class: "small" }, tr("Redirect URI to register (platform: Single-page application):"), " ", h("span", { class: "mono sel-text" }, here))),
     [c.override ? h("button", { class: "btn danger", style: { marginInlineEnd: "auto" }, onclick: function () { try { localStorage.removeItem(CONFIG_KEY); } catch (e) {} location.reload(); } }, tr("Use config.js")) : null,
       h("button", { class: "btn", onclick: closeModal }, tr("Cancel")),
       h("button", { class: "btn primary", onclick: function () {
-        var id = val("cx-client"), ten = val("cx-tenant"), link = val("cx-folder");
+        var id = val("cx-client"), ten = val("cx-tenant"), link = val("cx-folder"), st = val("cx-storage"), repo = val("cx-gh-repo");
         var guid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         if (id && !guid.test(id)) { toast(tr("The client ID is a GUID like 00000000-0000-0000-0000-000000000000.")); return; }
         if (ten && !guid.test(ten)) { toast(tr("The tenant ID is a GUID like 00000000-0000-0000-0000-000000000000.")); return; }
         if (link && !/^https:\/\//i.test(link)) { toast(tr("The folder link starts with https://")); return; }
-        try { localStorage.setItem(CONFIG_KEY, JSON.stringify({ entra: { clientId: id, tenantId: ten }, onedrive: { folderLink: link } })); } catch (e) {}
+        if (st === "github" && !/^[\w.-]+\/[\w.-]+$/.test(repo)) { toast(tr("Enter the repository as owner/name.")); return; }
+        if (st === "onedrive" && !id) { toast(tr("OneDrive needs the Microsoft Entra application ID.")); return; }
+        var rp = repo.split("/");
+        try { localStorage.setItem(CONFIG_KEY, JSON.stringify({ storage: st, entra: { clientId: id, tenantId: ten }, onedrive: { folderLink: link },
+          github: { owner: rp[0] || "", repo: rp[1] || "", branch: val("cx-gh-branch") || "taskana-data", path: val("cx-gh-path") } })); } catch (e) {}
         location.reload();
       } }, tr("Save and reload"))]);
 }

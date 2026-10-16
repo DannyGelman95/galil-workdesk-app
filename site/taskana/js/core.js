@@ -1,7 +1,7 @@
 /* =====================================================================
    Taskana (by GALIL) — core: constants, utilities, data store,
    permissions, history and notifications. (Team and demo data: seed.js;
-   sign-in: auth.js; OneDrive files: storage.js.)
+   sign-in: auth.js; GitHub / OneDrive files: storage.js.)
    Classic script: everything here is a global used by the other files.
    ===================================================================== */
 "use strict";
@@ -11,13 +11,27 @@ var CONFIG_KEY = "galil-taskana-config";
 var CONFIG = (function () {
   var base = window.TASKANA_CONFIG || {}, o = null;
   try { o = JSON.parse(localStorage.getItem(CONFIG_KEY) || "null"); } catch (e) {}
-  var c = { domain: base.domain || "@galiltc.co.il", entra: Object.assign({ clientId: "", tenantId: "" }, base.entra), onedrive: Object.assign({ folderLink: "", folderName: "Taskana", fileName: "taskana-data.json" }, base.onedrive), override: false };
-  if (o && typeof o === "object") { c.entra = Object.assign(c.entra, o.entra || {}); c.onedrive = Object.assign(c.onedrive, o.onedrive || {}); c.override = true; }
+  var c = { domain: base.domain || "@galiltc.co.il", storage: base.storage || "", entra: Object.assign({ clientId: "", tenantId: "" }, base.entra),
+    github: Object.assign({ owner: "", repo: "", branch: "taskana-data", path: "taskana" }, base.github),
+    onedrive: Object.assign({ folderLink: "", folderName: "Taskana", fileName: "taskana-data.json" }, base.onedrive), override: false };
+  if (o && typeof o === "object") {
+    if (o.storage != null) c.storage = o.storage;
+    ["entra", "github", "onedrive"].forEach(function (k) { c[k] = Object.assign(c[k], o[k] || {}); });
+    c.override = true;
+  }
   return c;
 })();
 var DOMAIN = CONFIG.domain.toLowerCase();
-/* connected = real Microsoft Entra ID sign-in + data files on OneDrive; otherwise the standalone demo */
-var CONNECTED = !!CONFIG.entra.clientId;
+/* ENTRA: real Microsoft Entra ID sign-in (otherwise the WorkDesk-style demo sign-in).
+   STORAGE: "local" (this browser), "github" (a data file in a repository) or "onedrive" (needs Entra). */
+var ENTRA = !!CONFIG.entra.clientId;
+var STORAGE = (function () {
+  var s = CONFIG.storage || (ENTRA ? "onedrive" : "local");
+  if (s === "onedrive" && !ENTRA) s = "local";
+  if (s === "github" && !(CONFIG.github.owner && CONFIG.github.repo)) s = "local";
+  return /^(local|github|onedrive)$/.test(s) ? s : "local";
+})();
+var REMOTE = STORAGE !== "local";
 
 var KEY = "galil-taskana-v1", OLD_KEYS = ["galil-folio-v1"], BEFORE_RESTORE_KEY = "galil-taskana-before-restore";
 var WORKDESK_KEY = "galil-workdesk-v1";
@@ -46,7 +60,7 @@ var DOC_TYPES = ["User Manual", "Operator Manual", "Maintenance Manual", "Online
 var PROJECT_STATUSES = ["Active", "On Hold", "Completed", "Archived"];
 var ROLES = ["Admin", "Manager", "Member", "External", "Viewer"];
 var EMPLOYMENT = ["Employee", "Outsourced"];
-var DEPARTMENTS = ["Management", "Civil Division", "Defense Division", "Marketing", "Finance", "HR"];
+var DEPARTMENTS = ["Management", "Civil Division", "Defense Division", "Engineering", "Office & HR", "Marketing", "Finance"];
 var RECURRENCES = ["", "Weekly", "Every 2 weeks", "Monthly"];
 var LINK_TYPES = ["blocks", "is blocked by", "relates to"];
 var LINK_INVERSE = { "blocks": "is blocked by", "is blocked by": "blocks", "relates to": "relates to" };
@@ -153,7 +167,7 @@ function load() {
 }
 function save(quiet) {
   dataVersion++;
-  if (CONNECTED) { if (Store.remote) Store.changed(); return; }   // OneDrive (storage.js); nothing is kept here before sign-in
+  if (REMOTE) { if (Store.remote) Store.changed(); return; }   // GitHub / OneDrive (storage.js)
   try { localStorage.setItem(KEY, JSON.stringify(db)); storageOK = true; }
   catch (e) { storageOK = false; if (!quiet && typeof toast === "function") toast(tr("Browser storage is full — the last change was not saved. Remove attachments or download a backup.")); }
 }
@@ -331,7 +345,7 @@ function deleteTasks(ids) {
   db.comments = db.comments.filter(function (c) { return !set[c.taskId]; });
   db.activity = db.activity.filter(function (a) { return !set[a.taskId]; });
   db.notifications = db.notifications.filter(function (n) { return !set[n.taskId]; });
-  db.attachments = db.attachments.filter(function (a) { if (set[a.taskId] && a.driveItemId) deleteAttachmentFile(a); return !set[a.taskId]; });
+  db.attachments = db.attachments.filter(function (a) { if (set[a.taskId] && (a.driveItemId || a.ghPath)) deleteAttachmentFile(a); return !set[a.taskId]; });
   save();
 }
 function addLink(a, type, b) {
