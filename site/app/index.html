@@ -19,6 +19,10 @@
 </head>
 <body>
 <div id="root"></div>
+<!-- sign-in and shared data files (config.js decides: this browser, GitHub or OneDrive) -->
+<script src="config.js"></script>
+<script src="vendor/msal-browser.min.js"></script>
+<script src="workdesk-cloud.js"></script>
 <div id="boot"><b>GALIL WORKDESK</b><span>Starting…</span></div>
 <script>
 window.__bootFail = function (e) {
@@ -17614,6 +17618,8 @@ function readRaw() {
   try { var s = localStorage.getItem(KEY); return s ? JSON.parse(s) : null; } catch (e) { return null; }
 }
 function writeRaw(obj) {
+  /* shared data file (GitHub / OneDrive): upload too; the browser copy is then only a cache */
+  if (WDCloud.remote) { WDCloud.changed(obj.data); try { localStorage.setItem(KEY, JSON.stringify(obj)); } catch (e) {} return true; }
   try { localStorage.setItem(KEY, JSON.stringify(obj)); return true; }
   catch (e) { toast("Browser storage is full — the last change was not saved. Download a backup and remove attachments.", "error"); return false; }
 }
@@ -17643,168 +17649,7 @@ function mkUser(id, name, nameHe, role, title, dept, teamId, managerId, active) 
     authProvider: "microsoft", mobile: "", password: "GalilWorkdesk1", sessions: []
   };
 }
-function seed() {
-  var db = emptyDB();
-  var T = function (n) { var d = new Date(); d.setDate(d.getDate() + n); return d2s(d); };
-
-  db.teams = [
-    { id: "team-doc", name: "Documentation", leadUserId: "u-tl", department: "Technical Writing", color: "#5C8B22", code: "DOC",
-      description: "Operator and maintenance manuals, help systems and API references for our defence and aerospace clients.",
-      contact: "docs@galiltc.co.il", location: "Haifa office", clientIds: ["c-iai", "c-elb"] },
-    { id: "team-trn", name: "Training",      leadUserId: "u-pm", department: "Training & Instructional Design", color: "#3B7DD8", code: "TRN",
-      description: "Courseware, instructor guides and e-learning modules, from needs analysis to delivery.",
-      contact: "training@galiltc.co.il", location: "Haifa office", clientIds: ["c-iai"] }
-  ];
-  db.users = [
-    mkUser("u-ceo", "Dana Galil",    "דנה גליל", "CEO", "Founder & CEO",          "Management",  null,       null,    true),
-    mkUser("u-ops", "Ronen Shaked",  "רונן שקד", "OPS", "Operations Manager",     "Operations",  null,       "u-ceo", true),
-    mkUser("u-pm",  "Maya Ben Ari",  "מיה בן ארי", "PM", "Project Manager",  "Delivery",    "team-trn", "u-ops", true),
-    mkUser("u-tl",  "Eitan Levi",    "איתן לוי", "TL",  "Team Lead, Docs",        "Delivery",    "team-doc", "u-pm",  true),
-    mkUser("u-sen", "Noa Katz",      "נועה כץ",       "SEN", "Senior Technical Writer","Delivery",    "team-doc", "u-tl",  true),
-    mkUser("u-emp", "Yossi Mizrahi", "יוסי מזרחי", "EMP", "Technical Writer", "Delivery", "team-doc", "u-tl", true),
-    mkUser("u-emp2","Tal Rosen",     "טל רוזן",       "EMP", "Trainer",                "Delivery",    "team-trn", "u-pm",  true),
-    mkUser("u-fin", "Orit Hadad",    "אורית חדד", "FIN", "Finance Controller","Finance",   null,       "u-ceo", true),
-    mkUser("u-ext", "Adam Peled",    "אדם פלד",       "EXT", "Contract Illustrator",   "External",    null,       "u-pm",  true),
-    mkUser("u-view","Gil Avrahami",  "גיל אברהמי", "VIEW","Board Observer","Stakeholder", null,     "u-ceo", true),
-    (function () {
-      var u = mkUser("u-new", "Shira Cohen", "שירה כהן", "EMP", "Technical Writer", "Delivery", "team-doc", "u-tl", true);
-      u.isActive = false; u.pendingActivation = true; u.requestedRole = "SEN"; u.startDate = T(-2); return u;
-    })()
-  ];
-
-  db.clients = [
-    { id: "c-gal", name: "GALIL (internal)", initials: "GAL", isInternal: true,  contactName: "", contactEmail: "", notes: "Red hours", isVerified: true },
-    { id: "c-iai", name: "IAI",              initials: "IAI", isInternal: false, contactName: "Ilan Barak", contactEmail: "ilan@iai.example",  notes: "", isVerified: true },
-    { id: "c-elb", name: "Elbit Systems",    initials: "ELB", isInternal: false, contactName: "Rita Gold",  contactEmail: "rita@elbit.example", notes: "", isVerified: true },
-    { id: "c-mob", name: "Mobileye",         initials: "MOB", isInternal: false, contactName: "Sagi Peer",  contactEmail: "sagi@mobileye.example", notes: "", isVerified: true }
-  ];
-  db.projects = [
-    { id: "p-iai1", clientId: "c-iai", name: "Radar Suite — Operator Manual", status: "Active",  ownerUserId: "u-pm", startDate: T(-120), endDate: T(90),  isWoTracked: true,  notes: "", isVerified: true },
-    { id: "p-iai2", clientId: "c-iai", name: "Maintenance Training Package",       status: "WIP",     ownerUserId: "u-pm", startDate: T(-60),  endDate: T(120), isWoTracked: true,  notes: "", isVerified: true },
-    { id: "p-elb1", clientId: "c-elb", name: "Avionics Help System",               status: "Active",  ownerUserId: "u-tl", startDate: T(-200), endDate: T(30),  isWoTracked: false, notes: "", isVerified: true },
-    { id: "p-mob1", clientId: "c-mob", name: "SDK Documentation Refresh",          status: "Pending Review", ownerUserId: "u-pm", startDate: T(-40), endDate: T(60), isWoTracked: true, notes: "", isVerified: true },
-    { id: "p-int1", clientId: "c-gal", name: "Internal — Administration",     status: "Active",  ownerUserId: "u-ops", startDate: T(-365), endDate: null,  isWoTracked: false, notes: "", isVerified: true },
-    { id: "p-int2", clientId: "c-gal", name: "Internal — Business Development", status: "Active",ownerUserId: "u-ceo", startDate: T(-365), endDate: null,  isWoTracked: false, notes: "", isVerified: true }
-  ];
-  db.workOrders = [
-    { id: "w-1", projectId: "p-iai1", code: "WO-IAI-004182", title: "Volume 1 — Operation",   status: "Active", contractRef: "PO-88213",    startDate: T(-120), endDate: T(30),  notes: "" },
-    { id: "w-2", projectId: "p-iai1", code: "WO-IAI-004183", title: "Volume 2 — Maintenance", status: "Active", contractRef: "PO-88213",    startDate: T(-60),  endDate: T(90),  notes: "" },
-    { id: "w-3", projectId: "p-iai2", code: "WO-IAI-004201", title: "Courseware build",            status: "Active", contractRef: "PO-88540",    startDate: T(-60),  endDate: T(120), notes: "" },
-    { id: "w-4", projectId: "p-mob1", code: "WO-MOB-000117", title: "API reference",               status: "Active", contractRef: "MOB-2026-11", startDate: T(-40),  endDate: T(60),  notes: "" }
-  ];
-  db.budgets = [
-    { id: "b-1", clientId: "c-iai", projectId: "p-iai1", workOrderId: "w-1", basis: "Money", currency: "₪", amount: 180000, rate: 300, hours: 600, units: null,  unitName: "",      notes: "", history: [] },
-    { id: "b-2", clientId: "c-iai", projectId: "p-iai1", workOrderId: "w-2", basis: "Hours", currency: "₪", amount: null,   rate: null, hours: 320, units: null, unitName: "",      notes: "", history: [] },
-    { id: "b-3", clientId: "c-iai", projectId: "p-iai2", workOrderId: "w-3", basis: "Pages", currency: "₪", amount: null,   rate: null, hours: 240, units: 400,  unitName: "pages", notes: "", history: [], produced: 168 },
-    { id: "b-4", clientId: "c-elb", projectId: "p-elb1", workOrderId: null,  basis: "Money", currency: "$",      amount: 60000,  rate: 90,   hours: 666, units: null, unitName: "",      notes: "", history: [] },
-    { id: "b-5", clientId: "c-mob", projectId: "p-mob1", workOrderId: "w-4", basis: "Words", currency: "₪", amount: null,   rate: null, hours: 150, units: 60000,unitName: "words", notes: "", history: [], produced: 21400 }
-  ];
-  db.assignments = [
-    { id: "a-1", userId: "u-emp",  projectId: "p-iai1", workOrderId: "w-1", allowanceHours: 40,   grantedBy: "u-pm",  grantedAt: nowISO() },
-    { id: "a-2", userId: "u-emp",  projectId: "p-elb1", workOrderId: null,  allowanceHours: 120,  grantedBy: "u-tl",  grantedAt: nowISO() },
-    { id: "a-3", userId: "u-sen",  projectId: "p-iai1", workOrderId: "w-2", allowanceHours: null, grantedBy: "u-pm",  grantedAt: nowISO() },
-    { id: "a-4", userId: "u-sen",  projectId: "p-mob1", workOrderId: "w-4", allowanceHours: 60,   grantedBy: "u-pm",  grantedAt: nowISO() },
-    { id: "a-5", userId: "u-tl",   projectId: "p-elb1", workOrderId: null,  allowanceHours: null, grantedBy: "u-pm",  grantedAt: nowISO() },
-    { id: "a-6", userId: "u-emp2", projectId: "p-iai2", workOrderId: "w-3", allowanceHours: 80,   grantedBy: "u-pm",  grantedAt: nowISO() },
-    { id: "a-7", userId: "u-ext",  projectId: "p-iai2", workOrderId: "w-3", allowanceHours: 0,    grantedBy: "u-pm",  grantedAt: nowISO() },
-    { id: "a-8", userId: "u-pm",   projectId: "p-iai1", workOrderId: null,  allowanceHours: null, grantedBy: "u-ops", grantedAt: nowISO() },
-    { id: "a-9", userId: "u-tl",   projectId: "p-int1", workOrderId: null,  allowanceHours: null, grantedBy: "u-ops", grantedAt: nowISO() },
-    { id: "a-10",userId: "u-pm",   projectId: "p-int2", workOrderId: null,  allowanceHours: null, grantedBy: "u-ops", grantedAt: nowISO() }
-  ];
-  db.tasks = [
-    { id: "t-1", projectId: "p-iai1", workOrderId: "w-1", title: "Draft chapter 3 — Track modes",     description: "Full draft, screenshots placed, ready for review.", status: "In progress", priority: "High",     allowanceHours: 24, startDate: T(-14), dueDate: T(3),  parentTaskId: null, dependencies: [],      comments: [], attachments: [] },
-    { id: "t-2", projectId: "p-iai1", workOrderId: "w-1", title: "Illustration pass — chapter 3",     description: "Redraw 12 figures to the client style sheet.",      status: "Blocked",     priority: "Normal",   allowanceHours: 16, startDate: T(-7),  dueDate: T(10), parentTaskId: null, dependencies: ["t-1"], comments: [], attachments: [] },
-    { id: "t-3", projectId: "p-iai1", workOrderId: "w-2", title: "Maintenance procedures — outline",  description: "Agree the task breakdown with the client SME.",      status: "To do",       priority: "Normal",   allowanceHours: 8,  startDate: T(0),   dueDate: T(14), parentTaskId: null, dependencies: [],      comments: [], attachments: [] },
-    { id: "t-4", projectId: "p-elb1", workOrderId: null,  title: "Help topic migration — batch 2",    description: "Convert 80 topics to the new DITA map.",             status: "In review",   priority: "Critical", allowanceHours: 40, startDate: T(-21), dueDate: T(-2), parentTaskId: null, dependencies: [],      comments: [], attachments: [] },
-    { id: "t-5", projectId: "p-iai2", workOrderId: "w-3", title: "Build module 4 slides",                  description: "Slides plus facilitator notes.",                     status: "To do",       priority: "Normal",   allowanceHours: 20, startDate: T(2),   dueDate: T(21), parentTaskId: null, dependencies: [],      comments: [], attachments: [] },
-    { id: "t-6", projectId: "p-mob1", workOrderId: "w-4", title: "API reference — endpoints A–F", description: "Generate and hand-edit reference pages.",           status: "Done",        priority: "Normal",   allowanceHours: 30, startDate: T(-30), dueDate: T(-5), parentTaskId: null, dependencies: [],      comments: [], attachments: [] }
-  ];
-  db.taskAssignees = [
-    { id: "ta-1", taskId: "t-1", userId: "u-emp",  allowanceHours: 24 },
-    { id: "ta-2", taskId: "t-2", userId: "u-ext",  allowanceHours: 16 },
-    { id: "ta-3", taskId: "t-3", userId: "u-sen",  allowanceHours: 8 },
-    { id: "ta-4", taskId: "t-4", userId: "u-emp",  allowanceHours: 40 },
-    { id: "ta-5", taskId: "t-5", userId: "u-emp2", allowanceHours: 20 },
-    { id: "ta-6", taskId: "t-6", userId: "u-sen",  allowanceHours: 30 }
-  ];
-  db.expenseTypes = [
-    { id: "et-1", name: "Meal",              requiresEvidence: true,  ceiling: 120 },
-    { id: "et-2", name: "Travel — fuel",  requiresEvidence: false, ceiling: 400 },
-    { id: "et-3", name: "Travel — public",requiresEvidence: false, ceiling: 200 },
-    { id: "et-4", name: "Parking",           requiresEvidence: false, ceiling: 80 },
-    { id: "et-5", name: "Accommodation",     requiresEvidence: true,  ceiling: 700 },
-    { id: "et-6", name: "Software / tools",  requiresEvidence: true,  ceiling: 300 },
-    { id: "et-7", name: "Other",             requiresEvidence: true,  ceiling: 100 }
-  ];
-  db.settings = { dailySoftLimit: 9, dailyHardLimit: 12, weeklyHours: 42, closedMonths: [], language: "en" };
-  db.library = [
-    { id: "l-1", title: "GALIL house style — quick rules", body: "Sentence case for headings. Second person for procedures. No future tense in steps. Israeli date format everywhere.", authorUserId: "u-tl",  isPrivate: false, tags: ["style","writing"],    projectId: null,    taskId: null, link: "", createdAt: nowISO() },
-    { id: "l-2", title: "Screenshot capture checklist",        body: "1366×768 window. Hide personal data. PNG, 96 dpi. Crop to the control plus one container.",                       authorUserId: "u-sen", isPrivate: false, tags: ["images","checklist"], projectId: "p-iai1", taskId: "t-1", link: "", createdAt: nowISO() },
-    { id: "l-3", title: "DITA map conventions (Elbit)",        body: "One map per volume. Topic ids prefixed by volume. Reltables, not conrefs, for cross-volume links.",                    authorUserId: "u-emp", isPrivate: false, tags: ["dita","elbit"],       projectId: "p-elb1", taskId: null, link: "", createdAt: nowISO() }
-  ];
-
-  /* historical entries — imported registered with a migrated flag (§17.1) */
-  var mk = function (o) {
-    return {
-      id: uid("e"), date: o.d, type: o.type || "Work", start: o.s || "", end: o.e || "",
-      red: o.red || 0, yellow: o.yellow || 0, blue: o.blue || 0, day: o.day || 0,
-      assignee: o.u, clientId: o.c || null, projectId: o.p || null, workOrderId: o.w || null, taskId: o.t || null,
-      client: "", project: "", workOrder: "", task: "",
-      projectStatus: "", description: o.desc || "", notes: "",
-      status: "registered", statusReason: "", submittedAt: null,
-      approvedBy: null, approvedAt: null, decisionNote: "", migrated: true, softFlag: false
-    };
-  };
-  var day = 0, made = [];
-  for (var k = 1; k <= 46; k++) {
-    var dt = new Date(); dt.setDate(dt.getDate() - k);
-    if (dt.getDay() === 5 || dt.getDay() === 6) continue; /* Fri/Sat weekend */
-    day++;
-    made.push(mk({ d: d2s(dt), u: "u-emp",  s: "09:00", e: "13:00", yellow: 4, c: "c-iai", p: "p-iai1", w: "w-1", t: "t-1", desc: "Chapter 3 drafting — track modes." }));
-    made.push(mk({ d: d2s(dt), u: "u-emp",  s: "14:00", e: "17:00", yellow: 3, c: "c-elb", p: "p-elb1", desc: "Help topic migration, batch 2." }));
-    made.push(mk({ d: d2s(dt), u: "u-sen",  s: "08:30", e: "16:30", yellow: 8, c: "c-iai", p: "p-iai1", w: "w-2", desc: "Maintenance volume — source review." }));
-    made.push(mk({ d: d2s(dt), u: "u-emp2", s: "09:00", e: "17:00", yellow: 8, c: "c-iai", p: "p-iai2", w: "w-3", t: "t-5", desc: "Courseware module build." }));
-    if (day % 4 === 0) made.push(mk({ d: d2s(dt), u: "u-tl", s: "09:00", e: "11:00", red: 2, c: "c-gal", p: "p-int1", desc: "Team administration and planning." }));
-    if (day % 5 === 0) made.push(mk({ d: d2s(dt), u: "u-pm", s: "09:00", e: "12:00", red: 3, c: "c-gal", p: "p-int2", desc: "Proposal work — new engagement." }));
-  }
-  var sickDay = new Date(); sickDay.setDate(sickDay.getDate() - 9);
-  made.push(mk({ d: d2s(sickDay), u: "u-emp", type: "Sick", day: 1, desc: "Sick day." }));
-  var vac = new Date(); vac.setDate(vac.getDate() - 16);
-  made.push(mk({ d: d2s(vac), u: "u-sen", type: "Vacation", day: 1, desc: "Annual leave." }));
-  db.entries = made;
-
-  /* live pending requests so the queue is not empty on first run */
-  var pd = new Date(); pd.setDate(pd.getDate() - 1);
-  var p1 = mk({ d: d2s(pd), u: "u-emp", s: "17:00", e: "20:00", yellow: 3, c: "c-iai", p: "p-iai1", w: "w-1", t: "t-1", desc: "Overtime on chapter 3 to hit the review date." });
-  p1.status = "pending"; p1.statusReason = "Allowance exceeded"; p1.submittedAt = nowISO(); p1.migrated = false;
-  var p2 = mk({ d: d2s(pd), u: "u-emp2", s: "09:00", e: "12:00", yellow: 3, desc: "Scoping call for a new training package." });
-  p2.status = "pending"; p2.statusReason = "Unlisted item"; p2.submittedAt = nowISO(); p2.migrated = false;
-  p2.client = "Rafael"; p2.project = "Simulator courseware";
-  db.entries.push(p1, p2);
-
-  db.approvals = [
-    { id: uid("ar"), type: "Time entry",         entityTable: "entries", entityId: p1.id,  requesterId: "u-emp",  assignedTo: "u-tl",  status: "pending", reason: "Allowance exceeded", payloadBefore: null, payloadAfter: null, decidedBy: null, decidedAt: null, decisionNote: "", thread: [], createdAt: nowISO() },
-    { id: uid("ar"), type: "Time entry",         entityTable: "entries", entityId: p2.id,  requesterId: "u-emp2", assignedTo: "u-pm",  status: "pending", reason: "Unlisted item",      payloadBefore: null, payloadAfter: null, decidedBy: null, decidedAt: null, decisionNote: "", thread: [], createdAt: nowISO() },
-    { id: uid("ar"), type: "Account activation", entityTable: "users",   entityId: "u-new",requesterId: "u-new",  assignedTo: "u-ops", status: "pending", reason: "New sign-up awaiting role confirmation — requested Senior Employee", payloadBefore: null, payloadAfter: null, decidedBy: null, decidedAt: null, decisionNote: "", thread: [], createdAt: nowISO() }
-  ];
-
-  var ed = new Date(); ed.setDate(ed.getDate() - 3);
-  db.expenses = [
-    { id: uid("x"), userId: "u-emp",  date: d2s(ed), time: "13:10", etype: "Meal",             vkind: "money", currency: "₪", amount: 68,  hours: 0, clientId: "c-iai", projectId: "p-iai1", workOrderId: "w-1", description: "Working lunch, client site.",            notes: "", attachments: [{ name: "receipt-1182.jpg" }], status: "Approved" },
-    { id: uid("x"), userId: "u-sen",  date: d2s(ed), time: "08:05", etype: "Travel — fuel", vkind: "money", currency: "₪", amount: 240, hours: 0, clientId: "c-iai", projectId: "p-iai1", workOrderId: "w-2", description: "Drive to Lod for the source review.",    notes: "", attachments: [], status: "Submitted" },
-    { id: uid("x"), userId: "u-emp2", date: d2s(ed), time: "19:40", etype: "Accommodation",    vkind: "money", currency: "₪", amount: 890, hours: 0, clientId: "c-iai", projectId: "p-iai2", workOrderId: "w-3", description: "Overnight before the delivery workshop.", notes: "Above the ceiling", attachments: [{ name: "hotel.pdf" }], status: "Submitted" }
-  ];
-
-  var mon = new Date(); mon.setDate(mon.getDate() + (7 - mon.getDay()));
-  for (var q = 0; q < 5; q++) {
-    var pdd = new Date(mon); pdd.setDate(mon.getDate() + q);
-    db.planned.push({ id: uid("pl"), userId: "u-emp", date: d2s(pdd), start: "09:00", end: "17:00", red: 0, yellow: 8, clientId: "c-iai", projectId: "p-iai1", workOrderId: "w-1", taskId: "t-1", description: "Chapter 3 completion." });
-    db.planned.push({ id: uid("pl"), userId: "u-sen", date: d2s(pdd), start: "09:00", end: "15:00", red: 0, yellow: 6, clientId: "c-mob", projectId: "p-mob1", workOrderId: "w-4", taskId: null, description: "SDK reference pages." });
-  }
-
-  db.audit = [{ id: uid("au"), actorId: "system", action: "Seed data created", entityTable: "-", entityId: "-", before: null, after: null, ip: "local", userAgent: (navigator.userAgent || "").slice(0, 80), at: nowISO() }];
-  return db;
-}
+/* seed() — the GALIL team and demo data — lives in workdesk-seed.js */
 
 /* ================= toast ================= */
 var _toastFn = null;
@@ -19529,6 +19374,7 @@ function SignIn(p) {
     if (!email) return set(Object.assign({}, st, { err: "Enter your company email address." }));
     if (email.slice(-DOMAIN.length) !== DOMAIN)
       return set(Object.assign({}, st, { err: "Only addresses ending in " + DOMAIN + " may sign in. External contractors are provisioned by an administrator." }));
+    if (WDCloud.entra) return WDCloud.login(email);            // the password is typed on Microsoft's page
     var lu = lockedUntil(email);
     if (lu) return set(Object.assign({}, st, { err: "Account locked after five failed attempts. Try again in " + Math.ceil((lu - Date.now()) / 60000) + " minutes." }));
     var u = db.users.filter(function (x) { return x.email.toLowerCase() === email; })[0];
@@ -19558,8 +19404,9 @@ function SignIn(p) {
         : h("div", { className: "col", style: { gap: 11 } },
             h(Btn, {
               className: "ms", style: { width: "100%", minHeight: 44 },
-              onClick: function () { set(Object.assign({}, st, { mode: "ms", err: "" })); }
+              onClick: function () { if (WDCloud.entra) WDCloud.login(); else set(Object.assign({}, st, { mode: "ms", err: "" })); }
             }, "⊞  Sign in with Microsoft"),
+            WDCloud.signInError ? h("div", { className: "banner err" }, "⚠ ", WDCloud.signInError) : null,
             h("div", { className: "cap", style: { textAlign: "center" } }, "Microsoft Authenticator enforces the company MFA policy."),
 
             st.mode === "ms"
@@ -19584,11 +19431,12 @@ function SignIn(p) {
               h("div", { className: "grow sep" }), h("span", { className: "cap" }, "or"), h("div", { className: "grow sep" })),
 
             h(Inp, { label: "Company email", id: "si-email", value: st.email, autoComplete: "username", placeholder: "name" + DOMAIN, onChange: function (e) { set(Object.assign({}, st, { email: e.target.value, err: "" })); } }),
-            h(Inp, { label: "Password", id: "si-pw", type: "password", value: st.pw, autoComplete: "current-password", onChange: function (e) { set(Object.assign({}, st, { pw: e.target.value, err: "" })); }, onKeyDown: function (e) { if (e.key === "Enter") tryPassword(); } }),
+            WDCloud.entra ? h("div", { className: "cap" }, "You'll type your password on the Microsoft sign-in page.")
+              : h(Inp, { label: "Password", id: "si-pw", type: "password", value: st.pw, autoComplete: "current-password", onChange: function (e) { set(Object.assign({}, st, { pw: e.target.value, err: "" })); }, onKeyDown: function (e) { if (e.key === "Enter") tryPassword(); } }),
             st.err ? h("div", { className: "banner err" }, "⚠ ", st.err) : null,
-            h(Btn, { kind: "p", style: { width: "100%", minHeight: 44 }, onClick: tryPassword }, "Sign in"),
+            h(Btn, { kind: "p", style: { width: "100%", minHeight: 44 }, onClick: tryPassword }, WDCloud.entra ? "Continue" : "Sign in"),
 
-            h("div", { className: "row", style: { justifyContent: "space-between" } },
+            WDCloud.entra ? null : h("div", { className: "row", style: { justifyContent: "space-between" } },
               h(Btn, { kind: "t", sm: true, onClick: function () { set(Object.assign({}, st, { mode: "forgot", err: "" })); } }, "Forgot password"),
               h(Btn, { kind: "t", sm: true, onClick: p.onSignUp }, "Create an account")),
 
@@ -19611,10 +19459,11 @@ function SignIn(p) {
                 }, "עברית"))),
             st.lang === "he" ? h("div", { className: "banner amber", style: { marginTop: 8 } },
               "⚠ Hebrew is the reserved localization slot — every string moves to a resource file and the layout flips to RTL in V8.") : null,
-            h("div", { className: "cap", style: { marginTop: 8, background: C.wash, padding: "7px 9px", borderRadius: 9 } },
+            WDCloud.entra ? null : h("div", { className: "cap", style: { marginTop: 8, background: C.wash, padding: "7px 9px", borderRadius: 9 } },
               h("b", null, "Demo accounts"), " — password ", h("span", { className: "mono" }, "GalilWorkdesk1"), ". Try ",
-              h("span", { className: "mono" }, "yossi.mizrahi" + DOMAIN), " (Employee) or ",
-              h("span", { className: "mono" }, "maya.ben.ari" + DOMAIN), " (Project Manager)."))));
+              h("span", { className: "mono" }, "danny.gelman" + DOMAIN), " (Project Manager) or ",
+              h("span", { className: "mono" }, "eitan.f" + DOMAIN), " (Employee)."),
+            h("div", { style: { textAlign: "center", marginTop: 6 } }, h(Btn, { kind: "t", sm: true, onClick: function () { WDCloud.showConfig(); } }, "Connection settings…")))));
 }
 
 /* ---------------- §6.2 four-step sign-up wizard ---------------- */
@@ -22949,12 +22798,25 @@ function AdminModal(p) {
             h("div", { className: "cap" }, "Loads dropdown definitions only — clients, projects, work orders, expense types and teams. It never touches entries. This is a different function from Restore Backup."),
             h("input", { type: "file", accept: ".json,application/json", ref: listRef }),
             h(Btn, { onClick: function () { readFile(listRef, function (o) { stageRestore(o, "lists"); } ); } }, "Validate and preview")),
+          WDCloud.remote ? h("div", { className: "panel pad col", style: { gap: 8 } },
+            h("div", { className: "h3" }, "Where the data lives"),
+            h("div", { className: "cap" }, (WDCloud.storage === "github" ? "A data file in the GitHub repository " : "Files in the OneDrive folder ") + (((WDCloud.describe().folder || {}).name) || "") + ". " +
+              (WDCloud.storage === "github" ? "Every save is a commit, so the branch history is the backup." : "A dated copy goes to backups/ once a day.")),
+            h("div", { className: "row", style: { gap: 8, flexWrap: "wrap" } }, h(Btn, { sm: true, onClick: function () { WDCloud.showInfo(); } }, "Details"))) : null,
+          h("div", { className: "panel pad col", style: { gap: 8 } },
+            h("div", { className: "h3" }, "Demo data"),
+            h("div", { className: "cap" }, "Made-up clients, projects, work orders, budgets, tasks, hours and expenses for the real GALIL team — different every time. Demo records are marked, so removing them leaves real work alone."),
+            h("div", { className: "row", style: { gap: 8, flexWrap: "wrap" } },
+              h(Btn, { onClick: function () { ask({ title: "Fill with demo data?", message: "Adds random demo work for the team, replacing earlier demo data. Real records stay as they are.", okLabel: "Fill" }).then(function (yes) { if (yes) { p.mutate(function (d) { addDemo(d); audit(d, user.id, "Demo data added", "-", "-", null, null); }); toast("Demo data added.", "ok"); } }); } }, "Fill with demo data"),
+              hasDemo(db) ? h(Btn, { kind: "d", onClick: function () { ask({ title: "Remove the demo data?", message: "Demo clients, projects, work orders, budgets, tasks, hours, plans, expenses and approvals are removed. Real records and people stay.", okLabel: "Remove", danger: true }).then(function (yes) { if (yes) { p.mutate(function (d) { removeDemo(d); audit(d, user.id, "Demo data removed", "-", "-", null, null); }); toast("Demo data removed.", "ok"); } }); } }, "Remove demo data") : null)),
           h("div", { className: "panel pad col", style: { gap: 8 } },
             h("div", { className: "h3" }, "Reset"),
             h("div", { className: "cap" }, "Wipes local data and reloads the demonstration seed. The storage key ", h("span", { className: "mono" }, KEY), " itself never changes."),
             h(Btn, { kind: "d", onClick: function () {
               ask({ title: "Reset to seed data?", message: "This wipes every record stored in this browser and reloads the demonstration data. It cannot be undone \u2014 download a backup first if you need one.", okLabel: "Wipe and reload", danger: true }).then(function (yes) {
-                if (yes) { writeRaw(wrap(seed())); location.reload(); }
+                if (!yes) return;
+                if (WDCloud.remote) { p.mutate(function (d) { var s = seed(); Object.keys(s).forEach(function (k) { d[k] = s[k]; }); }); toast("Everything was replaced with the GALIL team and fresh demo data.", "ok"); return; }
+                writeRaw(wrap(seed())); location.reload();
               });
             } }, "Reset to seed data"))) : null,
 
@@ -23583,6 +23445,7 @@ function MobileApp(p) {
     sheet === "profile" ? h(Profile, { db: db, user: user, onClose: function () { setSheet(null); }, onSignOut: p.onSignOut }) : null);
 }
 </script>
+<script src="workdesk-seed.js"></script>
 <script>"use strict";
 /* =====================================================================
    Application shell — §14.3 tab bar, §6.4 session, §8.3 my assignments
@@ -23684,11 +23547,14 @@ function Profile(p) {
 
 function App() {
   var ds = useState(function () {
+    if (WDCloud.enabled) return WDCloud.data || emptyDB();     // shared file, or Microsoft sign-in still to come
     var raw = readRaw();
     if (raw && raw.data) return raw.data;
     var s = seed(); writeRaw(wrap(s)); return s;
   });
   var db = ds[0], setDb = ds[1];
+  /* other people's changes, merged in by workdesk-cloud.js */
+  useEffect(function () { WDCloud.onRemote = function (d) { setDb(d); }; return function () { WDCloud.onRemote = null; }; }, []);
   var ss = useState(function () { try { return localStorage.getItem(SESSION_KEY) || null; } catch (e) { return null; } });
   var sessionId = ss[0], setSession = ss[1];
   var ts = useState("time"), tab = ts[0], setTab = ts[1];
@@ -23756,6 +23622,7 @@ function App() {
   function signOut() {
     if (user) mutate(function (d) { audit(d, user.id, "Sign-out", "users", user.id, null, null); });
     try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
+    if (WDCloud.entra) { WDCloud.signOut(); return; }
     setSession(null); setProfile(false); setAdmin(false); setAuthMode("signin");
   }
   function register(payload) {
@@ -23828,7 +23695,7 @@ function App() {
       h("div", { className: "brand" },
         h(Mark, null),
         h("div", null, "GALIL", h("small", null, "WorkDesk · V7.2")),
-        h(Chip, { k: "gr", style: { background: "rgba(255,255,255,.1)", color: "#C9DDB4", borderColor: "rgba(255,255,255,.2)" } }, "Standalone")),
+        h(Chip, { k: "gr", style: { background: "rgba(255,255,255,.1)", color: "#C9DDB4", borderColor: "rgba(255,255,255,.2)" } }, WDCloud.remote ? (WDCloud.storage === "github" ? "GitHub" : "OneDrive") : "Standalone")),
       isOnline ? null : h(Chip, { k: "amber" }, "Offline — changes cached locally"),
       h("div", { className: "spacer" }),
       h("button", {
@@ -23889,7 +23756,8 @@ function KbIcon() {
   document.head.appendChild(style);
   var boot = document.getElementById("boot");
   if (boot) boot.remove();
-  ReactDOM.createRoot(document.getElementById("root")).render(h(App));
+  WDCloud.boot({ seed: seed, emptyDB: emptyDB, wrap: wrap, validateBackup: validateBackup, mkUser: mkUser, uid: uid, raiseApproval: raiseApproval, audit: audit },
+    function () { ReactDOM.createRoot(document.getElementById("root")).render(h(App)); });
 })();
 </script>
 </body>
