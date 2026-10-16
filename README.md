@@ -245,23 +245,37 @@ tests/taskana/      Playwright browser tests (npm test), run in CI by
 
 ## The app (`site/app/`)
 
-### Data: fake database, built in
+### Data: where it lives
 
-There is no backend yet. The app ships with a seeded, in-memory database
-(`seed()` in `site/app/index.html`) covering users, teams, clients, projects,
-work orders, budgets, tasks, assignments, expense types and library notes.
-On every change the whole database is written to the browser's
-`localStorage`, so a signed-in user's data persists across reloads on that
-device/browser — but it is **not shared between users or devices**. Each
-visitor effectively gets their own sandboxed copy of the fake company.
+`site/app/config.js` decides, the same way as Taskana's:
 
-Use **⚙ System administration → Backup & restore** in the app to
-export/import that data as JSON (see `materials/backups/` for samples) if you
-want to move a demo session between browsers. People, clients, projects, work
-orders, assignments, expense types and the verification queue live on the
-**Management** tab instead (up to V7 this was the **Budgets** tab); the ⚙
-window now holds only company settings, backup & restore, the audit log and a
-read-only roles & permissions reference.
+- **GitHub data file — the current testing setup** (`storage: "github"`): the shared
+  data is `workdesk/workdesk-data.json` on the `workdesk-data` branch of this
+  repository (created on first use); every save is a commit there. Each device
+  pastes a GitHub fine-grained token once (this repository only, *Contents: Read and
+  write*). The repository is public: use demo data only until the move to OneDrive.
+- **Standalone demo** (`storage: "local"`): data in this browser only (key
+  `galil-workdesk-v1`).
+- **Microsoft 365** (`storage: "onedrive"`, `entra.clientId` filled in): sign-in
+  through Microsoft Entra ID and `workdesk-data.json` (plus a daily copy in
+  `backups/`) in a company OneDrive/SharePoint folder. The Taskana app registration
+  can be reused. Full steps and troubleshooting: `docs/workdesk/`.
+
+In both shared modes the browser copy under `galil-workdesk-v1` stays as an
+offline cache (the Knowledge Base and Taskana's WorkDesk import read it); every
+change is uploaded with the version it was based on, and a save that crossed
+someone else's is merged record by record. `site/app/workdesk-cloud.js` holds the
+sign-in and storage code; `site/app/workdesk-seed.js` holds the team and the demo
+data. A status pill (bottom left) shows where the data is and whether it is saved.
+
+**The team and demo data.** The seed is the real GALIL roster with company emails,
+Hebrew names, managers, teams and WorkDesk roles: Tamir Nisman (CEO), Inon Kanner
+(Operations Manager), the four client managers and Danny Gelman (Project Managers,
+each leading a team), the writers (Employees), Gil Hadar, Ofir Abutbul and Ronen
+Nachum (External Contractors) and the Galil TC Office mailbox. **⚙ → Backup &
+restore → Demo data** fills WorkDesk with random demo clients, projects, work
+orders, budgets, tasks, hours, plans, expenses and approvals for that team, or
+removes them again (demo records are flagged; real ones are left alone).
 
 ### What's new in V7.2
 
@@ -327,24 +341,25 @@ in `site/app/index.html`.
 
 ### Logging in
 
-Sign-in enforces the `@galiltc.co.il` domain and offers two paths — a real
-password form, and a simulated "Sign in with Microsoft" account picker (no
-real Microsoft/Entra call is made yet; see **Roadmap**).
+Sign-in enforces the `@galiltc.co.il` domain and offers two paths — the
+company email form and "Sign in with Microsoft". Without an Entra client ID the
+Microsoft button is a simulated account picker; with one, it is real.
 
-Demo accounts — password for all of them is `GalilWorkdesk1`:
+Demo accounts (standalone and GitHub modes) — every roster member signs in with
+their company email and the password `GalilWorkdesk1`, for example:
 
 | Email | Role |
 |---|---|
-| dana.galil@galiltc.co.il | CEO |
-| ronen.shaked@galiltc.co.il | Operations Manager |
-| maya.ben.ari@galiltc.co.il | Project Manager |
-| eitan.levi@galiltc.co.il | Team Lead |
-| noa.katz@galiltc.co.il | Senior Technical Writer |
-| yossi.mizrahi@galiltc.co.il | Technical Writer |
-| tal.rosen@galiltc.co.il | Trainer |
-| orit.hadad@galiltc.co.il | Finance Controller |
-| adam.peled@galiltc.co.il | External Contractor |
-| gil.avrahami@galiltc.co.il | Board Observer |
+| tamir@galiltc.co.il | CEO |
+| inon.kanner@galiltc.co.il | Operations Manager |
+| danny.gelman@galiltc.co.il | Project Manager (Defense) |
+| kfir@galiltc.co.il | Project Manager (Civil) |
+| eitan.f@galiltc.co.il | Employee |
+| gil.hadar@galiltc.co.il | External Contractor |
+
+With `entra.clientId` set, both "Sign in with Microsoft" and the email form go
+through Microsoft Entra ID instead; anyone not in the roster lands in Pending
+activation until an Operations Manager or the CEO confirms them.
 
 The sign-in screen itself also shows these credentials.
 
