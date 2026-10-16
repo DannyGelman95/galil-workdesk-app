@@ -5,6 +5,7 @@
 "use strict";
 
 function pageFor(r) {
+  if (!can.seeEverything() && /^(insights|clients|project|people)$/.test(r[0])) return notFound(tr("No access"), tr("Outsourced accounts see the tasks they work on. Ask a Manager if you need more."));
   switch (r[0]) {
     case "inbox": return pageInbox();
     case "my": return pageMy();
@@ -61,15 +62,15 @@ function viewBar(v) {
 
 /* ---------- Overview ---------- */
 function pageHome() {
-  var u = me(), open = db.tasks.filter(function (t) { return t.status !== "Done"; });
+  var u = me(), all = can.seeEverything(), open = visibleTasks().filter(function (t) { return t.status !== "Done"; });
   var overdue = open.filter(isOverdue);
-  var qs = db.comments.filter(function (c) { return c.kind === "question" && !c.resolved && byId(db.tasks, c.taskId); });
+  var qs = db.comments.filter(function (c) { return c.kind === "question" && !c.resolved && byId(db.tasks, c.taskId) && canSee(byId(db.tasks, c.taskId)); });
   var inReview = open.filter(function (t) { return t.status === "Peer Review" || t.status === "SME Review"; });
   var stat = function (n, label, fn, cls) { return h("div", clickable({ class: "card pad stat" }, fn), h("b", { class: cls || null }, n), h("span", null, label)); };
   var mine = open.filter(function (t) { return t.assigneeId === u.id; }).sort(function (a, b) { return (a.dueDate || "9") < (b.dueDate || "9") ? -1 : 1; });
   var forMe = function (c) { var t = byId(db.tasks, c.taskId) || {}; return (c.mentions || []).indexOf(u.id) >= 0 || (c.authorId !== u.id && (t.assigneeId === u.id || t.reporterId === u.id)); };
   var recent = db.activity.concat(db.comments.map(function (c) { return { taskId: c.taskId, userId: c.authorId, at: c.createdAt, kind: c.kind === "question" ? "asked" : "commented" }; }))
-    .filter(function (a) { return byId(db.tasks, a.taskId); }).sort(function (a, b) { return a.at < b.at ? 1 : -1; }).slice(0, 12);
+    .filter(function (a) { var t = byId(db.tasks, a.taskId); return t && canSee(t); }).sort(function (a, b) { return a.at < b.at ? 1 : -1; }).slice(0, 12);
   var hr = new Date().getHours();
   return {
     title: tr(hr < 12 ? "Good morning, {name}" : hr < 18 ? "Good afternoon, {name}" : "Good evening, {name}", { name: u.fullName.split(" ")[0] }),
@@ -77,15 +78,15 @@ function pageHome() {
     body: [
       h("div", { class: "grid g4", style: { marginBottom: "16px" } },
         stat(open.length, tr("Open tasks"), function () { clearFilters(); go("tasks"); }),
-        stat(db.projects.filter(function (p) { return p.status === "Active"; }).length, tr("Active projects"), function () { go("clients"); }),
+        all ? stat(db.projects.filter(function (p) { return p.status === "Active"; }).length, tr("Active projects"), function () { go("clients"); }) : stat(open.filter(function (t) { return t.assigneeId === u.id; }).length, tr("Assigned to me"), function () { go("my"); }),
         stat(inReview.length, tr("In review (peer + SME)"), function () { clearFilters(); go("board"); }),
         stat(overdue.length, tr("Overdue"), function () { clearFilters(); ui.filters.overdue = "1"; ui.sort = { k: "dueDate", dir: 1 }; go("tasks"); }, overdue.length ? "overdue" : "")),
       h("div", { class: "grid g2" },
         h("div", { class: "grid", style: { alignContent: "start" } },
           h("section", { class: "card pad" }, h("h2", null, tr("My open tasks")),
             mine.length ? mine.slice(0, 8).map(taskRow) : h("div", { class: "empty" }, tr("Nothing assigned to you."))),
-          h("section", { class: "card pad" }, h("h2", null, tr("Projects")),
-            db.projects.filter(function (p) { return p.status === "Active"; }).map(projectRow))),
+          all ? h("section", { class: "card pad" }, h("h2", null, tr("Projects")),
+            db.projects.filter(function (p) { return p.status === "Active"; }).map(projectRow)) : null),
         h("div", { class: "grid", style: { alignContent: "start" } },
           h("section", { class: "card pad" }, h("h2", null, tr("Open questions") + " ", h("span", { class: "chip amber" }, qs.length)),
             qs.length ? qs.slice().sort(function (a, b) { return a.createdAt < b.createdAt ? 1 : -1; }).slice(0, 8).map(function (c) {
@@ -380,11 +381,30 @@ function pageProject(id) {
 }
 
 /* ---------- People ---------- */
+function activate(u, role) {
+  u.role = role || u.role || "Member"; u.isActive = true; u.pendingActivation = false; u.declined = false; u.activatedBy = me().id; u.activatedAt = nowISO();
+  save(); toast(tr("{n} can sign in now, as {r}", { n: u.fullName, r: tr(u.role) })); render();
+}
+function pendingPanel() {
+  var list = db.users.filter(function (u) { return u.pendingActivation && !u.declined; });
+  if (!list.length || !can.managePeople()) return null;
+  return h("section", { class: "card pad pending", style: { marginBottom: "16px" } },
+    h("h2", null, tr("Waiting for activation") + " ", h("span", { class: "chip amber" }, list.length)),
+    h("p", { class: "muted small", style: { marginTop: 0 } }, tr("These {d} accounts signed in for the first time. Pick a role and let them in — External for outsourced finance, HR or contractors who should see only their own tasks.", { d: DOMAIN })),
+    list.map(function (u) {
+      var sid = "act-role-" + u.id;
+      return h("div", { class: "list-item static wrap" }, avatar(u.id),
+        h("div", { class: "grow" }, h("b", null, u.fullName), h("div", { class: "muted small" }, [u.email, u.jobTitle, u.department, u.employment === "Outsourced" ? tr("Outsourced") : "", fmtWhen(u.requestedAt || nowISO())].filter(Boolean).join(" · "))),
+        h("select", { id: sid, class: "f", style: { width: "auto" }, "aria-label": tr("Role for {n}", { n: u.fullName }) }, ROLES.map(function (r) { return h("option", { value: r, selected: r === (u.employment === "Outsourced" ? "External" : "Member") }, tr(r)); })),
+        h("button", { class: "btn sm primary", onclick: function () { activate(u, document.getElementById(sid).value); } }, icon("check"), tr("Activate")),
+        h("button", { class: "btn sm danger", onclick: function () { confirmBox(tr("Decline {n}?", { n: u.fullName }), tr("They stay out of Taskana. You can still activate them later from People."), tr("Decline"), function () { u.pendingActivation = false; u.isActive = false; u.declined = true; save(); render(); }); } }, tr("Decline")));
+    }));
+}
 function pagePeople() {
   return {
     title: tr("People"), crumbs: tr("Anyone in the company can be assigned a task"),
     actions: can.managePeople() ? h("button", { class: "btn primary", onclick: function () { openModal({ kind: "person" }); } }, icon("plus"), tr("Person")) : null,
-    body: h("div", { class: "tbl-wrap" }, h("table", { class: "t" },
+    body: [pendingPanel(), h("div", { class: "tbl-wrap" }, h("table", { class: "t" },
       h("caption", { class: "sr" }, tr("People")),
       h("thead", null, h("tr", null, [["Name"], ["Title"], ["Department"], ["Role"], ["Open", 1], ["In review", 1], ["Overdue", 1], ["Done", 1]].map(function (x) { return h("th", { class: x[1] ? "num" : "" }, tr(x[0])); }))),
       h("tbody", null, db.users.map(function (u) {
@@ -392,11 +412,13 @@ function pagePeople() {
         var open = ts.filter(function (t) { return t.status !== "Done"; });
         var od = open.filter(isOverdue).length;
         return h("tr", clickable({ class: "click" + (u.isActive ? "" : " inactive"), role: "row" }, function () { go("people/" + u.id); }),
-          h("td", null, h("span", { class: "row nowrap" }, avatar(u.id), h("span", null, u.fullName, u.isActive ? null : h("span", { class: "chip", style: { marginInlineStart: "6px" } }, tr("Inactive")), h("div", { class: "muted small" }, u.email)))),
+          h("td", null, h("span", { class: "row nowrap" }, avatar(u.id), h("span", null, u.fullName,
+            u.pendingActivation && !u.declined ? h("span", { class: "chip amber", style: { marginInlineStart: "6px" } }, tr("Pending")) : u.isActive ? null : h("span", { class: "chip", style: { marginInlineStart: "6px" } }, tr("Inactive")),
+            u.employment === "Outsourced" ? h("span", { class: "chip teal", style: { marginInlineStart: "6px" } }, tr("Outsourced")) : null, h("div", { class: "muted small" }, u.email)))),
           h("td", null, u.jobTitle), h("td", null, u.department), h("td", null, tr(u.role || "Member")), h("td", { class: "num" }, open.length),
           h("td", { class: "num" }, open.filter(function (t) { return /Review/.test(t.status); }).length),
           h("td", { class: "num" + (od ? " overdue" : "") }, od), h("td", { class: "num" }, ts.length - open.length));
-      }))))
+      }))))]
   };
 }
 function pagePerson(id) {
@@ -413,6 +435,10 @@ function pagePerson(id) {
           return g.length ? [h("h3", { style: { marginTop: "12px" } }, tr(s.k) + " (" + g.length + ")"), g.map(taskRow)] : null;
         }), ts.length ? null : h("div", { class: "empty" }, tr("No tasks assigned."))),
       h("section", { class: "card pad", style: { alignSelf: "start" } }, h("div", { class: "row", style: { marginBottom: "12px" } }, avatar(u.id, true), h("div", null, h("b", null, u.fullName), h("div", { class: "muted small" }, u.jobTitle))),
-        kv(tr("Email"), h("span", { class: "sel-text" }, u.email)), kv(tr("Department"), u.department), kv(tr("Role"), tr(u.role || "Member")), kv(tr("Status"), u.isActive ? tr("Active") : tr("Inactive"))))
+        kv(tr("Email"), h("span", { class: "sel-text" }, u.email)), kv(tr("Department"), u.department), kv(tr("Reports to"), u.managerId ? userName(u.managerId) : ""),
+        kv(tr("Employment"), tr(u.employment || "Employee")), kv(tr("Role"), tr(u.role || "Member")),
+        kv(tr("Status"), u.pendingActivation && !u.declined ? tr("Waiting for activation") : u.isActive ? tr("Active") : tr("Inactive")),
+        kv(tr("Sign-in"), u.lastSignInAt ? (u.authProvider === "microsoft" ? "Microsoft Entra ID" : tr("Email and password")) + " · " + fmtWhen(u.lastSignInAt) : tr("Hasn't signed in yet")),
+        u.pendingActivation && !u.declined && can.managePeople() ? h("button", { class: "btn primary sm", style: { marginTop: "10px" }, onclick: function () { activate(u, u.employment === "Outsourced" ? "External" : "Member"); } }, icon("check"), tr("Activate")) : null))
   };
 }

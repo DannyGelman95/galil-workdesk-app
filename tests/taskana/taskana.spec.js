@@ -1,9 +1,11 @@
 // End-to-end checks for Taskana's main flows and the QA fixes.
 const { test, expect } = require("@playwright/test");
 
-const open = async (page, route = "home") => {
+const open = async (page, route = "home", userId = "u-danny") => {
   const errors = [];
   page.on("pageerror", e => errors.push(e.message));
+  /* signed in as an Admin (Danny) unless a test says otherwise */
+  await page.addInitScript(id => { localStorage.setItem("galil-taskana-session", JSON.stringify({ userId: id, provider: "password" })); }, userId);
   await page.goto(test.info().project.use.baseURL + "#/" + route);
   await expect(page.locator(".top h1")).toBeVisible();
   return errors;
@@ -13,7 +15,7 @@ const go = (page, route) => page.evaluate(r => { location.hash = "#/" + r; }, ro
 
 test("every page renders without errors", async ({ page }) => {
   const errors = await open(page);
-  for (const r of ["inbox", "my", "board", "tasks", "insights", "clients", "clients/c-iai", "project/p-iai1", "people", "people/u-pm", "view/v-3", "task/RSOM-1"]) {
+  for (const r of ["inbox", "my", "board", "tasks", "insights", "clients", "clients/c-iai", "project/p-iai1", "people", "people/u-danny", "view/v-3", "task/RSOM-1"]) {
     await go(page, r);
     await expect(page.locator(".top h1")).toBeVisible();
   }
@@ -88,12 +90,12 @@ test("on-time shows 0% when nothing was on time", async ({ page }) => {
   await expect(page.locator(".kpi").nth(3).locator(".val")).toHaveText("0%");
 });
 
-test("deactivating the current person switches 'Working as' to an active person", async ({ page }) => {
+test("a deactivated person is shown the no-access screen and can sign out", async ({ page }) => {
   await open(page);
-  await page.evaluate(() => { byId(db.users, "u-pm").isActive = false; save(); render(); });
-  const sel = await page.locator("#working-as").inputValue();
-  expect(sel).not.toBe("u-pm");
-  expect((await store(page)).settings.currentUserId).toBe(sel);
+  await page.evaluate(() => { byId(db.users, "u-danny").isActive = false; save(); render(); });
+  await expect(page.locator(".auth-h")).toHaveText("No access");
+  await page.locator("#pa-out").click();
+  await expect(page.locator("#si-email")).toBeVisible();
 });
 
 test("leaving a saved view clears the filters it applied", async ({ page }) => {
@@ -113,9 +115,9 @@ test("moving a task to another project keeps the old key working", async ({ page
 
 test("deleting a project cleans up saved views that filtered on it", async ({ page }) => {
   await open(page);
-  await page.evaluate(() => { db.views.push({ id: "v-x", name: "SDK only", ownerId: "u-pm", shared: false, mode: "tasks", filters: { projectId: "p-mob1" } }); save(); });
+  await page.evaluate(() => { db.views.push({ id: "v-x", name: "SDK only", ownerId: "u-danny", shared: false, mode: "tasks", filters: { projectId: "p-mob1" } }); save(); });
   await go(page, "project/p-mob1");
-  await page.getByRole("button", { name: "Edit" }).click();
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
   await page.getByRole("button", { name: "Delete" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
   const views = (await store(page)).views;
@@ -157,26 +159,29 @@ test("a card can be moved with its Move menu and with Alt+Arrow", async ({ page 
 
 test("dragging a card with the pointer moves it", async ({ page }) => {
   await open(page, "board");
+  /* the demo board is random, so put the card at the top of its column first */
+  await page.evaluate(() => { db.tasks.find(t => t.id === "t-3").priority = "Critical"; save(); render(); });
   const card = page.locator('[data-task="t-3"]');
+  await card.scrollIntoViewIfNeeded();
   const target = page.locator('[data-drop="Peer Review"]');
   const a = await card.boundingBox(), b = await target.boundingBox();
   await page.mouse.move(a.x + 20, a.y + 20); await page.mouse.down();
   await page.mouse.move(a.x + 60, a.y + 40, { steps: 5 });
-  await page.mouse.move(b.x + 60, b.y + 80, { steps: 10 });
+  await page.mouse.move(b.x + 60, b.y + 30, { steps: 10 });
   await page.mouse.up();
   expect((await store(page)).tasks.find(t => t.id === "t-3").status).toBe("Peer Review");
 });
 
 test("mentions notify by id and show in the inbox", async ({ page }) => {
   await open(page, "task/RSOM-2");
-  await page.fill("#composer", "@Noa");
-  await page.locator(".mention-hint button", { hasText: "Noa Katz" }).click();
+  await page.fill("#composer", "@Shosh");
+  await page.locator(".mention-hint button", { hasText: "Shoshana Axel" }).click();
   await page.locator("#composer").pressSequentially("please check the figures");
   await page.getByRole("button", { name: "Post" }).click();
   const s = await store(page);
   const c = s.comments[s.comments.length - 1];
-  expect(c.body).toContain("@[u-sen]");
-  expect(s.notifications.some(n => n.userId === "u-sen" && n.kind === "mention")).toBe(true);
+  expect(c.body).toContain("@[u-shoshana]");
+  expect(s.notifications.some(n => n.userId === "u-shoshana" && n.kind === "mention")).toBe(true);
 });
 
 test("sub-tasks, links, attachments and recurrence", async ({ page }) => {
@@ -198,6 +203,7 @@ test("sub-tasks, links, attachments and recurrence", async ({ page }) => {
 
 test("bulk actions update several tasks", async ({ page }) => {
   await open(page, "tasks");
+  await page.evaluate(() => { db.tasks.forEach(t => { t.priority = "Medium"; }); save(); render(); });   // demo priorities are random
   const boxes = page.locator("tbody .chk input");
   await boxes.nth(0).check(); await boxes.nth(1).check();
   await page.selectOption("#bulk-priority", "Critical");
@@ -205,8 +211,8 @@ test("bulk actions update several tasks", async ({ page }) => {
 });
 
 test("viewers can't edit tasks", async ({ page }) => {
-  await open(page);
-  await page.evaluate(() => { db.settings.currentUserId = "u-fin"; save(); });
+  await open(page, "home", "u-eitan");
+  await page.evaluate(() => { byId(db.users, "u-eitan").role = "Viewer"; save(); render(); });
   await go(page, "task/RSOM-1");
   await expect(page.locator("#tf-status")).toBeDisabled();
   await expect(page.getByRole("button", { name: "New task" })).toHaveCount(0);
@@ -234,4 +240,175 @@ test("WorkDesk import adds people, clients and projects", async ({ page }) => {
   expect(stats).toEqual({ users: 1, clients: 1, projects: 1 });
   const s = await store(page);
   expect(s.projects.find(p => p.id === "p-wd").key).toMatch(/^[A-Z][A-Z0-9]{1,5}$/);
+});
+
+/* ---------------- sign-in (standalone demo) ---------------- */
+test.describe("sign-in", () => {
+  const fresh = async page => {
+    const errors = [];
+    page.on("pageerror", e => errors.push(e.message));
+    await page.goto(test.info().project.use.baseURL);
+    return errors;
+  };
+  test("only @galiltc.co.il addresses and the right password get in", async ({ page }) => {
+    const errors = await fresh(page);
+    await page.fill("#si-email", "someone@gmail.com"); await page.fill("#si-pw", "GalilTaskana1"); await page.click("#si-go");
+    await expect(page.locator("#si-err")).toContainText("@galiltc.co.il");
+    await page.fill("#si-email", "danny.gelman@galiltc.co.il"); await page.fill("#si-pw", "wrong"); await page.click("#si-go");
+    await expect(page.locator("#si-err")).toContainText("4 attempts left");
+    await page.fill("#si-pw", "GalilTaskana1"); await page.click("#si-go");
+    await expect(page.locator(".top h1")).toContainText("Danny");
+    await expect(page.locator(".who-am-i")).toContainText("Admin");
+    await page.locator("#sign-out").click();
+    await expect(page.locator("#si-email")).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+  test("the simulated Microsoft picker lists the real team", async ({ page }) => {
+    await fresh(page);
+    await page.click("#si-ms");
+    await expect(page.locator(".msacc")).toHaveCount(24);
+    await page.locator(".msacc", { hasText: "Amy di Nardo" }).click();
+    await expect(page.locator(".who-am-i")).toContainText("Amy di Nardo");
+  });
+  test("a new account waits for an Admin, who activates it as External", async ({ page }) => {
+    await fresh(page);
+    await page.getByRole("button", { name: "Request an account" }).click();
+    await page.fill("#fm-fullName", "Outsourced Bookkeeper");
+    await page.fill("#fm-email", "books@galiltc.co.il");
+    await page.selectOption("#fm-employment", "Outsourced");
+    await page.getByRole("button", { name: "Send request" }).click();
+    await expect(page.locator(".auth-h")).toHaveText("Waiting for activation");
+    await page.locator("#pa-out").click();
+    await page.fill("#si-email", "danny.gelman@galiltc.co.il"); await page.fill("#si-pw", "GalilTaskana1"); await page.click("#si-go");
+    await expect(page.locator(".nav button", { hasText: "People" }).locator(".count")).toHaveText("1");
+    await go(page, "people");
+    const u = await page.evaluate(() => db.users.find(x => x.email === "books@galiltc.co.il").id);
+    await expect(page.locator("#act-role-" + u)).toHaveValue("External");
+    await page.locator(".pending .btn.primary").click();
+    await page.evaluate(id => { db.tasks.find(t => t.id === "t-19").assigneeId = id; save(); }, u);
+    await page.locator("#sign-out").click();
+    await page.fill("#si-email", "books@galiltc.co.il"); await page.fill("#si-pw", "GalilTaskana1"); await page.click("#si-go");
+    await expect(page.locator(".nav button", { hasText: "People" })).toHaveCount(0);
+    await go(page, "tasks");
+    await expect(page.locator("tbody tr")).toHaveCount(1);
+    await go(page, "task/RSOM-1");
+    await expect(page.locator(".top h1")).toHaveText("Task not found");
+  });
+});
+
+test("demo data can be removed and filled again without touching real work", async ({ page }) => {
+  await open(page);
+  await page.evaluate(() => { createTask({ projectId: "p-iai1", title: "Real work" }); });
+  await page.evaluate(() => { removeDemo(db); save(); });
+  let s = await store(page);
+  expect(s.tasks.map(t => t.title)).toEqual(["Real work"]);
+  expect(s.users.length).toBe(24);
+  await page.evaluate(() => { addDemo(db); save(); });
+  s = await store(page);
+  expect(s.tasks.length).toBeGreaterThan(30);
+  expect(s.tasks.filter(t => t.title === "Real work").length).toBe(1);
+  expect(new Set(s.tasks.map(t => t.id)).size).toBe(s.tasks.length);
+});
+
+/* ---------------- connected: Microsoft Entra ID + OneDrive, both mocked ---------------- */
+test.describe("Microsoft 365", () => {
+  const fs = require("fs"), path = require("path");
+  const SITE = path.resolve(__dirname, "../../site/taskana");
+  const ORIGIN = "https://taskana.test";
+  const file = () => ({ text: null, etag: null, n: 0, puts: [] });
+
+  async function connect(page, drive, account) {
+    const errors = [];
+    page.on("pageerror", e => errors.push(e.message));
+    await page.route(ORIGIN + "/**", r => {
+      const p = new URL(r.request().url()).pathname.replace(/^\//, "") || "index.html";
+      r.fulfill({ path: path.join(SITE, p) });
+    });
+    const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "*", "Access-Control-Allow-Methods": "*", "Access-Control-Expose-Headers": "*" };
+    const json = (r, status, body) => r.fulfill({ status, headers: Object.assign({ "Content-Type": "application/json" }, cors), body: JSON.stringify(body) });
+    await page.route("https://dl.test/**", r => r.fulfill({ status: 200, headers: cors, body: drive.text }));
+    await page.route("https://graph.microsoft.com/**", async r => {
+      const req = r.request(), url = decodeURIComponent(new URL(req.url()).pathname), m = req.method();
+      if (m === "OPTIONS") return r.fulfill({ status: 204, headers: cors });
+      if (url.endsWith("/me/drive/root:/Taskana")) return json(r, 200, { id: "F", name: "Taskana", webUrl: "https://onedrive.test/Taskana", folder: {}, parentReference: { driveId: "D" } });
+      if (url.endsWith("/children") || url.includes("backups/")) return json(r, 201, { id: "x" });
+      if (url.endsWith("taskana-data.json:/content") && m === "PUT") {
+        const h = req.headers();
+        if ((h["if-match"] && h["if-match"] !== drive.etag) || (h["if-none-match"] === "*" && drive.text)) return json(r, 412, { error: { code: "resourceModified", message: "changed" } });
+        drive.text = req.postData(); drive.etag = "e" + (++drive.n); drive.puts.push(h["if-match"] || "new");
+        return json(r, 200, { id: "data", eTag: drive.etag, size: drive.text.length });
+      }
+      if (url.endsWith("taskana-data.json:")) return drive.text ? json(r, 200, { id: "data", eTag: drive.etag, size: drive.text.length, "@microsoft.graph.downloadUrl": "https://dl.test/data" }) : json(r, 404, { error: { code: "itemNotFound", message: "nope" } });
+      return json(r, 404, { error: { code: "itemNotFound", message: url } });
+    });
+    await page.addInitScript(acc => {
+      localStorage.setItem("galil-taskana-config", JSON.stringify({ entra: { clientId: "11111111-2222-3333-4444-555555555555" }, onedrive: {} }));
+      window.TASKANA_MSAL = function () {
+        this.initialize = () => Promise.resolve();
+        this.handleRedirectPromise = () => Promise.resolve(null);
+        this.getAllAccounts = () => (sessionStorage.getItem("signed-out") ? [] : [acc]);
+        this.setActiveAccount = () => {};
+        this.acquireTokenSilent = () => Promise.resolve({ accessToken: "token" });
+        this.loginRedirect = () => { sessionStorage.removeItem("signed-out"); location.reload(); return Promise.resolve(); };
+        this.logoutRedirect = () => { sessionStorage.setItem("signed-out", "1"); return Promise.resolve(); };
+      };
+    }, account);
+    await page.goto(ORIGIN + "/index.html");
+    return errors;
+  }
+  const danny = { username: "danny.gelman@galiltc.co.il", name: "Danny Gelman", localAccountId: "oid-danny", idTokenClaims: { tid: "t" } };
+
+  test("first sign-in sets up the OneDrive file; the person who did it is Admin", async ({ page }) => {
+    const drive = file();
+    const errors = await connect(page, drive, danny);
+    await expect(page.locator(".auth-h")).toHaveText("Set up Taskana");
+    await page.getByRole("button", { name: "Start with the team and demo tasks" }).click();
+    await expect(page.locator(".top h1")).toContainText("Danny");
+    await expect.poll(() => drive.text && JSON.parse(drive.text).tasks.length).toBeGreaterThan(30);
+    const d = JSON.parse(drive.text);
+    expect(d.settings).toBeUndefined();
+    const u = d.users.find(x => x.email === "danny.gelman@galiltc.co.il");
+    expect(u.role).toBe("Admin"); expect(u.entraId).toBe("oid-danny");
+    await expect(page.locator("#sync-status")).toContainText("Saved to OneDrive");
+    expect(errors).toEqual([]);
+  });
+
+  test("someone else's save in between is merged, not overwritten", async ({ page }) => {
+    const drive = file();
+    await connect(page, drive, danny);
+    await page.getByRole("button", { name: "Start with the GALIL team (no tasks)" }).click();
+    await expect.poll(() => drive.etag).toBe("e1");
+    /* another person changes the file on OneDrive… */
+    const other = JSON.parse(drive.text);
+    other.clients.push({ id: "c-theirs", name: "Their client", code: "THR" });
+    other.users.find(u => u.id === "u-amy").jobTitle = "Senior Technical Writer";
+    drive.text = JSON.stringify(other); drive.etag = "e-other";
+    /* …while we change something else here */
+    await page.evaluate(() => { db.clients.push({ id: "c-mine", name: "My client", code: "MIN" }); byId(db.users, "u-eitan").jobTitle = "Lead Writer"; save(); });
+    await expect.poll(() => JSON.parse(drive.text).clients.map(c => c.id).sort().join()).toBe("c-mine,c-theirs");
+    const d = JSON.parse(drive.text);
+    expect(d.users.find(u => u.id === "u-amy").jobTitle).toBe("Senior Technical Writer");
+    expect(d.users.find(u => u.id === "u-eitan").jobTitle).toBe("Lead Writer");
+    expect(await page.evaluate(() => db.clients.length)).toBe(2);
+  });
+
+  test("an unknown company account waits for activation; other domains are refused", async ({ page }) => {
+    const drive = file();
+    drive.text = JSON.stringify(Object.assign({ app: "galil-taskana", version: 2, rosterVersion: 1, clients: [], projects: [], tasks: [], comments: [], activity: [], views: [], notifications: [], attachments: [] }, { users: [{ id: "u-danny", fullName: "Danny Gelman", email: "danny.gelman@galiltc.co.il", role: "Admin", isActive: true }] }));
+    drive.etag = "e0";
+    await connect(page, drive, { username: "hr.outsourced@galiltc.co.il", name: "Outsourced HR", localAccountId: "oid-hr" });
+    await expect(page.locator(".auth-h")).toHaveText("Waiting for activation");
+    await expect.poll(() => JSON.parse(drive.text).users.some(u => u.email === "hr.outsourced@galiltc.co.il" && u.pendingActivation)).toBe(true);
+    /* an Admin activates them elsewhere; "Check again" lets them in */
+    const d = JSON.parse(drive.text); const u = d.users.find(x => x.email === "hr.outsourced@galiltc.co.il");
+    Object.assign(u, { pendingActivation: false, isActive: true, role: "External" }); drive.text = JSON.stringify(d); drive.etag = "e-admin";
+    await page.getByRole("button", { name: "Check again" }).click();
+    await expect(page.locator(".who-am-i")).toContainText("External");
+  });
+
+  test("accounts outside @galiltc.co.il are refused", async ({ page }) => {
+    await connect(page, file(), { username: "someone@gmail.com", name: "Someone", localAccountId: "x" });
+    await expect(page.locator(".banner.err")).toContainText("@galiltc.co.il");
+    await expect(page.locator("#si-ms")).toBeVisible();
+  });
 });

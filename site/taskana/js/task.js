@@ -196,7 +196,7 @@ function linksSection(t, ro) {
     } },
       h("select", { id: "link-type", class: "f", style: { width: "auto" }, "aria-label": tr("Link type") }, LINK_TYPES.map(function (x) { return h("option", { value: x }, tr(x)); })),
       h("input", { id: "link-key", class: "f", list: "task-keys", placeholder: tr("Task key, e.g. RSOM-4"), "aria-label": tr("Task key"), style: { flex: 1, minWidth: "120px" } }),
-      h("datalist", { id: "task-keys" }, db.tasks.filter(function (x) { return x.id !== t.id; }).slice(0, 300).map(function (x) { return h("option", { value: taskKey(x) }, x.title); })),
+      h("datalist", { id: "task-keys" }, visibleTasks().filter(function (x) { return x.id !== t.id; }).slice(0, 300).map(function (x) { return h("option", { value: taskKey(x) }, x.title); })),
       h("button", { class: "btn sm" }, tr("Link"))))];
 }
 
@@ -205,6 +205,17 @@ function attachmentsSection(t, ro) {
   var list = attachmentsOf(t.id);
   var addFile = function (file) {
     if (!file) return;
+    if (Store.remote) {
+      /* connected: the file goes to the attachments folder on OneDrive */
+      if (file.size > MAX_ONEDRIVE_ATTACHMENT) { toast(tr("“{n}” is {s}. Files up to 50 MB can be attached — add a link to larger files instead.", { n: file.name, s: fmtBytes(file.size) })); return; }
+      var id = uid("at");
+      toast(tr("Uploading “{n}” to OneDrive…", { n: file.name }));
+      uploadAttachment(file, id).then(function (it) {
+        db.attachments.push({ id: id, taskId: t.id, kind: "file", name: file.name, size: file.size, type: file.type, driveId: (it.parentReference || {}).driveId, driveItemId: it.id, url: it.webUrl, addedBy: me().id, at: nowISO() });
+        log(t.id, "attach", { field: file.name }); t.updatedAt = nowISO(); save(); toast(tr("“{n}” attached", { n: file.name })); refreshUI();
+      }, function (e) { toast(tr("Couldn't upload “{n}”: {m}", { n: file.name, m: e.message })); });
+      return;
+    }
     if (file.size > MAX_ATTACHMENT_BYTES) { toast(tr("“{n}” is {s}. Files up to 1 MB can be stored here — add a link to larger files instead.", { n: file.name, s: fmtBytes(file.size) })); return; }
     var r = new FileReader();
     r.onload = function () {
@@ -220,9 +231,10 @@ function attachmentsSection(t, ro) {
       var mayRemove = !ro && (a.addedBy === me().id || isManager());
       return h("div", { class: "list-item static" }, icon(a.kind === "link" ? "link" : "clip"),
         a.kind === "link" ? h("a", { href: a.url, target: "_blank", rel: "noopener noreferrer", class: "grow ellipsis" }, a.name || a.url)
+          : a.driveItemId ? h("a", { href: a.url, target: "_blank", rel: "noopener noreferrer", class: "grow ellipsis", title: tr("Opens in OneDrive") }, a.name)
           : h("a", { href: a.data, download: a.name, class: "grow ellipsis" }, a.name),
         h("span", { class: "muted small" }, (a.kind === "file" ? fmtBytes(a.size) + " · " : "") + userName(a.addedBy)),
-        mayRemove ? h("button", { class: "x sm", "aria-label": tr("Remove {n}", { n: a.name }), onclick: function () { db.attachments = db.attachments.filter(function (x) { return x !== a; }); save(); render(); } }, icon("x")) : null);
+        mayRemove ? h("button", { class: "x sm", "aria-label": tr("Remove {n}", { n: a.name }), onclick: function () { db.attachments = db.attachments.filter(function (x) { return x !== a; }); deleteAttachmentFile(a); save(); render(); } }, icon("x")) : null);
     }) : h("div", { class: "muted small" }, tr("Nothing attached. Link to drafts, source documents or SME notes, or attach a small file.")),
     ro ? null : h("form", { class: "row wrap", style: { marginTop: "6px" }, onsubmit: function (e) {
       e.preventDefault();

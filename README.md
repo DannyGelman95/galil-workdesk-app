@@ -99,11 +99,74 @@ See `site-mui/README.md` for the app's structure and stack.
 
 Taskana, by GALIL, is a Jira-style project and task tracker built for
 technical-writing teams. It is a static app with no build step: open
-`site/taskana/index.html` directly or serve the folder. It makes no network
-requests (fonts are bundled). Data lives in the browser's `localStorage` (key
-`galil-taskana-v1`; data saved under the app's earlier name, Folio, is picked up
-automatically). There is no backend or real sign-in yet: pick who you're working
-as at the bottom of the sidebar.
+`site/taskana/index.html` directly or serve the folder. It runs in one of two
+modes, set in `site/taskana/config.js`:
+
+- **Standalone demo** (no Entra client ID, the default): sign in like WorkDesk —
+  a simulated "Sign in with Microsoft" account picker, or a company email and the
+  demo password `GalilTaskana1`. Only `@galiltc.co.il` addresses get in; five wrong
+  passwords lock an address for 15 minutes. Data lives in the browser's
+  `localStorage` (key `galil-taskana-v1`) and nothing leaves the browser.
+- **Microsoft 365** (Entra client ID filled in): "Sign in with Microsoft" and
+  "Sign in with your email" both go through **Microsoft Entra ID** (MSAL, bundled in
+  `js/vendor/`); the password is typed on Microsoft's page, the company MFA policy
+  applies, and only `@galiltc.co.il` accounts (and, if set, the GALIL tenant) are
+  accepted. The data lives as **files in a OneDrive folder** instead of a database:
+
+  ```
+  <Taskana folder on OneDrive>/
+    taskana-data.json            the shared data everyone reads and writes
+    attachments/<id>-<name>      files attached to tasks (up to 50 MB each)
+    backups/taskana-<date>.json  a copy of the data, once a day
+  ```
+
+  Every save uploads `taskana-data.json` with its eTag; if someone saved in
+  between, their version is downloaded and merged record by record (field by
+  field when both changed the same record) before saving again. Other people's
+  changes appear within 30 seconds, or at once when the tab is focused. A copy is
+  cached in the browser so Taskana opens instantly and keeps working offline;
+  pending changes upload when the connection returns.
+
+**Accounts and permissions.** The team in `js/seed.js` (`TEAM`) is the real GALIL
+roster with company emails, managers and roles: Tamir Nisman, Inon Kanner and
+Danny Gelman are Admins, the client managers are Managers, writers are Members.
+Anyone else with a `@galiltc.co.il` account who signs in is added as **Pending
+activation**; an Admin lets them in from **People** and picks a role. The roles:
+Admin (everything), Manager (clients, projects, any task), Member (tasks),
+**External** (outsourced finance, HR or contractors: only the tasks they're
+assigned, reported or mentioned in; no Clients, People or Insights), Viewer (read
+and comment). People also carry *Employment* (Employee / Outsourced) and *Reports
+to*. Admins can add an outsourced person ahead of time with their company email;
+their first Microsoft sign-in then goes straight in with that role. External is
+enforced by the app; anyone who can open the OneDrive folder itself can read the
+raw data file, so share the folder only with GALIL accounts.
+
+**Demo data.** **⇅ Data → Demo data** (Admins) fills Taskana with made-up clients,
+projects and tasks — random each time — assigned to the real team, removes them
+again (demo records are flagged, real work is left alone), or resets everything.
+The first person to open an empty OneDrive folder chooses between the team only,
+the team plus demo tasks, or a backup file, and becomes its first Admin.
+
+### Taskana → Microsoft 365 setup
+
+1. **Register the app** in the Microsoft Entra admin center → App registrations →
+   New registration: name *Taskana*, *Accounts in this organizational directory
+   only*, redirect URI platform **Single-page application** with Taskana's address,
+   e.g. `https://<user>.github.io/<repo>/taskana/index.html` (the sign-in screen's
+   *Microsoft 365 connection…* dialog shows the exact value). Under API
+   permissions add Microsoft Graph delegated **User.Read** and
+   **Files.ReadWrite.All** (grant admin consent so people aren't asked one by one).
+2. **Make the folder**: create a `Taskana` folder in OneDrive (or a SharePoint
+   document library), share it with *People in GALIL* with **edit** rights, and
+   copy the link. (Or leave the link empty, sign in, and use **⇅ Data → Share
+   folder and copy link**, which shares the `Taskana` folder in your own OneDrive.)
+3. **Fill in `site/taskana/config.js`**: `entra.clientId`, `entra.tenantId` and
+   `onedrive.folderLink`, then push to `main`. To try settings out first in one
+   browser, use *Microsoft 365 connection…* on the sign-in screen.
+4. Open Taskana, sign in, and choose how to start.
+
+Microsoft sign-in needs Taskana served over https (GitHub Pages is fine), not
+opened as a file.
 
 ```
 site/taskana/
@@ -112,8 +175,15 @@ site/taskana/
   fonts/            Noto Sans, Noto Sans Hebrew, Noto Sans Mono (OFL), bundled.
   js/i18n.js        tr() and date formatting; English is the key.
   js/he.js          Hebrew strings.
-  js/core.js        Data model, storage, permissions, history, notifications,
-                    mentions, WorkDesk import, demo data.
+  config.js         Deployment settings: Entra app registration, OneDrive folder.
+  js/vendor/        MSAL (Microsoft Authentication Library for JS, MIT).
+  js/core.js        Data model, local storage, permissions, history,
+                    notifications, mentions, WorkDesk import.
+  js/seed.js        The GALIL team and the random demo-data generator.
+  js/storage.js     OneDrive files through Microsoft Graph: load, save with
+                    eTags, three-way merge, polling, attachments, backups.
+  js/auth.js        Sign-in (Entra ID / email / demo), pending activation,
+                    the Microsoft 365 connection dialog.
   js/ui.js          DOM helper, icons, routing, shell, filters, dialogs,
                     pointer drag-and-drop.
   js/pages.js       Overview, Inbox, My work, Board, All tasks, Clients,
@@ -149,12 +219,14 @@ tests/taskana/      Playwright browser tests (npm test), run in CI by
   answer rate; weekly or monthly opened-vs-closed (weeks start on Sunday), work
   by stage, per-person table, project completion, closed work by type.
 - **Roles:** Admin (everything), Manager (clients, projects, any task), Member
-  (tasks), Viewer (read and comment).
+  (tasks), External (outsourced staff: their own tasks only), Viewer (read and
+  comment).
 - **English / Hebrew** with a right-to-left layout, light/dark theme, phone
   layout, keyboard access and screen-reader labels.
 - **⇅ Data:** JSON backup, validated restore with undo, CSV export (safe to
-  open in Excel), import of people/clients/projects from WorkDesk, reset to
-  demo data, storage meter.
+  open in Excel), import of people/clients/projects from WorkDesk, fill / remove
+  / reset demo data, OneDrive folder and sync status (or the storage meter in the
+  standalone demo).
 
 ## The app (`site/app/`)
 
