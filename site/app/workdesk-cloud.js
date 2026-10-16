@@ -453,6 +453,40 @@ var WDCloud = (function () {
       go();
     }, function (e) { api.signInError = e.message; mount(); });
   };
+  /* try other settings in this browser only (config.js stays the default for everyone) */
+  api.showConfig = function () {
+    var g = C.github, here = location.origin + location.pathname;
+    var field = function (id, label, value, ph) {
+      return el("label", { style: "display:grid;gap:4px;font-size:12.5px;color:var(--muted)" }, label,
+        el("input", { id: id, value: value || "", placeholder: ph || "", style: "min-height:36px;border:1px solid var(--line);border-radius:9px;padding:6px 10px;font:13px system-ui;background:var(--surface);color:var(--ink)" }));
+    };
+    var sel = el("select", { id: "cx-storage", style: "min-height:36px;border:1px solid var(--line);border-radius:9px;padding:6px 10px;background:var(--surface);color:var(--ink)" });
+    [["local", "This browser only (demo)"], ["github", "A data file in a GitHub repository"], ["onedrive", "A OneDrive folder (needs Microsoft Entra ID)"]].forEach(function (o) { var op = el("option", { value: o[0] }, o[1]); if (STORAGE === o[0]) op.selected = true; sel.appendChild(op); });
+    var v = function (id) { return document.getElementById(id).value.trim(); };
+    var box = el("div", { style: "position:fixed;inset:0;z-index:950;background:rgba(10,20,10,.45);display:grid;place-items:center;padding:16px;overflow:auto", onclick: function (e) { if (e.target === box) box.remove(); } },
+      el("div", { class: "authcard", style: "display:grid;gap:10px" },
+        el("div", { class: "h3" }, "Connection settings"),
+        el("div", { class: "cap" }, "Where WorkDesk keeps its data and how people sign in. config.js sets this for everyone; what you save here applies to this browser only."),
+        el("label", { style: "display:grid;gap:4px;font-size:12.5px;color:var(--muted)" }, "Data location", sel),
+        field("cx-repo", "GitHub repository (owner/name)", g.owner && g.repo ? g.owner + "/" + g.repo : "", "DannyGelman95/galil-workdesk-app"),
+        field("cx-branch", "GitHub branch for the data", g.branch, "workdesk-data"),
+        field("cx-client", "Microsoft Entra application (client) ID", C.entra.clientId, "00000000-0000-0000-0000-000000000000"),
+        field("cx-tenant", "Directory (tenant) ID", C.entra.tenantId, "optional"),
+        field("cx-folder", "OneDrive folder link", C.onedrive.folderLink, "https://galiltc-my.sharepoint.com/:f:/…"),
+        el("div", { class: "cap" }, "Redirect URI to register (Single-page application): " + here),
+        el("div", { style: "display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end" },
+          C.override ? el("button", { class: "btn d sm", onclick: function () { api.setConfig(null); } }, "Use config.js") : null,
+          el("button", { class: "btn sm", onclick: function () { box.remove(); } }, "Cancel"),
+          el("button", { class: "btn p sm", onclick: function () {
+            var guid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, id = v("cx-client"), ten = v("cx-tenant"), st = sel.value, rp = v("cx-repo").split("/");
+            if (id && !guid.test(id)) return alert("The client ID is a GUID like 00000000-0000-0000-0000-000000000000.");
+            if (ten && !guid.test(ten)) return alert("The tenant ID is a GUID like 00000000-0000-0000-0000-000000000000.");
+            if (st === "onedrive" && !id) return alert("OneDrive needs the Microsoft Entra application ID.");
+            if (st === "github" && rp.length !== 2) return alert("Enter the repository as owner/name.");
+            api.setConfig({ storage: st, entra: { clientId: id, tenantId: ten }, onedrive: { folderLink: v("cx-folder") }, github: { owner: rp[0] || "", repo: rp[1] || "", branch: v("cx-branch") || "workdesk-data", path: g.path } });
+          } }, "Save and reload"))));
+    document.body.appendChild(box);
+  };
   api.domainOK = domainOK;
   api.setConfig = function (o) { try { if (o) localStorage.setItem(CONFIG_KEY, JSON.stringify(o)); else localStorage.removeItem(CONFIG_KEY); } catch (e) {} location.reload(); };
   return api;

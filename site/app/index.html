@@ -19462,7 +19462,8 @@ function SignIn(p) {
             WDCloud.entra ? null : h("div", { className: "cap", style: { marginTop: 8, background: C.wash, padding: "7px 9px", borderRadius: 9 } },
               h("b", null, "Demo accounts"), " — password ", h("span", { className: "mono" }, "GalilWorkdesk1"), ". Try ",
               h("span", { className: "mono" }, "danny.gelman" + DOMAIN), " (Project Manager) or ",
-              h("span", { className: "mono" }, "eitan.f" + DOMAIN), " (Employee)."))));
+              h("span", { className: "mono" }, "eitan.f" + DOMAIN), " (Employee)."),
+            h("div", { style: { textAlign: "center", marginTop: 6 } }, h(Btn, { kind: "t", sm: true, onClick: function () { WDCloud.showConfig(); } }, "Connection settings…")))));
 }
 
 /* ---------------- §6.2 four-step sign-up wizard ---------------- */
