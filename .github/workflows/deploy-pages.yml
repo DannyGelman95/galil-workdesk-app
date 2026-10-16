@@ -42,7 +42,7 @@ jobs:
           npm run build
 
       # The published site is the Material UI build (site-mui/dist) at the
-      # root, with the WorkDesk app, Handbook, Knowledge Base and Taskana — unrelated static
+      # root, with the WorkDesk app, Handbook, Knowledge Base, Taskana and the install guide — unrelated static
       # products that live under site/ — carried over unchanged.
       - name: Assemble the published site
         run: |
@@ -53,6 +53,7 @@ jobs:
           cp -r site/handbook pages-dist/handbook
           cp -r site/kb pages-dist/kb
           cp -r site/taskana pages-dist/taskana
+          cp -r site/install pages-dist/install
 
       - name: Upload pages artifact
         uses: actions/upload-pages-artifact@v3

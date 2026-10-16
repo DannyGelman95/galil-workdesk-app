@@ -52,6 +52,11 @@ site/                     The other two products published to GitHub Pages
     index.html              Taskana — Jira-style project & task tracker for
                            the technical-writing teams. Standalone (see
                            "Taskana" below).
+  install/
+    index.html              "Install on your phone" guide for WorkDesk and
+                           Taskana (iPhone, Android, computer), with QR codes.
+                           Both apps are installable web apps: each has a
+                           manifest.webmanifest and an icons/ folder.
 archive/                  Superseded builds, kept for reference.
   GALIL-WorkDesk-v6.html
   galil-workdesk-dev-cdn-build.html
