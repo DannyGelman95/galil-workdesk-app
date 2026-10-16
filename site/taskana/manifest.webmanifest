@@ -2,7 +2,7 @@
   "name": "Taskana",
   "short_name": "Taskana",
   "description": "GALIL project and task tracker.",
-  "id": "./index.html",
+  "id": "/galil-taskana",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

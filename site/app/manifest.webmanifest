@@ -2,7 +2,7 @@
   "name": "GALIL WorkDesk",
   "short_name": "WorkDesk",
   "description": "GALIL time, planning, tasks and budgets.",
-  "id": "./index.html",
+  "id": "/galil-workdesk",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
