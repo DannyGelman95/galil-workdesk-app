@@ -115,6 +115,12 @@ test("a work order carries its document fields and downloads as a branded PDF", 
   expect(dl.suggestedFilename()).toBe("GALIL-" + wo.code + ".pdf");
   const bytes = fs.readFileSync(await dl.path());
   expect(bytes.slice(0, 5).toString()).toBe("%PDF-");
+  await doc.getByRole("button", { name: "עברית" }).click();
+  await expect(doc.getByRole("button", { name: "עברית" })).toHaveAttribute("aria-pressed", "true");
+  await expect(doc.locator("iframe.wodoc")).toBeVisible();
+  const [he] = await Promise.all([page.waitForEvent("download"), doc.getByRole("button", { name: "Download PDF" }).click()]);
+  expect(he.suggestedFilename()).toBe("GALIL-" + wo.code + "-HE.pdf");
+  expect(fs.readFileSync(await he.path()).slice(0, 5).toString()).toBe("%PDF-");
   expect(errors).toEqual([]);
 });
 
