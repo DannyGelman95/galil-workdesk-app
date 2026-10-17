@@ -7,7 +7,8 @@ const data = page => page.evaluate(() => JSON.parse(localStorage.getItem("galil-
 const local = async page => {
   const errors = [];
   page.on("pageerror", e => errors.push(e.message));
-  await page.addInitScript(() => localStorage.setItem("galil-workdesk-config", JSON.stringify({ storage: "local" })));
+  /* the work order preview is a blob: frame, where storage is off limits */
+  await page.addInitScript(() => { try { localStorage.setItem("galil-workdesk-config", JSON.stringify({ storage: "local" })); } catch (e) {} });
   await page.goto(test.info().project.use.baseURL);
   await expect(page.locator("#si-email")).toBeVisible();
   return errors;
@@ -49,6 +50,72 @@ test("demo data can be removed and filled again; real records stay", async ({ pa
   expect(r.after.demo).toBe(false);
   expect(r.refilled).toBeGreaterThan(300);
   expect(r.demo).toBe(true);
+});
+
+test("Back retraces tabs and Management sections, closing an open window first", async ({ page }) => {
+  const errors = await local(page);
+  await signIn(page, "tamir@galiltc.co.il");
+  const back = page.getByRole("button", { name: "Back", exact: true });
+  await expect(back).toBeDisabled();
+  await page.getByRole("tab", { name: "Management" }).click();
+  await page.getByRole("button", { name: "Clients", exact: true }).click();
+  await page.getByRole("tab", { name: "Dashboard" }).click();
+  await page.getByRole("button", { name: "System administration" }).click();
+  await page.keyboard.press("Alt+ArrowLeft");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await back.click();
+  await expect(page.getByRole("tab", { name: "Management" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("button", { name: "Clients", exact: true })).toHaveClass(/on/);
+  await page.keyboard.press("Alt+ArrowLeft");
+  await expect(page.getByRole("button", { name: "People", exact: true })).toHaveClass(/on/);
+  await back.click();
+  await expect(page.getByRole("tab", { name: "Time Log" })).toHaveAttribute("aria-selected", "true");
+  await expect(back).toBeDisabled();
+  expect(errors).toEqual([]);
+});
+
+test("email addresses copy to the clipboard when clicked", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  const errors = await local(page);
+  await signIn(page, "tamir@galiltc.co.il");
+  await page.getByRole("tab", { name: "Management" }).click();
+  await page.getByRole("button", { name: "Copy inon.kanner@galiltc.co.il" }).click();
+  await expect(page.getByText("inon.kanner@galiltc.co.il copied to the clipboard.")).toBeVisible();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("inon.kanner@galiltc.co.il");
+  expect(errors).toEqual([]);
+});
+
+test("a work order carries its document fields and downloads as a branded PDF", async ({ page }) => {
+  const errors = await local(page);
+  await signIn(page, "tamir@galiltc.co.il");
+  await page.getByRole("tab", { name: "Management" }).click();
+  await page.getByRole("button", { name: "Work Orders", exact: true }).click();
+  await page.getByRole("button", { name: "+ New work order" }).click();
+  const dlg = page.getByRole("dialog", { name: "New work order" });
+  await dlg.locator("select").first().selectOption({ index: 2 });
+  await dlg.locator("#wo-title").fill("Operator manual — release 4");
+  await dlg.getByLabel("Scope of work").fill("Write and lay out the operator manual for release 4.");
+  await dlg.getByLabel("Deliverables — one per line").fill("Operator manual, EN\nQuick-start card");
+  await dlg.getByRole("button", { name: "+ Add contact" }).click();
+  await dlg.getByLabel("Contact name").last().fill("Ruth Levi");
+  await dlg.getByLabel("Contact email").last().fill("ruth@client.example");
+  await dlg.getByLabel("Client signatory", { exact: true }).fill("Ruth Levi");
+  await dlg.getByRole("button", { name: "Save work order" }).click();
+  const d = await data(page);
+  const wo = d.workOrders.find(w => w.title === "Operator manual — release 4");
+  expect(wo.scope).toContain("release 4");
+  expect(wo.clientContacts.some(c => c.email === "ruth@client.example")).toBe(true);
+  expect(wo.createdBy).toBe("u-tamir");
+
+  await page.getByRole("row", { name: new RegExp(wo.code) }).getByRole("button", { name: "Work order document (PDF)" }).click();
+  const doc = page.getByRole("dialog", { name: "Work order document — " + wo.code });
+  await expect(doc.locator("iframe.wodoc")).toBeVisible();
+  await expect(doc.getByLabel("Send to")).toHaveValue(/ruth@client\.example/);
+  const [dl] = await Promise.all([page.waitForEvent("download"), doc.getByRole("button", { name: "Download PDF" }).click()]);
+  expect(dl.suggestedFilename()).toBe("GALIL-" + wo.code + ".pdf");
+  const bytes = fs.readFileSync(await dl.path());
+  expect(bytes.slice(0, 5).toString()).toBe("%PDF-");
+  expect(errors).toEqual([]);
 });
 
 /* ---------- served over https with the APIs mocked ---------- */
